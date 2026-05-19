@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   Zap, LayoutDashboard, Settings, Bell, Server, Network,
-  ChevronDown, Search, LogOut, Activity, Sun, Battery, Fuel,
+  ChevronDown, Search, LogOut, Sun, Battery, Fuel,
   AlertTriangle, TrendingUp, Globe,
 } from "lucide-react";
 import { useState } from "react";
