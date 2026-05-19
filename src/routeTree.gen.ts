@@ -10,42 +10,176 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppSystemUsersRouteImport } from './routes/_app.system.users'
+import { Route as AppSystemRolesRouteImport } from './routes/_app.system.roles'
+import { Route as AppSystemOrgsRouteImport } from './routes/_app.system.orgs'
+import { Route as AppNotifTemplatesRouteImport } from './routes/_app.notif.templates'
+import { Route as AppNotifConfigsRouteImport } from './routes/_app.notif.configs'
+import { Route as AppIngestProtocolsRouteImport } from './routes/_app.ingest.protocols'
+import { Route as AppIngestGatewaysRouteImport } from './routes/_app.ingest.gateways'
+import { Route as AppIngestComponentsRouteImport } from './routes/_app.ingest.components'
+import { Route as AppDevicesProductsRouteImport } from './routes/_app.devices.products'
+import { Route as AppDevicesListRouteImport } from './routes/_app.devices.list'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSystemUsersRoute = AppSystemUsersRouteImport.update({
+  id: '/system/users',
+  path: '/system/users',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSystemRolesRoute = AppSystemRolesRouteImport.update({
+  id: '/system/roles',
+  path: '/system/roles',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSystemOrgsRoute = AppSystemOrgsRouteImport.update({
+  id: '/system/orgs',
+  path: '/system/orgs',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNotifTemplatesRoute = AppNotifTemplatesRouteImport.update({
+  id: '/notif/templates',
+  path: '/notif/templates',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNotifConfigsRoute = AppNotifConfigsRouteImport.update({
+  id: '/notif/configs',
+  path: '/notif/configs',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppIngestProtocolsRoute = AppIngestProtocolsRouteImport.update({
+  id: '/ingest/protocols',
+  path: '/ingest/protocols',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppIngestGatewaysRoute = AppIngestGatewaysRouteImport.update({
+  id: '/ingest/gateways',
+  path: '/ingest/gateways',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppIngestComponentsRoute = AppIngestComponentsRouteImport.update({
+  id: '/ingest/components',
+  path: '/ingest/components',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDevicesProductsRoute = AppDevicesProductsRouteImport.update({
+  id: '/devices/products',
+  path: '/devices/products',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDevicesListRoute = AppDevicesListRouteImport.update({
+  id: '/devices/list',
+  path: '/devices/list',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
+  '/devices/list': typeof AppDevicesListRoute
+  '/devices/products': typeof AppDevicesProductsRoute
+  '/ingest/components': typeof AppIngestComponentsRoute
+  '/ingest/gateways': typeof AppIngestGatewaysRoute
+  '/ingest/protocols': typeof AppIngestProtocolsRoute
+  '/notif/configs': typeof AppNotifConfigsRoute
+  '/notif/templates': typeof AppNotifTemplatesRoute
+  '/system/orgs': typeof AppSystemOrgsRoute
+  '/system/roles': typeof AppSystemRolesRoute
+  '/system/users': typeof AppSystemUsersRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/': typeof AppIndexRoute
+  '/devices/list': typeof AppDevicesListRoute
+  '/devices/products': typeof AppDevicesProductsRoute
+  '/ingest/components': typeof AppIngestComponentsRoute
+  '/ingest/gateways': typeof AppIngestGatewaysRoute
+  '/ingest/protocols': typeof AppIngestProtocolsRoute
+  '/notif/configs': typeof AppNotifConfigsRoute
+  '/notif/templates': typeof AppNotifTemplatesRoute
+  '/system/orgs': typeof AppSystemOrgsRoute
+  '/system/roles': typeof AppSystemRolesRoute
+  '/system/users': typeof AppSystemUsersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/devices/list': typeof AppDevicesListRoute
+  '/_app/devices/products': typeof AppDevicesProductsRoute
+  '/_app/ingest/components': typeof AppIngestComponentsRoute
+  '/_app/ingest/gateways': typeof AppIngestGatewaysRoute
+  '/_app/ingest/protocols': typeof AppIngestProtocolsRoute
+  '/_app/notif/configs': typeof AppNotifConfigsRoute
+  '/_app/notif/templates': typeof AppNotifTemplatesRoute
+  '/_app/system/orgs': typeof AppSystemOrgsRoute
+  '/_app/system/roles': typeof AppSystemRolesRoute
+  '/_app/system/users': typeof AppSystemUsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/devices/list'
+    | '/devices/products'
+    | '/ingest/components'
+    | '/ingest/gateways'
+    | '/ingest/protocols'
+    | '/notif/configs'
+    | '/notif/templates'
+    | '/system/orgs'
+    | '/system/roles'
+    | '/system/users'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login'
-  id: '__root__' | '/' | '/login'
+  to:
+    | '/login'
+    | '/'
+    | '/devices/list'
+    | '/devices/products'
+    | '/ingest/components'
+    | '/ingest/gateways'
+    | '/ingest/protocols'
+    | '/notif/configs'
+    | '/notif/templates'
+    | '/system/orgs'
+    | '/system/roles'
+    | '/system/users'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/login'
+    | '/_app/'
+    | '/_app/devices/list'
+    | '/_app/devices/products'
+    | '/_app/ingest/components'
+    | '/_app/ingest/gateways'
+    | '/_app/ingest/protocols'
+    | '/_app/notif/configs'
+    | '/_app/notif/templates'
+    | '/_app/system/orgs'
+    | '/_app/system/roles'
+    | '/_app/system/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
   LoginRoute: typeof LoginRoute
 }
 
@@ -58,18 +192,125 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/system/users': {
+      id: '/_app/system/users'
+      path: '/system/users'
+      fullPath: '/system/users'
+      preLoaderRoute: typeof AppSystemUsersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/system/roles': {
+      id: '/_app/system/roles'
+      path: '/system/roles'
+      fullPath: '/system/roles'
+      preLoaderRoute: typeof AppSystemRolesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/system/orgs': {
+      id: '/_app/system/orgs'
+      path: '/system/orgs'
+      fullPath: '/system/orgs'
+      preLoaderRoute: typeof AppSystemOrgsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/notif/templates': {
+      id: '/_app/notif/templates'
+      path: '/notif/templates'
+      fullPath: '/notif/templates'
+      preLoaderRoute: typeof AppNotifTemplatesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/notif/configs': {
+      id: '/_app/notif/configs'
+      path: '/notif/configs'
+      fullPath: '/notif/configs'
+      preLoaderRoute: typeof AppNotifConfigsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/ingest/protocols': {
+      id: '/_app/ingest/protocols'
+      path: '/ingest/protocols'
+      fullPath: '/ingest/protocols'
+      preLoaderRoute: typeof AppIngestProtocolsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/ingest/gateways': {
+      id: '/_app/ingest/gateways'
+      path: '/ingest/gateways'
+      fullPath: '/ingest/gateways'
+      preLoaderRoute: typeof AppIngestGatewaysRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/ingest/components': {
+      id: '/_app/ingest/components'
+      path: '/ingest/components'
+      fullPath: '/ingest/components'
+      preLoaderRoute: typeof AppIngestComponentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/devices/products': {
+      id: '/_app/devices/products'
+      path: '/devices/products'
+      fullPath: '/devices/products'
+      preLoaderRoute: typeof AppDevicesProductsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/devices/list': {
+      id: '/_app/devices/list'
+      path: '/devices/list'
+      fullPath: '/devices/list'
+      preLoaderRoute: typeof AppDevicesListRouteImport
+      parentRoute: typeof AppRoute
     }
   }
 }
 
+interface AppRouteChildren {
+  AppIndexRoute: typeof AppIndexRoute
+  AppDevicesListRoute: typeof AppDevicesListRoute
+  AppDevicesProductsRoute: typeof AppDevicesProductsRoute
+  AppIngestComponentsRoute: typeof AppIngestComponentsRoute
+  AppIngestGatewaysRoute: typeof AppIngestGatewaysRoute
+  AppIngestProtocolsRoute: typeof AppIngestProtocolsRoute
+  AppNotifConfigsRoute: typeof AppNotifConfigsRoute
+  AppNotifTemplatesRoute: typeof AppNotifTemplatesRoute
+  AppSystemOrgsRoute: typeof AppSystemOrgsRoute
+  AppSystemRolesRoute: typeof AppSystemRolesRoute
+  AppSystemUsersRoute: typeof AppSystemUsersRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppIndexRoute: AppIndexRoute,
+  AppDevicesListRoute: AppDevicesListRoute,
+  AppDevicesProductsRoute: AppDevicesProductsRoute,
+  AppIngestComponentsRoute: AppIngestComponentsRoute,
+  AppIngestGatewaysRoute: AppIngestGatewaysRoute,
+  AppIngestProtocolsRoute: AppIngestProtocolsRoute,
+  AppNotifConfigsRoute: AppNotifConfigsRoute,
+  AppNotifTemplatesRoute: AppNotifTemplatesRoute,
+  AppSystemOrgsRoute: AppSystemOrgsRoute,
+  AppSystemRolesRoute: AppSystemRolesRoute,
+  AppSystemUsersRoute: AppSystemUsersRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
