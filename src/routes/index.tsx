@@ -288,7 +288,7 @@ function SparklineChart() {
         <polyline fill="none" stroke="var(--energy-pv)"  strokeWidth="1.8" points={gen(1, 80, 25)} />
         <polyline fill="none" stroke="var(--energy-ess)" strokeWidth="1.8" points={gen(3, 55, 18)} />
         <polyline fill="none" stroke="var(--energy-dg)"  strokeWidth="1.8" points={gen(5, 30, 12)} />
-        <Activity x={w-28} y={8} width={20} height={20} className="text-text-muted" />
+        
       </svg>
     </div>
   );
