@@ -28,6 +28,7 @@ function RolesPage() {
   const [rows, setRows] = useState<Role[]>(initial);
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<{ name: string; org: string }>({ name: "", org: "" });
+  const [editing, setEditing] = useState<Role | null>(null);
   const [permRole, setPermRole] = useState<Role | null>(null);
   const [permSel, setPermSel] = useState<Set<string>>(new Set());
 
