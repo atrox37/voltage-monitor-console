@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Trash2, ChevronDown, ChevronRight } from "lucide-react";
-import { ListPageTemplate } from "@/components/list-page-template";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
 import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
 import { OrgTreeSelect } from "@/components/org-tree-select";
 import { NAV } from "@/lib/nav-config";
+
+export const Route = createFileRoute("/_app/system/roles")({
+  component: RolesPage,
+});
 
 export const Route = createFileRoute("/_app/system/roles")({
   component: RolesPage,
