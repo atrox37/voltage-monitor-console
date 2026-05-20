@@ -232,18 +232,43 @@ export function StatusBadge({
   );
 }
 
+const ROW_ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
+  编辑: Pencil,
+  删除: Trash2,
+  详情: Eye,
+  预览: Eye,
+  导出: Download,
+  启用: Power,
+  停用: Power,
+  禁用: Power,
+  重启: RotateCw,
+  解绑: Link2Off,
+  测试连通: Activity,
+  物模型: Boxes,
+  新增子机构: GitBranch,
+  下发: Send,
+};
+
 export function RowBtn({
-  children, onClick, danger,
-}: { children: ReactNode; onClick?: () => void; danger?: boolean }) {
+  children, onClick, danger, icon: IconProp,
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  danger?: boolean;
+  icon?: ComponentType<{ className?: string }>;
+}) {
+  const label = typeof children === "string" ? children : "";
+  const Icon = IconProp ?? ROW_ICON_MAP[label];
   return (
     <button
       onClick={onClick}
-      className={`mx-0.5 rounded border px-2 py-1 text-xs transition ${
+      className={`mx-0.5 inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition ${
         danger
           ? "border-status-critical/40 text-status-critical hover:bg-status-critical/10"
           : "border-panel-border text-text-secondary hover:border-primary/40 hover:text-primary"
       }`}
     >
+      {Icon && <Icon className="h-3.5 w-3.5" />}
       {children}
     </button>
   );
