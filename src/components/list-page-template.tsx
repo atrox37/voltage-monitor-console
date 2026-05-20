@@ -71,25 +71,25 @@ export function ListPageTemplate<T extends { id: string | number }>({
 
       {/* Filters */}
       {filters.length > 0 && (
-        <div className="vt-glass p-4">
-          <div className="flex flex-wrap items-end gap-4">
+        <div className="vt-glass px-4 py-3">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             {filters.map((f) => (
-              <div key={f.key} className="flex flex-col gap-1.5">
-                <label className="text-[11px] uppercase tracking-wider text-text-secondary">
-                  {f.label}
+              <div key={f.key} className="flex items-center gap-2">
+                <label className="whitespace-nowrap text-xs text-text-secondary">
+                  {f.label}：
                 </label>
                 {f.type === "text" ? (
                   <input
                     value={draft[f.key] ?? ""}
                     onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
                     placeholder={f.placeholder ?? "请输入"}
-                    className="h-9 w-56 rounded-md border border-panel-border bg-background/40 px-3 text-sm text-foreground placeholder:text-text-muted outline-none focus:border-primary/60"
+                    className="h-8 w-52 rounded-md border border-panel-border bg-background/40 px-3 text-sm text-foreground placeholder:text-text-muted outline-none focus:border-primary/60"
                   />
                 ) : (
                   <select
                     value={draft[f.key] ?? ""}
                     onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
-                    className="h-9 w-56 rounded-md border border-panel-border bg-background/40 px-2 text-sm text-foreground outline-none focus:border-primary/60"
+                    className="h-8 w-52 rounded-md border border-panel-border bg-background/40 px-2 text-sm text-foreground outline-none focus:border-primary/60"
                   >
                     <option value="">全部</option>
                     {f.options.map((o) => (
@@ -99,16 +99,17 @@ export function ListPageTemplate<T extends { id: string | number }>({
                 )}
               </div>
             ))}
-            <div className="flex gap-2">
+            <div className="ml-auto flex gap-2">
               <button
                 onClick={applyQuery}
-                className="h-9 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:brightness-110"
+                className="flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:brightness-110"
               >
+                <Search className="h-3.5 w-3.5" />
                 查询
               </button>
               <button
                 onClick={resetQuery}
-                className="flex h-9 items-center gap-1 rounded-md border border-panel-border bg-panel px-3 text-sm text-text-secondary hover:text-foreground"
+                className="flex h-8 items-center gap-1 rounded-md border border-panel-border bg-panel px-3 text-xs text-text-secondary hover:text-foreground"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 重置
