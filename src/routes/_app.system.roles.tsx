@@ -154,6 +154,9 @@ function RolesPage() {
             </VtField>
           </>
         )}
+      </VtDrawer>
+
+
 
       {/* Permission Tree Drawer */}
       <VtDrawer
