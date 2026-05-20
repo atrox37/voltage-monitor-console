@@ -1,5 +1,9 @@
-import { type ReactNode, useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Plus, RotateCcw } from "lucide-react";
+import { type ReactNode, type ComponentType, useState, useMemo } from "react";
+import {
+  ChevronLeft, ChevronRight, Plus, RotateCcw,
+  Pencil, Trash2, Eye, Download, Power, RotateCw, Link2Off, Activity,
+  Boxes, GitBranch, Send, Search,
+} from "lucide-react";
 
 export type Column<T> = {
   key: keyof T | string;
