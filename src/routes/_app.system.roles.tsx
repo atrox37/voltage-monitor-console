@@ -67,6 +67,14 @@ function RolesPage() {
     setDraft({ name: "", org: "" });
   };
 
+  const saveEdit = () => {
+    if (!editing) return;
+    const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+    setRows((rs) => rs.map((r) => (r.id === editing.id ? { ...editing, updatedAt: now } : r)));
+    setEditing(null);
+  };
+
+
   return (
     <>
       <ListPageTemplate<Role>
