@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Trash2, ChevronDown, ChevronRight } from "lucide-react";
-import { ListPageTemplate } from "@/components/list-page-template";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
 import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
 import { OrgTreeSelect } from "@/components/org-tree-select";
 import { NAV } from "@/lib/nav-config";
@@ -9,6 +9,7 @@ import { NAV } from "@/lib/nav-config";
 export const Route = createFileRoute("/_app/system/roles")({
   component: RolesPage,
 });
+
 
 type Role = { id: string; name: string; org: string; updatedAt: string; perms: string[] };
 
@@ -27,6 +28,7 @@ function RolesPage() {
   const [rows, setRows] = useState<Role[]>(initial);
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<{ name: string; org: string }>({ name: "", org: "" });
+  const [editing, setEditing] = useState<Role | null>(null);
   const [permRole, setPermRole] = useState<Role | null>(null);
   const [permSel, setPermSel] = useState<Set<string>>(new Set());
 
@@ -65,6 +67,14 @@ function RolesPage() {
     setDraft({ name: "", org: "" });
   };
 
+  const saveEdit = () => {
+    if (!editing) return;
+    const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+    setRows((rs) => rs.map((r) => (r.id === editing.id ? { ...editing, updatedAt: now } : r)));
+    setEditing(null);
+  };
+
+
   return (
     <>
       <ListPageTemplate<Role>
@@ -90,13 +100,12 @@ function RolesPage() {
         rows={rows}
         onAdd={() => setAddOpen(true)}
         rowActions={(r) => (
-          <button
-            onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}
-            className="rounded border border-panel-border bg-panel p-1.5 text-text-secondary transition hover:border-status-critical/40 hover:text-status-critical"
-            title="删除"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          <>
+            <RowBtn onClick={() => setEditing({ ...r })}>编辑</RowBtn>
+            <RowBtn danger onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}>
+              删除
+            </RowBtn>
+          </>
         )}
       />
 
@@ -120,6 +129,34 @@ function RolesPage() {
           <OrgTreeSelect value={draft.org} onChange={(v) => setDraft({ ...draft, org: v })} />
         </VtField>
       </VtDrawer>
+
+      {/* Edit Role Drawer */}
+      <VtDrawer
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title="编辑角色"
+        footer={
+          <>
+            <VtBtn variant="ghost" onClick={() => setEditing(null)}>关闭</VtBtn>
+            <VtBtn onClick={saveEdit}>保存</VtBtn>
+          </>
+        }
+      >
+        {editing && (
+          <>
+            <VtField label="名称" required>
+              <input className={vtInputCls} value={editing.name}
+                onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+            </VtField>
+            <VtField label="机构" required>
+              <OrgTreeSelect value={editing.org}
+                onChange={(v) => setEditing({ ...editing, org: v })} />
+            </VtField>
+          </>
+        )}
+      </VtDrawer>
+
+
 
       {/* Permission Tree Drawer */}
       <VtDrawer
