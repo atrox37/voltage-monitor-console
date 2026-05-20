@@ -10,9 +10,6 @@ export const Route = createFileRoute("/_app/system/roles")({
   component: RolesPage,
 });
 
-export const Route = createFileRoute("/_app/system/roles")({
-  component: RolesPage,
-});
 
 type Role = { id: string; name: string; org: string; updatedAt: string; perms: string[] };
 
