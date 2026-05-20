@@ -100,13 +100,12 @@ function RolesPage() {
         rows={rows}
         onAdd={() => setAddOpen(true)}
         rowActions={(r) => (
-          <button
-            onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}
-            className="rounded border border-panel-border bg-panel p-1.5 text-text-secondary transition hover:border-status-critical/40 hover:text-status-critical"
-            title="删除"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          <>
+            <RowBtn onClick={() => setEditing({ ...r })}>编辑</RowBtn>
+            <RowBtn danger onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}>
+              删除
+            </RowBtn>
+          </>
         )}
       />
 
