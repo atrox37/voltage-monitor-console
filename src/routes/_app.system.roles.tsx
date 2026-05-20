@@ -130,6 +130,31 @@ function RolesPage() {
         </VtField>
       </VtDrawer>
 
+      {/* Edit Role Drawer */}
+      <VtDrawer
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        title="编辑角色"
+        footer={
+          <>
+            <VtBtn variant="ghost" onClick={() => setEditing(null)}>关闭</VtBtn>
+            <VtBtn onClick={saveEdit}>保存</VtBtn>
+          </>
+        }
+      >
+        {editing && (
+          <>
+            <VtField label="名称" required>
+              <input className={vtInputCls} value={editing.name}
+                onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+            </VtField>
+            <VtField label="机构" required>
+              <OrgTreeSelect value={editing.org}
+                onChange={(v) => setEditing({ ...editing, org: v })} />
+            </VtField>
+          </>
+        )}
+
       {/* Permission Tree Drawer */}
       <VtDrawer
         open={!!permRole}
