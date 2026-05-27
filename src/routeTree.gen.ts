@@ -22,6 +22,7 @@ import { Route as AppIngestGatewaysRouteImport } from './routes/_app.ingest.gate
 import { Route as AppIngestComponentsRouteImport } from './routes/_app.ingest.components'
 import { Route as AppDevicesProductsRouteImport } from './routes/_app.devices.products'
 import { Route as AppDevicesListRouteImport } from './routes/_app.devices.list'
+import { Route as AppDevicesProductsIndexRouteImport } from './routes/_app.devices.products.index'
 import { Route as AppDevicesProductsIdRouteImport } from './routes/_app.devices.products.$id'
 
 const LoginRoute = LoginRouteImport.update({
@@ -88,6 +89,11 @@ const AppDevicesListRoute = AppDevicesListRouteImport.update({
   path: '/devices/list',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDevicesProductsIndexRoute = AppDevicesProductsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppDevicesProductsRoute,
+} as any)
 const AppDevicesProductsIdRoute = AppDevicesProductsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -108,12 +114,12 @@ export interface FileRoutesByFullPath {
   '/system/roles': typeof AppSystemRolesRoute
   '/system/users': typeof AppSystemUsersRoute
   '/devices/products/$id': typeof AppDevicesProductsIdRoute
+  '/devices/products/': typeof AppDevicesProductsIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/': typeof AppIndexRoute
   '/devices/list': typeof AppDevicesListRoute
-  '/devices/products': typeof AppDevicesProductsRouteWithChildren
   '/ingest/components': typeof AppIngestComponentsRoute
   '/ingest/gateways': typeof AppIngestGatewaysRoute
   '/ingest/protocols': typeof AppIngestProtocolsRoute
@@ -123,6 +129,7 @@ export interface FileRoutesByTo {
   '/system/roles': typeof AppSystemRolesRoute
   '/system/users': typeof AppSystemUsersRoute
   '/devices/products/$id': typeof AppDevicesProductsIdRoute
+  '/devices/products': typeof AppDevicesProductsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -140,6 +147,7 @@ export interface FileRoutesById {
   '/_app/system/roles': typeof AppSystemRolesRoute
   '/_app/system/users': typeof AppSystemUsersRoute
   '/_app/devices/products/$id': typeof AppDevicesProductsIdRoute
+  '/_app/devices/products/': typeof AppDevicesProductsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -157,12 +165,12 @@ export interface FileRouteTypes {
     | '/system/roles'
     | '/system/users'
     | '/devices/products/$id'
+    | '/devices/products/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
     | '/'
     | '/devices/list'
-    | '/devices/products'
     | '/ingest/components'
     | '/ingest/gateways'
     | '/ingest/protocols'
@@ -172,6 +180,7 @@ export interface FileRouteTypes {
     | '/system/roles'
     | '/system/users'
     | '/devices/products/$id'
+    | '/devices/products'
   id:
     | '__root__'
     | '/_app'
@@ -188,6 +197,7 @@ export interface FileRouteTypes {
     | '/_app/system/roles'
     | '/_app/system/users'
     | '/_app/devices/products/$id'
+    | '/_app/devices/products/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -288,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDevicesListRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/devices/products/': {
+      id: '/_app/devices/products/'
+      path: '/'
+      fullPath: '/devices/products/'
+      preLoaderRoute: typeof AppDevicesProductsIndexRouteImport
+      parentRoute: typeof AppDevicesProductsRoute
+    }
     '/_app/devices/products/$id': {
       id: '/_app/devices/products/$id'
       path: '/$id'
@@ -300,10 +317,12 @@ declare module '@tanstack/react-router' {
 
 interface AppDevicesProductsRouteChildren {
   AppDevicesProductsIdRoute: typeof AppDevicesProductsIdRoute
+  AppDevicesProductsIndexRoute: typeof AppDevicesProductsIndexRoute
 }
 
 const AppDevicesProductsRouteChildren: AppDevicesProductsRouteChildren = {
   AppDevicesProductsIdRoute: AppDevicesProductsIdRoute,
+  AppDevicesProductsIndexRoute: AppDevicesProductsIndexRoute,
 }
 
 const AppDevicesProductsRouteWithChildren =
