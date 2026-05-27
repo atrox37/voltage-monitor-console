@@ -22,6 +22,7 @@ import { Route as AppIngestGatewaysRouteImport } from './routes/_app.ingest.gate
 import { Route as AppIngestComponentsRouteImport } from './routes/_app.ingest.components'
 import { Route as AppDevicesProductsRouteImport } from './routes/_app.devices.products'
 import { Route as AppDevicesListRouteImport } from './routes/_app.devices.list'
+import { Route as AppDevicesProductsIdRouteImport } from './routes/_app.devices.products.$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -87,12 +88,17 @@ const AppDevicesListRoute = AppDevicesListRouteImport.update({
   path: '/devices/list',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDevicesProductsIdRoute = AppDevicesProductsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppDevicesProductsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/devices/list': typeof AppDevicesListRoute
-  '/devices/products': typeof AppDevicesProductsRoute
+  '/devices/products': typeof AppDevicesProductsRouteWithChildren
   '/ingest/components': typeof AppIngestComponentsRoute
   '/ingest/gateways': typeof AppIngestGatewaysRoute
   '/ingest/protocols': typeof AppIngestProtocolsRoute
@@ -101,12 +107,13 @@ export interface FileRoutesByFullPath {
   '/system/orgs': typeof AppSystemOrgsRoute
   '/system/roles': typeof AppSystemRolesRoute
   '/system/users': typeof AppSystemUsersRoute
+  '/devices/products/$id': typeof AppDevicesProductsIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/': typeof AppIndexRoute
   '/devices/list': typeof AppDevicesListRoute
-  '/devices/products': typeof AppDevicesProductsRoute
+  '/devices/products': typeof AppDevicesProductsRouteWithChildren
   '/ingest/components': typeof AppIngestComponentsRoute
   '/ingest/gateways': typeof AppIngestGatewaysRoute
   '/ingest/protocols': typeof AppIngestProtocolsRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/system/orgs': typeof AppSystemOrgsRoute
   '/system/roles': typeof AppSystemRolesRoute
   '/system/users': typeof AppSystemUsersRoute
+  '/devices/products/$id': typeof AppDevicesProductsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -122,7 +130,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/': typeof AppIndexRoute
   '/_app/devices/list': typeof AppDevicesListRoute
-  '/_app/devices/products': typeof AppDevicesProductsRoute
+  '/_app/devices/products': typeof AppDevicesProductsRouteWithChildren
   '/_app/ingest/components': typeof AppIngestComponentsRoute
   '/_app/ingest/gateways': typeof AppIngestGatewaysRoute
   '/_app/ingest/protocols': typeof AppIngestProtocolsRoute
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/_app/system/orgs': typeof AppSystemOrgsRoute
   '/_app/system/roles': typeof AppSystemRolesRoute
   '/_app/system/users': typeof AppSystemUsersRoute
+  '/_app/devices/products/$id': typeof AppDevicesProductsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/system/orgs'
     | '/system/roles'
     | '/system/users'
+    | '/devices/products/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/system/orgs'
     | '/system/roles'
     | '/system/users'
+    | '/devices/products/$id'
   id:
     | '__root__'
     | '/_app'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/_app/system/orgs'
     | '/_app/system/roles'
     | '/_app/system/users'
+    | '/_app/devices/products/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -276,13 +288,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDevicesListRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/devices/products/$id': {
+      id: '/_app/devices/products/$id'
+      path: '/$id'
+      fullPath: '/devices/products/$id'
+      preLoaderRoute: typeof AppDevicesProductsIdRouteImport
+      parentRoute: typeof AppDevicesProductsRoute
+    }
   }
 }
+
+interface AppDevicesProductsRouteChildren {
+  AppDevicesProductsIdRoute: typeof AppDevicesProductsIdRoute
+}
+
+const AppDevicesProductsRouteChildren: AppDevicesProductsRouteChildren = {
+  AppDevicesProductsIdRoute: AppDevicesProductsIdRoute,
+}
+
+const AppDevicesProductsRouteWithChildren =
+  AppDevicesProductsRoute._addFileChildren(AppDevicesProductsRouteChildren)
 
 interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppDevicesListRoute: typeof AppDevicesListRoute
-  AppDevicesProductsRoute: typeof AppDevicesProductsRoute
+  AppDevicesProductsRoute: typeof AppDevicesProductsRouteWithChildren
   AppIngestComponentsRoute: typeof AppIngestComponentsRoute
   AppIngestGatewaysRoute: typeof AppIngestGatewaysRoute
   AppIngestProtocolsRoute: typeof AppIngestProtocolsRoute
@@ -296,7 +326,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppDevicesListRoute: AppDevicesListRoute,
-  AppDevicesProductsRoute: AppDevicesProductsRoute,
+  AppDevicesProductsRoute: AppDevicesProductsRouteWithChildren,
   AppIngestComponentsRoute: AppIngestComponentsRoute,
   AppIngestGatewaysRoute: AppIngestGatewaysRoute,
   AppIngestProtocolsRoute: AppIngestProtocolsRoute,
