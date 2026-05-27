@@ -159,23 +159,7 @@ function OrgsPage() {
         )}
       </VtDrawer>
 
-      {/* Delete confirm */}
-      <VtDrawer
-        open={!!confirmDelete}
-        onClose={() => setConfirmDelete(null)}
-        title="警告"
-        width={360}
-        footer={
-          <>
-            <VtBtn variant="ghost" onClick={() => setConfirmDelete(null)}>取消</VtBtn>
-            <VtBtn onClick={doDelete} className="bg-status-critical hover:brightness-110">删除</VtBtn>
-          </>
-        }
-      >
-        <p className="text-sm text-text-secondary">
-          确定要删除组织 <span className="font-semibold text-foreground">「{confirmDelete?.label}」</span> 吗？该操作不可恢复。
-        </p>
-      </VtDrawer>
+      {confirmNode}
     </main>
   );
 }
@@ -233,48 +217,29 @@ function NodeCard({
   node: OrgNode;
   onAction: (cmd: "edit" | "members" | "add" | "delete", n: OrgNode) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
   const count = node.children?.length ?? 0;
   return (
-    <div className="vt-glass relative w-52 overflow-hidden">
+    <div className="vt-glass relative w-56 overflow-hidden">
       <div className="bg-primary/15 px-3 py-2 text-center text-sm font-semibold text-primary border-b border-primary/30">
         {node.label}
       </div>
-      <div className="flex items-center justify-between px-3 py-2 text-xs text-text-secondary">
+      <div className="flex items-center justify-between px-3 py-1.5 text-xs text-text-secondary border-b border-panel-border/60">
         <span className="inline-flex items-center gap-1">
           <UsersRound className="h-3 w-3" />
           子节点 <span className="font-mono text-foreground">{count}</span>
         </span>
-        <div ref={ref} className="relative">
-          <button
-            onClick={() => setOpen((o) => !o)}
-            className="rounded p-1 text-text-muted hover:bg-panel hover:text-foreground"
-          >
-            <MoreVertical className="h-3.5 w-3.5" />
-          </button>
-          {open && (
-            <div className="absolute right-0 top-full z-10 mt-1 w-36 overflow-hidden rounded-md border border-panel-border bg-page shadow-xl">
-              <MenuItem icon={Pencil}     label="编辑"       onClick={() => { setOpen(false); onAction("edit", node); }} />
-              <MenuItem icon={UsersRound} label="关联用户"   onClick={() => { setOpen(false); onAction("members", node); }} />
-              <MenuItem icon={Plus}       label="新增子机构" onClick={() => { setOpen(false); onAction("add", node); }} />
-              <div className="border-t border-panel-border" />
-              <MenuItem icon={Trash2}     label="删除" danger onClick={() => { setOpen(false); onAction("delete", node); }} />
-            </div>
-          )}
-        </div>
+      </div>
+      <div className="flex items-stretch divide-x divide-panel-border/60">
+        <IconBtn icon={Pencil}     label="编辑"     onClick={() => onAction("edit", node)} />
+        <IconBtn icon={UsersRound} label="用户"     onClick={() => onAction("members", node)} />
+        <IconBtn icon={Plus}       label="子机构"   onClick={() => onAction("add", node)} />
+        <IconBtn icon={Trash2}     label="删除" danger onClick={() => onAction("delete", node)} />
       </div>
     </div>
   );
 }
 
-function MenuItem({
+function IconBtn({
   icon: Icon, label, onClick, danger,
 }: {
   icon: typeof Pencil;
@@ -285,8 +250,11 @@ function MenuItem({
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition ${
-        danger ? "text-status-critical hover:bg-status-critical/10" : "text-text-secondary hover:bg-panel hover:text-foreground"
+      title={label}
+      className={`flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-[10px] transition ${
+        danger
+          ? "text-text-muted hover:bg-status-critical/10 hover:text-status-critical"
+          : "text-text-muted hover:bg-panel hover:text-primary"
       }`}
     >
       <Icon className="h-3.5 w-3.5" />
