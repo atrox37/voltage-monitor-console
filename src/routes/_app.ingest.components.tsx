@@ -31,10 +31,8 @@ const CONN_MAP = {
   connecting:   { cls: "text-status-warning bg-status-warning/15",   label: "正在连接" },
 } as const;
 
-function Pill({ map, k }: { map: typeof SWITCH_MAP; k: keyof typeof SWITCH_MAP } | { map: typeof CONN_MAP; k: keyof typeof CONN_MAP }) {
-  // @ts-expect-error
-  const s = map[k];
-  return <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] ${s.cls}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{s.label}</span>;
+function Pill({ cls, label }: { cls: string; label: string }) {
+  return <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] ${cls}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{label}</span>;
 }
 
 function NetworkComponentsPage() {
