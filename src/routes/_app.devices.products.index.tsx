@@ -11,7 +11,7 @@ import {
   useProducts,
 } from "@/lib/products-store";
 
-export const Route = createFileRoute("/_app/devices/products")({
+export const Route = createFileRoute("/_app/devices/products/")({
   component: ProductsPage,
 });
 
