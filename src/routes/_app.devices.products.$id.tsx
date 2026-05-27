@@ -324,52 +324,31 @@ function TabMeta({ productId }: { productId: string }) {
       </div>
 
       <div className="flex-1 overflow-auto">
-
       {sub === "prop" ? (
-        <>
-          <MetaTable
-            headers={["标识", "名称", "类型", "单位", "分组"]}
-            rows={filteredProps.map((p) => [
-              <span className="font-mono text-xs text-text-secondary">{p.id}</span>,
-              p.name,
-              p.valueType?.type ?? "—",
-              p.valueType?.unit || "—",
-              propertyTags.find((t) => t.id === p.tagId)?.name ?? <span className="text-text-muted">—</span>,
-            ])}
-            onEdit={(visualIdx) => {
-              const original = product.metadata.properties!.findIndex((x) => x.id === filteredProps[visualIdx].id);
-              setPropDraft({ data: { ...product.metadata.properties![original] }, index: original });
-            }}
-            onDelete={(visualIdx) => {
-              const original = product.metadata.properties!.findIndex((x) => x.id === filteredProps[visualIdx].id);
-              const name = product.metadata.properties![original].name;
-              confirm({
-                description: <>确定删除属性 <span className="font-semibold text-foreground">「{name}」</span> 吗？</>,
-                onConfirm: () => productActions.updateMetadata(productId, (m) => ({
-                  ...m, properties: (m.properties ?? []).filter((_, idx) => idx !== original),
-                })),
-              });
-            }}
-          />
-          {/* 属性分组芯片 */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setSelectedTagId("-1")}
-              className={`rounded px-2 py-0.5 text-xs transition ${selectedTagId === "-1" ? "bg-primary text-primary-foreground" : "bg-panel/60 text-text-secondary hover:text-foreground"}`}
-            >全部</button>
-            {propertyTags.map((t, i) => (
-              <button
-                key={t.id}
-                onClick={() => selectedTagId === t.id ? setRenameTag({ index: i, name: t.name }) : setSelectedTagId(t.id)}
-                className={`rounded px-2 py-0.5 text-xs transition ${selectedTagId === t.id ? "bg-primary text-primary-foreground" : "bg-panel/60 text-text-secondary hover:text-foreground"}`}
-              >{t.name}</button>
-            ))}
-            <button onClick={addPropertyTag}
-              className="inline-flex items-center gap-1 rounded border border-dashed border-panel-border px-2 py-0.5 text-xs text-text-muted hover:border-primary/40 hover:text-primary">
-              <Plus className="h-3 w-3" /> 新建分组
-            </button>
-          </div>
-        </>
+        <MetaTable
+          headers={["标识", "名称", "类型", "单位", "分组"]}
+          rows={filteredProps.map((p) => [
+            <span className="font-mono text-xs text-text-secondary">{p.id}</span>,
+            p.name,
+            p.valueType?.type ?? "—",
+            p.valueType?.unit || "—",
+            propertyTags.find((t) => t.id === p.tagId)?.name ?? <span className="text-text-muted">—</span>,
+          ])}
+          onEdit={(visualIdx) => {
+            const original = product.metadata.properties!.findIndex((x) => x.id === filteredProps[visualIdx].id);
+            setPropDraft({ data: { ...product.metadata.properties![original] }, index: original });
+          }}
+          onDelete={(visualIdx) => {
+            const original = product.metadata.properties!.findIndex((x) => x.id === filteredProps[visualIdx].id);
+            const name = product.metadata.properties![original].name;
+            confirm({
+              description: <>确定删除属性 <span className="font-semibold text-foreground">「{name}」</span> 吗？</>,
+              onConfirm: () => productActions.updateMetadata(productId, (m) => ({
+                ...m, properties: (m.properties ?? []).filter((_, idx) => idx !== original),
+              })),
+            });
+          }}
+        />
       ) : (
         <MetaTable
           headers={["标识", "名称", "异步", "参数数"]}
@@ -390,6 +369,28 @@ function TabMeta({ productId }: { productId: string }) {
             });
           }}
         />
+      )}
+      </div>
+
+      {/* 属性分组芯片 — 固定在底部 */}
+      {sub === "prop" && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-panel-border/60 pt-3">
+          <button
+            onClick={() => setSelectedTagId("-1")}
+            className={`rounded px-2 py-0.5 text-xs transition ${selectedTagId === "-1" ? "bg-primary text-primary-foreground" : "bg-panel/60 text-text-secondary hover:text-foreground"}`}
+          >全部</button>
+          {propertyTags.map((t, i) => (
+            <button
+              key={t.id}
+              onClick={() => selectedTagId === t.id ? setRenameTag({ index: i, name: t.name }) : setSelectedTagId(t.id)}
+              className={`rounded px-2 py-0.5 text-xs transition ${selectedTagId === t.id ? "bg-primary text-primary-foreground" : "bg-panel/60 text-text-secondary hover:text-foreground"}`}
+            >{t.name}</button>
+          ))}
+          <button onClick={addPropertyTag}
+            className="inline-flex items-center gap-1 rounded border border-dashed border-panel-border px-2 py-0.5 text-xs text-text-muted hover:border-primary/40 hover:text-primary">
+            <Plus className="h-3 w-3" /> 新建分组
+          </button>
+        </div>
       )}
 
       {/* ===== 属性抽屉 ===== */}
