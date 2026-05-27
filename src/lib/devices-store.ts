@@ -126,7 +126,7 @@ export function mockReadings(
     const num = (rand * 100).toFixed(2);
     return {
       id: p.id, name: p.name, value: num,
-      unit: p.valueType?.unit, updateTime: t,
+      unit: p.valueType?.unit ?? undefined, updateTime: t,
     };
   });
 }
