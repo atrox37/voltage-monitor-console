@@ -52,13 +52,18 @@ function OrgsPage() {
   const [tree, setTree] = useState<OrgNode[]>(ORG_TREE);
   const [editing, setEditing] = useState<{ mode: "edit" | "add"; id?: string; parentId?: string; name: string } | null>(null);
   const [membersOf, setMembersOf] = useState<OrgNode | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<OrgNode | null>(null);
+  const { confirm, confirmNode } = useConfirm();
 
   const handleAction = (cmd: "edit" | "members" | "add" | "delete", node: OrgNode) => {
     if (cmd === "edit") setEditing({ mode: "edit", id: node.id, name: node.label });
     if (cmd === "members") setMembersOf(node);
     if (cmd === "add") setEditing({ mode: "add", parentId: node.id, name: "" });
-    if (cmd === "delete") setConfirmDelete(node);
+    if (cmd === "delete") {
+      confirm({
+        description: <>确定要删除组织 <span className="font-semibold text-foreground">「{node.label}」</span> 吗？该操作不可恢复。</>,
+        onConfirm: () => setTree((t) => removeOrg(t, node.id)),
+      });
+    }
   };
 
   const saveEditing = () => {
@@ -70,12 +75,6 @@ function OrgsPage() {
       setTree((t) => addChild(t, editing.parentId!, { id, label: editing.name.trim(), parentId: editing.parentId, userCount: 0 }));
     }
     setEditing(null);
-  };
-
-  const doDelete = () => {
-    if (!confirmDelete) return;
-    setTree((t) => removeOrg(t, confirmDelete.id));
-    setConfirmDelete(null);
   };
 
   const members = useMemo(() => (membersOf ? MEMBERS[membersOf.id] ?? [] : []), [membersOf]);
