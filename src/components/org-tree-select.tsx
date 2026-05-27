@@ -5,6 +5,8 @@ import { vtInputCls } from "./vt-drawer";
 export type OrgNode = {
   id: string;
   label: string;
+  parentId?: string;
+  userCount?: number;
   children?: OrgNode[];
 };
 
@@ -12,17 +14,40 @@ export const ORG_TREE: OrgNode[] = [
   {
     id: "root",
     label: "Group Root",
+    userCount: 5,
     children: [
       {
         id: "c1",
         label: "Group Children1",
-        children: [{ id: "c1-1", label: "Group Children1-1" }],
+        parentId: "root",
+        userCount: 8,
+        children: [
+          { id: "c1-1", label: "Group Children1-1", parentId: "c1", userCount: 2 },
+        ],
       },
-      { id: "c2", label: "Group Children2" },
-      { id: "c3", label: "Group Children3" },
+      { id: "c2", label: "Group Children2", parentId: "root", userCount: 3 },
+      { id: "c3", label: "Group Children3", parentId: "root", userCount: 0 },
     ],
   },
 ];
+
+/* ---- helpers ---- */
+export function findOrg(id: string, tree: OrgNode[] = ORG_TREE): OrgNode | undefined {
+  for (const n of tree) {
+    if (n.id === id) return n;
+    if (n.children) {
+      const r = findOrg(id, n.children);
+      if (r) return r;
+    }
+  }
+}
+
+export function flattenOrgs(tree: OrgNode[] = ORG_TREE): OrgNode[] {
+  const out: OrgNode[] = [];
+  const walk = (ns: OrgNode[]) => ns.forEach((n) => { out.push(n); if (n.children) walk(n.children); });
+  walk(tree);
+  return out;
+}
 
 export function OrgTreeSelect({
   value,
@@ -91,10 +116,7 @@ export function OrgTreeSelect({
 }
 
 function TreeBranch({
-  node,
-  depth,
-  selected,
-  onPick,
+  node, depth, selected, onPick,
 }: {
   node: OrgNode;
   depth: number;
@@ -107,42 +129,23 @@ function TreeBranch({
     <div>
       <div className="flex items-center">
         {hasChildren ? (
-          <button
-            onClick={() => setExpanded((e) => !e)}
-            className="text-text-muted hover:text-foreground"
-            style={{ marginLeft: depth * 12 }}
-          >
+          <button onClick={() => setExpanded((e) => !e)} className="text-text-muted hover:text-foreground" style={{ marginLeft: depth * 12 }}>
             {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           </button>
         ) : (
           <span style={{ marginLeft: depth * 12 + 12 }} />
         )}
-        <TreeRow
-          label={node.label}
-          depth={0}
-          onPick={() => onPick(node.label)}
-          selected={selected === node.label}
-        />
+        <TreeRow label={node.label} depth={0} onPick={() => onPick(node.label)} selected={selected === node.label} />
       </div>
-      {expanded &&
-        node.children?.map((c) => (
-          <TreeBranch
-            key={c.id}
-            node={c}
-            depth={depth + 1}
-            selected={selected}
-            onPick={onPick}
-          />
-        ))}
+      {expanded && node.children?.map((c) => (
+        <TreeBranch key={c.id} node={c} depth={depth + 1} selected={selected} onPick={onPick} />
+      ))}
     </div>
   );
 }
 
 function TreeRow({
-  label,
-  depth,
-  selected,
-  onPick,
+  label, depth, selected, onPick,
 }: {
   label: string;
   depth: number;
@@ -155,9 +158,7 @@ function TreeRow({
       onClick={onPick}
       style={{ paddingLeft: depth * 12 + 4 }}
       className={`flex-1 rounded px-2 py-1 text-left text-xs transition ${
-        selected
-          ? "bg-primary/20 text-primary"
-          : "text-text-secondary hover:bg-panel hover:text-foreground"
+        selected ? "bg-primary/20 text-primary" : "text-text-secondary hover:bg-panel hover:text-foreground"
       }`}
     >
       {label}

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { Lock } from "lucide-react";
 import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
 import { VtDrawer, VtField, VtBtn, VtSegmented, vtInputCls } from "@/components/vt-drawer";
 import { OrgTreeSelect } from "@/components/org-tree-select";
@@ -36,11 +37,13 @@ function emptyUser(): User {
 function UsersPage() {
   const [rows, setRows] = useState<User[]>(initial);
   const [editing, setEditing] = useState<User | null>(null);
-  const [password, setPassword] = useState("");
+  const [isAdd, setIsAdd] = useState(false);
+  const [passUser, setPassUser] = useState<User | null>(null);
+  const [newPass, setNewPass] = useState("");
 
-  const openAdd = () => { setEditing(emptyUser()); setPassword(""); };
-  const openEdit = (u: User) => { setEditing({ ...u }); setPassword(""); };
-  const close = () => setEditing(null);
+  const openAdd  = () => { setEditing(emptyUser()); setIsAdd(true); };
+  const openEdit = (u: User) => { setEditing({ ...u }); setIsAdd(false); };
+  const close    = () => setEditing(null);
 
   const save = () => {
     if (!editing) return;
@@ -51,6 +54,14 @@ function UsersPage() {
       setRows((rs) => [...rs, { ...editing, id: String(Date.now()), updatedAt: now }]);
     }
     close();
+  };
+
+  const savePass = () => {
+    if (!passUser || !newPass.trim()) return;
+    const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+    setRows((rs) => rs.map((r) => (r.id === passUser.id ? { ...r, updatedAt: now } : r)));
+    setPassUser(null);
+    setNewPass("");
   };
 
   return (
@@ -79,16 +90,17 @@ function UsersPage() {
         rowActions={(r) => (
           <>
             <RowBtn onClick={() => openEdit(r)}>编辑</RowBtn>
-            <RowBtn>{r.status === "disabled" ? "启用" : "禁用"}</RowBtn>
-            <RowBtn danger>删除</RowBtn>
+            <RowBtn icon={Lock} onClick={() => { setPassUser(r); setNewPass(""); }}>修改密码</RowBtn>
+            <RowBtn danger onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}>删除</RowBtn>
           </>
         )}
       />
 
+      {/* Edit / Add Drawer */}
       <VtDrawer
         open={!!editing}
         onClose={close}
-        title={editing?.id ? "编辑用户" : "新增用户"}
+        title={isAdd ? "新建用户" : "编辑用户"}
         footer={
           <>
             <VtBtn variant="ghost" onClick={close}>关闭</VtBtn>
@@ -99,7 +111,7 @@ function UsersPage() {
         {editing && (
           <div>
             <VtField label="用户名" required>
-              <input className={vtInputCls} value={editing.username}
+              <input className={vtInputCls} value={editing.username} placeholder="请输入用户名"
                 onChange={(e) => setEditing({ ...editing, username: e.target.value })} />
             </VtField>
             <VtField label="角色" required>
@@ -111,19 +123,20 @@ function UsersPage() {
             <VtField label="机构" required>
               <OrgTreeSelect value={editing.org} onChange={(v) => setEditing({ ...editing, org: v })} />
             </VtField>
-            <VtField label="邮箱">
-              <input className={vtInputCls} type="email" value={editing.email}
+            <VtField label="邮箱" required>
+              <input className={vtInputCls} type="email" value={editing.email} placeholder="user@example.com"
                 onChange={(e) => setEditing({ ...editing, email: e.target.value })} />
             </VtField>
             <VtField label="电话">
-              <input className={vtInputCls} value={editing.phone ?? ""}
+              <input className={vtInputCls} value={editing.phone ?? ""} placeholder="请输入电话"
                 onChange={(e) => setEditing({ ...editing, phone: e.target.value })} />
             </VtField>
-            <VtField label="密码">
-              <input className={vtInputCls} type="password" autoComplete="new-password"
-                placeholder={editing.id ? "留空则不修改" : "请输入密码"}
-                value={password} onChange={(e) => setPassword(e.target.value)} />
-            </VtField>
+            {isAdd && (
+              <VtField label="密码" required>
+                <input className={vtInputCls} type="password" autoComplete="new-password"
+                  placeholder="请输入密码" />
+              </VtField>
+            )}
             <VtField label="状态">
               <VtSegmented<User["status"]>
                 value={editing.status}
@@ -136,6 +149,33 @@ function UsersPage() {
             </VtField>
           </div>
         )}
+      </VtDrawer>
+
+      {/* Change password dialog (drawer) */}
+      <VtDrawer
+        open={!!passUser}
+        onClose={() => { setPassUser(null); setNewPass(""); }}
+        title={`修改密码 — ${passUser?.username ?? ""}`}
+        width={400}
+        footer={
+          <>
+            <VtBtn variant="ghost" onClick={() => { setPassUser(null); setNewPass(""); }}>取消</VtBtn>
+            <VtBtn onClick={savePass}>修改</VtBtn>
+          </>
+        }
+      >
+        <VtField label="密码" required>
+          <input
+            className={vtInputCls}
+            type="password"
+            autoComplete="new-password"
+            placeholder="请输入新密码"
+            value={newPass}
+            onChange={(e) => setNewPass(e.target.value)}
+            autoFocus
+          />
+        </VtField>
+        <p className="ml-[84px] mt-1 text-xs text-text-muted">提交后该用户将使用新密码登录。</p>
       </VtDrawer>
     </>
   );
