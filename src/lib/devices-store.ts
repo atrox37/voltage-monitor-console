@@ -117,7 +117,7 @@ export type PropertyReading = {
 };
 
 export function mockReadings(
-  productProps: { id: string; name: string; valueType?: { type?: string; unit?: string } }[],
+  productProps: { id: string; name: string; valueType?: { type?: string; unit?: string | null } }[],
   seed: number,
 ): PropertyReading[] {
   const t = nowStr();
