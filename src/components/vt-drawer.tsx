@@ -73,11 +73,25 @@ export function VtField({
   label,
   children,
   required,
+  full,
 }: {
   label: string;
   children: ReactNode;
   required?: boolean;
+  /** Stack label above content (use for wide editors like tables) */
+  full?: boolean;
 }) {
+  if (full) {
+    return (
+      <div className="mb-4">
+        <label className="mb-1 block text-xs text-text-secondary">
+          {required && <span className="mr-0.5 text-status-critical">*</span>}
+          {label}
+        </label>
+        <div>{children}</div>
+      </div>
+    );
+  }
   return (
     <div className="mb-4 grid grid-cols-[72px_1fr] items-center gap-3">
       <label className="text-right text-xs text-text-secondary">
