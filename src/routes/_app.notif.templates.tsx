@@ -2,36 +2,44 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
 
 export const Route = createFileRoute("/_app/notif/templates")({
-  component: TemplatesPage,
+  component: NotifyTemplatesPage,
 });
 
-type Tpl = { id: string; name: string; channel: string; subject: string; usedBy: number; updatedAt: string };
+type NotifyTemplate = {
+  id: string;
+  name: string;
+  config: string;
+  type: "email" | "awsEmail";
+  creator: string;
+  org: string;
+  updateTime: string;
+};
 
-const rows: Tpl[] = [
-  { id: "1", name: "通信中断_邮件",      channel: "Email",   subject: "【严重】设备 {{device}} 通信中断",     usedBy: 3, updatedAt: "2026-05-10 09:00:00" },
-  { id: "2", name: "通信中断_短信",      channel: "SMS",     subject: "设备 {{device}} 离线请处理",          usedBy: 1, updatedAt: "2026-05-10 09:00:00" },
-  { id: "3", name: "电压告警_邮件",      channel: "Email",   subject: "【警告】{{site}} 电压偏低 {{value}}V", usedBy: 2, updatedAt: "2026-04-21 11:15:42" },
-  { id: "4", name: "通用_Webhook",       channel: "Webhook", subject: "POST /alarm — payload JSON",         usedBy: 5, updatedAt: "2026-04-01 14:08:22" },
+const TYPE_LABEL: Record<NotifyTemplate["type"], string> = { email: "邮箱", awsEmail: "AWS邮箱" };
+
+const rows: NotifyTemplate[] = [
+  { id: "1", name: "设备离线告警",  config: "运维告警 - 邮箱",  type: "email",    creator: "admin",        org: "Group Root",      updateTime: "2026-05-12 09:20:00" },
+  { id: "2", name: "电池过温告警",  config: "高优告警 - AWS",   type: "awsEmail", creator: "root",         org: "Group Children1", updateTime: "2026-05-10 17:55:11" },
+  { id: "3", name: "日报模板",      config: "日报推送",          type: "email",    creator: "zhiyuan.wang", org: "Group Root",      updateTime: "2026-04-21 11:10:42" },
 ];
 
-function TemplatesPage() {
+function NotifyTemplatesPage() {
   return (
-    <ListPageTemplate<Tpl>
+    <ListPageTemplate<NotifyTemplate>
       title="通知模板"
-      filters={[
-        { type: "text",   key: "name",    label: "模板名" },
-        { type: "select", key: "channel", label: "通道",
-          options: [{label:"Email",value:"Email"},{label:"SMS",value:"SMS"},{label:"Webhook",value:"Webhook"},{label:"站内信",value:"站内信"}] },
-      ]}
+      filters={[{ type: "text", key: "name", label: "名称" }]}
       columns={[
-        { key: "name",     title: "模板名" },
-        { key: "channel",  title: "通道", render: (r) => <span className="rounded bg-energy-ess/15 px-1.5 py-0.5 text-xs text-energy-ess">{r.channel}</span> },
-        { key: "subject",  title: "主题 / 内容", render: (r) => <span className="text-text-secondary">{r.subject}</span> },
-        { key: "usedBy",   title: "被引用", align: "right" },
-        { key: "updatedAt",title: "更新时间", render: (r) => <span className="font-mono text-xs text-text-secondary">{r.updatedAt}</span> },
+        { key: "name",       title: "模板名称" },
+        { key: "config",     title: "通知配置" },
+        { key: "type",       title: "模板类型", render: (r) => (
+          <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] text-primary">{TYPE_LABEL[r.type]}</span>
+        ) },
+        { key: "creator",    title: "创建人" },
+        { key: "org",        title: "所属机构" },
+        { key: "updateTime", title: "更新时间", render: (r) => <span className="font-mono text-xs text-text-secondary">{r.updateTime}</span> },
       ]}
       rows={rows}
-      onAdd={() => alert("新增模板")}
+      onAdd={() => alert("添加模板")}
       rowActions={() => (<><RowBtn>编辑</RowBtn><RowBtn>预览</RowBtn><RowBtn danger>删除</RowBtn></>)}
     />
   );

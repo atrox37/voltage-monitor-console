@@ -1,41 +1,71 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
+import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
 
 export const Route = createFileRoute("/_app/ingest/components")({
-  component: ComponentsPage,
+  component: NetworkComponentsPage,
 });
 
-type NetComp = {
-  id: string; name: string; type: string; addr: string;
-  status: "online" | "warning" | "critical" | "disabled"; updatedAt: string;
+type NetworkComp = {
+  id: string;
+  name: string;
+  type: string;
+  org: string;
+  updateTime: string;
+  switchStatus: "started" | "stopped";
+  connectStatus: "connected" | "notConnected" | "connecting";
 };
 
-const rows: NetComp[] = [
-  { id: "1", name: "MQTT Broker A", type: "MQTT Broker",   addr: "tcp://10.0.1.21:1883",  status: "online",  updatedAt: "2026-05-15 09:00:00" },
-  { id: "2", name: "Kafka Bus",     type: "Kafka",         addr: "kafka://10.0.1.45:9092",status: "online",  updatedAt: "2026-05-10 14:23:12" },
-  { id: "3", name: "Modbus Gw 02",  type: "Modbus Bridge", addr: "tcp://10.1.0.55:502",   status: "warning", updatedAt: "2026-05-18 11:30:00" },
-  { id: "4", name: "OPC UA Server", type: "OPC UA",        addr: "opc.tcp://10.0.1.88:4840", status: "online", updatedAt: "2026-04-29 17:11:55" },
+const rows: NetworkComp[] = [
+  { id: "1", name: "MQTT-EAST",   type: "MQTT客户端", org: "Group Root",      updateTime: "2026-05-12 09:20:00", switchStatus: "started", connectStatus: "connected" },
+  { id: "2", name: "TCP-SOUTH",   type: "TCP服务",    org: "Group Children1", updateTime: "2026-05-10 17:55:11", switchStatus: "started", connectStatus: "connecting" },
+  { id: "3", name: "MQTT-NORTH",  type: "MQTT客户端", org: "Group Root",      updateTime: "2026-04-21 11:10:42", switchStatus: "stopped", connectStatus: "notConnected" },
 ];
 
-function ComponentsPage() {
+const SWITCH_MAP = {
+  started: { cls: "text-status-online bg-status-online/15",   label: "启动" },
+  stopped: { cls: "text-text-muted bg-panel-heavy",           label: "关闭" },
+} as const;
+const CONN_MAP = {
+  connected:    { cls: "text-status-online bg-status-online/15",     label: "已连接" },
+  notConnected: { cls: "text-status-critical bg-status-critical/15", label: "未连接" },
+  connecting:   { cls: "text-status-warning bg-status-warning/15",   label: "正在连接" },
+} as const;
+
+function Pill({ cls, label }: { cls: string; label: string }) {
+  return <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] ${cls}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{label}</span>;
+}
+
+function NetworkComponentsPage() {
   return (
-    <ListPageTemplate<NetComp>
-      title="网络组件列表"
+    <ListPageTemplate<NetworkComp>
+      title="网络组件"
       filters={[
-        { type: "text",   key: "name", label: "组件名" },
-        { type: "select", key: "type", label: "类型",
-          options: [{label:"MQTT Broker",value:"MQTT Broker"},{label:"Kafka",value:"Kafka"},{label:"Modbus Bridge",value:"Modbus Bridge"},{label:"OPC UA",value:"OPC UA"}] },
+        { type: "text",   key: "name", label: "名称" },
+        { type: "text",   key: "org",  label: "机构" },
+        { type: "select", key: "type", label: "组件类型",
+          options: [
+            { label: "MQTT客户端", value: "MQTT客户端" },
+            { label: "TCP服务",    value: "TCP服务" },
+          ] },
       ]}
       columns={[
-        { key: "name",      title: "组件名" },
-        { key: "type",      title: "类型" },
-        { key: "addr",      title: "地址", render: (r) => <code className="font-mono text-xs text-energy-pv">{r.addr}</code> },
-        { key: "status",    title: "状态", render: (r) => <StatusBadge status={r.status} /> },
-        { key: "updatedAt", title: "更新时间", render: (r) => <span className="font-mono text-xs text-text-secondary">{r.updatedAt}</span> },
+        { key: "name",          title: "名称" },
+        { key: "type",          title: "类型" },
+        { key: "org",           title: "所属机构" },
+        { key: "updateTime",    title: "更新日期", render: (r) => <span className="font-mono text-xs text-text-secondary">{r.updateTime}</span> },
+        { key: "switchStatus",  title: "开关状态", render: (r) => <Pill {...SWITCH_MAP[r.switchStatus]} /> },
+        { key: "connectStatus", title: "连接状态", render: (r) => <Pill {...CONN_MAP[r.connectStatus]} /> },
       ]}
       rows={rows}
-      onAdd={() => alert("新增组件")}
-      rowActions={() => (<><RowBtn>编辑</RowBtn><RowBtn>测试连通</RowBtn><RowBtn danger>停用</RowBtn></>)}
+      onAdd={() => alert("新增网络组件")}
+      rowActions={(r) => (
+        <>
+          <RowBtn>编辑</RowBtn>
+          <RowBtn>{r.switchStatus === "started" ? "停用" : "启用"}</RowBtn>
+          <RowBtn>测试连通</RowBtn>
+          <RowBtn danger>删除</RowBtn>
+        </>
+      )}
     />
   );
 }
