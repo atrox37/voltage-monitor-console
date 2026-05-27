@@ -20,6 +20,7 @@ import { Route as AppNotifConfigsRouteImport } from './routes/_app.notif.configs
 import { Route as AppIngestProtocolsRouteImport } from './routes/_app.ingest.protocols'
 import { Route as AppIngestGatewaysRouteImport } from './routes/_app.ingest.gateways'
 import { Route as AppIngestComponentsRouteImport } from './routes/_app.ingest.components'
+import { Route as AppDevicesProductsRouteImport } from './routes/_app.devices.products'
 import { Route as AppDevicesListRouteImport } from './routes/_app.devices.list'
 import { Route as AppDevicesProductsIndexRouteImport } from './routes/_app.devices.products.index'
 import { Route as AppDevicesProductsIdRouteImport } from './routes/_app.devices.products.$id'
@@ -78,26 +79,32 @@ const AppIngestComponentsRoute = AppIngestComponentsRouteImport.update({
   path: '/ingest/components',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDevicesProductsRoute = AppDevicesProductsRouteImport.update({
+  id: '/devices/products',
+  path: '/devices/products',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDevicesListRoute = AppDevicesListRouteImport.update({
   id: '/devices/list',
   path: '/devices/list',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDevicesProductsIndexRoute = AppDevicesProductsIndexRouteImport.update({
-  id: '/devices/products/',
-  path: '/devices/products/',
-  getParentRoute: () => AppRoute,
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppDevicesProductsRoute,
 } as any)
 const AppDevicesProductsIdRoute = AppDevicesProductsIdRouteImport.update({
-  id: '/devices/products/$id',
-  path: '/devices/products/$id',
-  getParentRoute: () => AppRoute,
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppDevicesProductsRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/devices/list': typeof AppDevicesListRoute
+  '/devices/products': typeof AppDevicesProductsRouteWithChildren
   '/ingest/components': typeof AppIngestComponentsRoute
   '/ingest/gateways': typeof AppIngestGatewaysRoute
   '/ingest/protocols': typeof AppIngestProtocolsRoute
@@ -130,6 +137,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/': typeof AppIndexRoute
   '/_app/devices/list': typeof AppDevicesListRoute
+  '/_app/devices/products': typeof AppDevicesProductsRouteWithChildren
   '/_app/ingest/components': typeof AppIngestComponentsRoute
   '/_app/ingest/gateways': typeof AppIngestGatewaysRoute
   '/_app/ingest/protocols': typeof AppIngestProtocolsRoute
@@ -147,6 +155,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/devices/list'
+    | '/devices/products'
     | '/ingest/components'
     | '/ingest/gateways'
     | '/ingest/protocols'
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_app/'
     | '/_app/devices/list'
+    | '/_app/devices/products'
     | '/_app/ingest/components'
     | '/_app/ingest/gateways'
     | '/_app/ingest/protocols'
@@ -274,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIngestComponentsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/devices/products': {
+      id: '/_app/devices/products'
+      path: '/devices/products'
+      fullPath: '/devices/products'
+      preLoaderRoute: typeof AppDevicesProductsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/devices/list': {
       id: '/_app/devices/list'
       path: '/devices/list'
@@ -283,24 +300,38 @@ declare module '@tanstack/react-router' {
     }
     '/_app/devices/products/': {
       id: '/_app/devices/products/'
-      path: '/devices/products'
+      path: '/'
       fullPath: '/devices/products/'
       preLoaderRoute: typeof AppDevicesProductsIndexRouteImport
-      parentRoute: typeof AppRoute
+      parentRoute: typeof AppDevicesProductsRoute
     }
     '/_app/devices/products/$id': {
       id: '/_app/devices/products/$id'
-      path: '/devices/products/$id'
+      path: '/$id'
       fullPath: '/devices/products/$id'
       preLoaderRoute: typeof AppDevicesProductsIdRouteImport
-      parentRoute: typeof AppRoute
+      parentRoute: typeof AppDevicesProductsRoute
     }
   }
 }
 
+interface AppDevicesProductsRouteChildren {
+  AppDevicesProductsIdRoute: typeof AppDevicesProductsIdRoute
+  AppDevicesProductsIndexRoute: typeof AppDevicesProductsIndexRoute
+}
+
+const AppDevicesProductsRouteChildren: AppDevicesProductsRouteChildren = {
+  AppDevicesProductsIdRoute: AppDevicesProductsIdRoute,
+  AppDevicesProductsIndexRoute: AppDevicesProductsIndexRoute,
+}
+
+const AppDevicesProductsRouteWithChildren =
+  AppDevicesProductsRoute._addFileChildren(AppDevicesProductsRouteChildren)
+
 interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppDevicesListRoute: typeof AppDevicesListRoute
+  AppDevicesProductsRoute: typeof AppDevicesProductsRouteWithChildren
   AppIngestComponentsRoute: typeof AppIngestComponentsRoute
   AppIngestGatewaysRoute: typeof AppIngestGatewaysRoute
   AppIngestProtocolsRoute: typeof AppIngestProtocolsRoute
@@ -309,13 +340,12 @@ interface AppRouteChildren {
   AppSystemOrgsRoute: typeof AppSystemOrgsRoute
   AppSystemRolesRoute: typeof AppSystemRolesRoute
   AppSystemUsersRoute: typeof AppSystemUsersRoute
-  AppDevicesProductsIdRoute: typeof AppDevicesProductsIdRoute
-  AppDevicesProductsIndexRoute: typeof AppDevicesProductsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppDevicesListRoute: AppDevicesListRoute,
+  AppDevicesProductsRoute: AppDevicesProductsRouteWithChildren,
   AppIngestComponentsRoute: AppIngestComponentsRoute,
   AppIngestGatewaysRoute: AppIngestGatewaysRoute,
   AppIngestProtocolsRoute: AppIngestProtocolsRoute,
@@ -324,8 +354,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppSystemOrgsRoute: AppSystemOrgsRoute,
   AppSystemRolesRoute: AppSystemRolesRoute,
   AppSystemUsersRoute: AppSystemUsersRoute,
-  AppDevicesProductsIdRoute: AppDevicesProductsIdRoute,
-  AppDevicesProductsIndexRoute: AppDevicesProductsIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
