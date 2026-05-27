@@ -45,13 +45,13 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "设备接入",
+    label: "网络管理",
     key: "ingest",
     icon: Network,
     children: [
-      { label: "协议库",       to: "/ingest/protocols",  icon: Plug },
-      { label: "网络组件列表", to: "/ingest/components", icon: Cable },
-      { label: "网关列表",     to: "/ingest/gateways",   icon: RouterIcon },
+      { label: "网络组件", to: "/ingest/components", icon: Cable },
+      { label: "网关列表", to: "/ingest/gateways",   icon: RouterIcon },
+      { label: "协议库",   to: "/ingest/protocols",  icon: Plug },
     ],
   },
   {
@@ -59,8 +59,8 @@ export const NAV: NavGroup[] = [
     key: "notif",
     icon: Bell,
     children: [
-      { label: "通知配置列表", to: "/notif/configs",   icon: BellRing },
-      { label: "通知模板",     to: "/notif/templates", icon: FileText },
+      { label: "通知配置", to: "/notif/configs",   icon: BellRing },
+      { label: "通知模板", to: "/notif/templates", icon: FileText },
     ],
   },
 ];
