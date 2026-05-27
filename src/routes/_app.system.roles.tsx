@@ -192,12 +192,8 @@ function RolesPage() {
             </RowBtn>
             <RowBtn
               danger
-              onClick={() =>
-                confirm({
-                  description: <>确定要删除角色 <span className="font-semibold text-foreground">「{r.name}」</span> 吗？该操作不可恢复。</>,
-                  onConfirm: () => setRows((rs) => rs.filter((x) => x.id !== r.id)),
-                })
-              }
+              confirm={{ description: <>确定要删除角色 <span className="font-semibold text-foreground">「{r.name}」</span> 吗？该操作不可恢复。</> }}
+              onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}
             >
               删除
             </RowBtn>
