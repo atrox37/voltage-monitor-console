@@ -53,8 +53,8 @@ function NetworkComponentsPage() {
         { key: "type",          title: "类型" },
         { key: "org",           title: "所属机构" },
         { key: "updateTime",    title: "更新日期", render: (r) => <span className="font-mono text-xs text-text-secondary">{r.updateTime}</span> },
-        { key: "switchStatus",  title: "开关状态", render: (r) => <Pill map={SWITCH_MAP} k={r.switchStatus} /> },
-        { key: "connectStatus", title: "连接状态", render: (r) => <Pill map={CONN_MAP} k={r.connectStatus} /> },
+        { key: "switchStatus",  title: "开关状态", render: (r) => <Pill {...SWITCH_MAP[r.switchStatus]} /> },
+        { key: "connectStatus", title: "连接状态", render: (r) => <Pill {...CONN_MAP[r.connectStatus]} /> },
       ]}
       rows={rows}
       onAdd={() => alert("新增网络组件")}
