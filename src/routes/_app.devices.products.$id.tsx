@@ -114,10 +114,10 @@ function ProductDetailPage() {
         })}
       </div>
 
-      <div className="vt-glass mt-3 flex-1 overflow-auto p-5">
+      <div className="vt-glass mt-3 flex-1 overflow-hidden p-5">
         {tab === "info" && <TabInfo productId={product.id} />}
         {tab === "meta" && <TabMeta productId={product.id} />}
-        {tab === "tree" && product.type === "gateway" && <TabTree productId={product.id} />}
+        {tab === "tree" && <TabTree productId={product.id} />}
         {tab === "rule" && <TabRule productId={product.id} />}
       </div>
     </main>
