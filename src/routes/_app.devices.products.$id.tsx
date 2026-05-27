@@ -307,7 +307,7 @@ function TabMeta({ productId }: { productId: string }) {
   const propType = propDraft?.data.valueType?.type ?? "double";
 
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <div className="mb-3 flex items-center justify-between">
         <div className="inline-flex overflow-hidden rounded-md border border-panel-border text-xs">
           <SubTab active={sub === "prop"} onClick={() => setSub("prop")}>属性</SubTab>
@@ -322,6 +322,8 @@ function TabMeta({ productId }: { productId: string }) {
           <Plus className="h-3.5 w-3.5" /> 新增{sub === "prop" ? "属性" : "功能"}
         </button>
       </div>
+
+      <div className="flex-1 overflow-auto">
 
       {sub === "prop" ? (
         <>
