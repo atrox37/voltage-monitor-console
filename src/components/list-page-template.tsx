@@ -250,26 +250,48 @@ const ROW_ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
 };
 
 export function RowBtn({
-  children, onClick, danger, icon: IconProp,
+  children, onClick, danger, icon: IconProp, confirm,
 }: {
   children: ReactNode;
   onClick?: () => void;
   danger?: boolean;
   icon?: ComponentType<{ className?: string }>;
+  /** If provided, clicking opens a confirm dialog before invoking onClick. */
+  confirm?: { description: ReactNode; title?: string; confirmText?: string };
 }) {
   const label = typeof children === "string" ? children : "";
   const Icon = IconProp ?? ROW_ICON_MAP[label];
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const triggerConfirm = danger || !!confirm;
   return (
-    <button
-      onClick={onClick}
-      className={`mx-0.5 inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition ${
-        danger
-          ? "border-status-critical/40 text-status-critical hover:bg-status-critical/10"
-          : "border-panel-border text-text-secondary hover:border-primary/40 hover:text-primary"
-      }`}
-    >
-      {Icon && <Icon className="h-3.5 w-3.5" />}
-      {children}
-    </button>
+    <>
+      <button
+        onClick={() => {
+          if (triggerConfirm) setConfirmOpen(true);
+          else onClick?.();
+        }}
+        className={`mx-0.5 inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition ${
+          danger
+            ? "border-status-critical/40 text-status-critical hover:bg-status-critical/10"
+            : "border-panel-border text-text-secondary hover:border-primary/40 hover:text-primary"
+        }`}
+      >
+        {Icon && <Icon className="h-3.5 w-3.5" />}
+        {children}
+      </button>
+      {triggerConfirm && (
+        <ConfirmDialog
+          open={confirmOpen}
+          title={confirm?.title ?? (danger ? "确认删除" : "确认操作")}
+          description={
+            confirm?.description ?? <>确定要执行此操作吗？该操作不可恢复。</>
+          }
+          confirmText={confirm?.confirmText ?? (danger ? "删除" : "确定")}
+          danger={danger}
+          onConfirm={() => onClick?.()}
+          onClose={() => setConfirmOpen(false)}
+        />
+      )}
+    </>
   );
 }
