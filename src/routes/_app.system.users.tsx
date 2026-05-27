@@ -91,7 +91,11 @@ function UsersPage() {
           <>
             <RowBtn onClick={() => openEdit(r)}>编辑</RowBtn>
             <RowBtn icon={Lock} onClick={() => { setPassUser(r); setNewPass(""); }}>修改密码</RowBtn>
-            <RowBtn danger onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}>删除</RowBtn>
+            <RowBtn
+              danger
+              confirm={{ description: <>确定要删除用户 <span className="font-semibold text-foreground">「{r.username}」</span> 吗？该操作不可恢复。</> }}
+              onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}
+            >删除</RowBtn>
           </>
         )}
       />

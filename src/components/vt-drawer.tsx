@@ -8,6 +8,8 @@ export function VtDrawer({
   width = 480,
   footer,
   children,
+  offsetRight = 0,
+  hideOverlay = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -15,6 +17,8 @@ export function VtDrawer({
   width?: number;
   footer?: ReactNode;
   children: ReactNode;
+  offsetRight?: number;
+  hideOverlay?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -28,17 +32,17 @@ export function VtDrawer({
       className={`fixed inset-0 z-50 transition ${open ? "pointer-events-auto" : "pointer-events-none"}`}
       aria-hidden={!open}
     >
-      {/* overlay */}
-      <div
-        onClick={onClose}
-        className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity ${
-          open ? "opacity-100" : "opacity-0"
-        }`}
-      />
-      {/* panel */}
+      {!hideOverlay && (
+        <div
+          onClick={onClose}
+          className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity ${
+            open ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      )}
       <aside
-        style={{ width }}
-        className={`absolute right-0 top-0 flex h-full flex-col border-l border-panel-border bg-background shadow-2xl transition-transform duration-300 ${
+        style={{ width, right: offsetRight }}
+        className={`absolute top-0 flex h-full flex-col border-l border-panel-border bg-background shadow-2xl transition-all duration-300 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
