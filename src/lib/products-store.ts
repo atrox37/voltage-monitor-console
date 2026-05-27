@@ -121,7 +121,7 @@ export function useProduct(id: string | undefined): Product | undefined {
 }
 
 export const productActions = {
-  add(p: Omit<Product, "id" | "updateTime"> & Partial<Pick<Product, "metadata">>) {
+  add(p: Omit<Product, "id" | "updateTime" | "metadata"> & { metadata?: SimpleMetadata }) {
     const newP: Product = {
       ...p,
       id: String(Date.now()),
