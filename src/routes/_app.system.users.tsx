@@ -4,6 +4,7 @@ import { Lock } from "lucide-react";
 import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
 import { VtDrawer, VtField, VtBtn, VtSegmented, vtInputCls } from "@/components/vt-drawer";
 import { OrgTreeSelect } from "@/components/org-tree-select";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export const Route = createFileRoute("/_app/system/users")({
   component: UsersPage,
@@ -40,6 +41,7 @@ function UsersPage() {
   const [isAdd, setIsAdd] = useState(false);
   const [passUser, setPassUser] = useState<User | null>(null);
   const [newPass, setNewPass] = useState("");
+  const { confirm, confirmNode } = useConfirm();
 
   const openAdd  = () => { setEditing(emptyUser()); setIsAdd(true); };
   const openEdit = (u: User) => { setEditing({ ...u }); setIsAdd(false); };
@@ -91,7 +93,10 @@ function UsersPage() {
           <>
             <RowBtn onClick={() => openEdit(r)}>编辑</RowBtn>
             <RowBtn icon={Lock} onClick={() => { setPassUser(r); setNewPass(""); }}>修改密码</RowBtn>
-            <RowBtn danger onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}>删除</RowBtn>
+            <RowBtn danger onClick={() => confirm({
+              description: <>确定要删除用户 <span className="font-semibold text-foreground">「{r.username}」</span> 吗？该操作不可恢复。</>,
+              onConfirm: () => setRows((rs) => rs.filter((x) => x.id !== r.id)),
+            })}>删除</RowBtn>
           </>
         )}
       />
@@ -177,6 +182,8 @@ function UsersPage() {
         </VtField>
         <p className="ml-[84px] mt-1 text-xs text-text-muted">提交后该用户将使用新密码登录。</p>
       </VtDrawer>
+
+      {confirmNode}
     </>
   );
 }
