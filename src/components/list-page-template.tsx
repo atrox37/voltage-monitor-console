@@ -4,6 +4,7 @@ import {
   Pencil, Trash2, Eye, Download, Power, RotateCw, Link2Off, Activity,
   Boxes, GitBranch, Send, Search,
 } from "lucide-react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 export type Column<T> = {
   key: keyof T | string;
