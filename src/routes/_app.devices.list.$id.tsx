@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, RefreshCw, Save, Send, Plus, X, Activity,
+  ArrowLeft, RefreshCw, Send, Plus, X, Activity,
   CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
