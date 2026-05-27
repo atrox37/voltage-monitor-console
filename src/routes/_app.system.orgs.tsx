@@ -180,36 +180,46 @@ function OrgsPage() {
   );
 }
 
-/* ===== Org chart node ===== */
+/* ===== Org chart node =====
+ * Classic CSS approach: each child cell gets a top half-border to fake
+ * the horizontal trunk between siblings, plus a vertical drop line.
+ */
 function OrgChartNode({
   node, onAction,
 }: {
   node: OrgNode;
   onAction: (cmd: "edit" | "members" | "add" | "delete", n: OrgNode) => void;
 }) {
-  const hasChildren = !!node.children?.length;
+  const children = node.children ?? [];
+  const hasChildren = children.length > 0;
   return (
     <div className="flex flex-col items-center">
       <NodeCard node={node} onAction={onAction} />
 
       {hasChildren && (
         <>
-          {/* trunk down */}
           <div className="h-6 w-px bg-panel-border" />
-          {/* horizontal bar */}
-          <div className="relative flex items-start">
-            {node.children!.length > 1 && (
-              <div
-                className="absolute left-0 right-0 top-0 h-px bg-panel-border"
-                style={{ marginLeft: "calc(50% / " + node.children!.length + ")", marginRight: "calc(50% / " + node.children!.length + ")" }}
-              />
-            )}
-            {node.children!.map((c) => (
-              <div key={c.id} className="flex flex-col items-center px-3">
-                <div className="h-6 w-px bg-panel-border" />
-                <OrgChartNode node={c} onAction={onAction} />
-              </div>
-            ))}
+          <div className="flex items-start">
+            {children.map((c, i) => {
+              const single = children.length === 1;
+              const first = i === 0;
+              const last = i === children.length - 1;
+              const sideBorder = "border-panel-border";
+              const topClass = single
+                ? ""
+                : first
+                  ? `border-t ${sideBorder} ml-[50%] w-1/2`
+                  : last
+                    ? `border-t ${sideBorder} mr-[50%] w-1/2`
+                    : `border-t ${sideBorder} w-full`;
+              return (
+                <div key={c.id} className="flex flex-col items-center px-3">
+                  <div className={`h-0 ${topClass}`} />
+                  <div className="h-6 w-px bg-panel-border" />
+                  <OrgChartNode node={c} onAction={onAction} />
+                </div>
+              );
+            })}
           </div>
         </>
       )}
