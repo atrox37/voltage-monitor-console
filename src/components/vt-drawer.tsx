@@ -41,10 +41,12 @@ export function VtDrawer({
         />
       )}
       <aside
-        style={{ width, right: offsetRight }}
-        className={`absolute top-0 flex h-full flex-col border-l border-panel-border bg-background shadow-2xl transition-all duration-300 ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
+        style={{
+          width,
+          right: offsetRight,
+          transform: open ? "translateX(0)" : `translateX(calc(100% + ${offsetRight}px))`,
+        }}
+        className="absolute top-0 flex h-full flex-col border-l border-panel-border bg-background shadow-2xl transition-transform duration-300"
       >
         <header className="flex h-14 items-center justify-between border-b border-panel-border px-5">
           <h3 className="font-heading text-sm font-semibold tracking-wider text-foreground">
