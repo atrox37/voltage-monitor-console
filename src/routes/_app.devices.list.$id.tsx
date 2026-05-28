@@ -1,10 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, RefreshCw, Send, Plus, X, BarChart3,
+  ArrowLeft, RefreshCw, Send, Plus, BarChart3,
   CheckCircle2, AlertTriangle, Save, FileText, Bell, RotateCw, Inbox,
 } from "lucide-react";
-import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
+import { VtBtn, vtInputCls } from "@/components/vt-drawer";
 import { OrgTreeSelect } from "@/components/org-tree-select";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
@@ -12,7 +12,7 @@ import {
   type AlarmLog, type EventLog,
 } from "@/lib/devices-store";
 import { useProduct, PRODUCT_TYPE_LABEL } from "@/lib/products-store";
-import type { SimpleFunctionMetadata, PropertyTagMetadata } from "@/types/api/metadata";
+import type { PropertyTagMetadata } from "@/types/api/metadata";
 
 export const Route = createFileRoute("/_app/devices/list/$id")({
   component: DeviceDetailPage,
