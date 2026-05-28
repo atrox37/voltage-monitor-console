@@ -549,9 +549,9 @@ function TabRuntime({ deviceId }: { deviceId: string }) {
         </VtBtn>
       </div>
 
-      <div className="grid flex-1 grid-cols-1 gap-3 overflow-auto md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid flex-1 auto-rows-min grid-cols-1 gap-3 overflow-auto md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {readings.map((r) => (
-          <div key={r.id} className="rounded-lg border border-panel-border bg-panel/40 p-4">
+          <div key={r.id} className="flex h-[132px] flex-col justify-between rounded-lg border border-panel-border bg-panel/40 p-4">
             <div className="flex items-start justify-between">
               <span className="text-xs text-text-muted">{r.name}</span>
               <div className="flex gap-1 text-text-muted">
