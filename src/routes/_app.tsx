@@ -47,7 +47,7 @@ function AppLayout() {
                   className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-semibold uppercase tracking-wider text-text-secondary hover:bg-panel hover:text-foreground"
                 >
                   <span className="flex items-center gap-2">
-                    <GroupIcon className="h-3.5 w-3.5" />
+                    <GroupIcon className="h-4 w-4" />
                     {g.label}
                   </span>
                   {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
