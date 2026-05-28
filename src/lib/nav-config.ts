@@ -68,7 +68,8 @@ export const NAV: NavGroup[] = [
 export function findCrumbs(pathname: string): { group?: string; page?: string } {
   for (const g of NAV) {
     for (const c of g.children) {
-      if (c.to === pathname) return { group: g.label, page: c.label };
+      const match = c.to === "/" ? pathname === "/" : pathname === c.to || pathname.startsWith(c.to + "/");
+      if (match) return { group: g.label, page: c.label };
     }
   }
   return {};
