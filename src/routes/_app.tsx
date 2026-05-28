@@ -44,7 +44,7 @@ function AppLayout() {
               <div key={g.key} className="mb-1">
                 <button
                   onClick={() => setOpen((o) => ({ ...o, [g.key]: !o[g.key] }))}
-                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wider text-text-secondary hover:bg-panel hover:text-foreground"
+                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-semibold uppercase tracking-wider text-text-secondary hover:bg-panel hover:text-foreground"
                 >
                   <span className="flex items-center gap-2">
                     <GroupIcon className="h-3.5 w-3.5" />
