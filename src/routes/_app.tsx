@@ -61,7 +61,7 @@ function AppLayout() {
                           key={c.to}
                           to={c.to}
                           activeOptions={{ exact: true }}
-                          className="group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 pl-7 text-sm text-text-secondary transition hover:text-foreground"
+                          className="group relative flex items-center gap-2.5 rounded-md px-3 py-2 pl-8 text-[15px] text-text-secondary transition hover:text-foreground"
                           activeProps={{
                             className: "bg-primary/15 text-foreground",
                           }}
@@ -71,7 +71,7 @@ function AppLayout() {
                               {isActive && (
                                 <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r bg-primary" />
                               )}
-                              <Icon className={`h-3.5 w-3.5 ${isActive ? "text-primary" : ""}`} />
+                              <Icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
                               <span>{c.label}</span>
                             </>
                           )}
