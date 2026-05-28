@@ -31,7 +31,7 @@ const initial: Device[] = [
   {
     id: "1", name: "1号逆变器", sn: "INV-2025-0001",
     productId: "1", productName: "PV 逆变器", productType: "device",
-    gatewayId: "3", gatewayName: "网关-华东-01",
+    gatewayId: "4", gatewayName: "网关-华南-03",
     collectGateway: "mqtt-client网关", collectMode: "MQTT_CLIENT",
     org: "Group Root", creator: "admin",
     status: "online", statusTime: "2026-05-19 02:14:08",
@@ -41,7 +41,7 @@ const initial: Device[] = [
   {
     id: "2", name: "B2 电池柜", sn: "ESS-2025-002",
     productId: "2", productName: "储能电池柜", productType: "children",
-    gatewayId: "3", gatewayName: "网关-华东-01",
+    gatewayId: "4", gatewayName: "网关-华南-03",
     collectGateway: "mqtt-client网关", collectMode: "MQTT_CLIENT",
     org: "Group Children1", creator: "admin",
     status: "online", statusTime: "2026-05-19 01:52:31",
