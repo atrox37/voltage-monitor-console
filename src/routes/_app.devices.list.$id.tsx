@@ -50,14 +50,16 @@ function DeviceDetailPage() {
     );
   }
 
+  const isGateway = device.productType === "gateway";
   const tabs: { key: TabKey; label: string }[] = [
     { key: "info", label: "基本信息" },
     { key: "meta", label: "模型属性" },
     { key: "runtime", label: "运行状态" },
     { key: "func", label: "设备功能" },
     { key: "events", label: "日志信息" },
-    { key: "rules", label: "设备告警" },
+    { key: "rules", label: "告警规则" },
     { key: "alarm", label: "告警记录" },
+    ...(isGateway ? [{ key: "children" as TabKey, label: "子设备" }] : []),
   ];
 
   const statusCls =
