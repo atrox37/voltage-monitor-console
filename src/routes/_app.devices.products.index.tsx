@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
 import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
-import { OrgTreeSelect } from "@/components/org-tree-select";
 import {
   type Product,
   type ProductType,
@@ -23,7 +22,7 @@ function ProductsPage() {
   const rows = useProducts();
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
-  const [editing, setEditing] = useState<Product | null>(null);
+
 
   const goDetail = (id: string) => navigate({ to: "/devices/products/$id", params: { id } });
 
