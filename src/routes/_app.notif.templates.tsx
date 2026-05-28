@@ -129,7 +129,6 @@ function NotifyTemplatesPage() {
         rowActions={(r) => (
           <>
             <RowBtn onClick={() => setEditing(r)}>编辑</RowBtn>
-            <RowBtn onClick={() => setEditing(r)}>预览</RowBtn>
             <RowBtn danger onClick={() => setDelTarget(r)}>删除</RowBtn>
           </>
         )}
