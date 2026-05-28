@@ -87,13 +87,14 @@ export function useDevice(id: string | undefined): Device | undefined {
 }
 
 export const deviceActions = {
-  add(d: Omit<Device, "id" | "statusTime" | "createTime" | "tags" | "status"> & { status?: DeviceStatus }) {
+  add(d: Omit<Device, "id" | "statusTime" | "createTime" | "updateTime" | "tags" | "status"> & { status?: DeviceStatus }) {
     const newD: Device = {
       ...d,
       id: String(Date.now()),
       status: d.status ?? "offline",
       statusTime: nowStr(),
       createTime: nowStr(),
+      updateTime: nowStr(),
       tags: [],
     };
     state = [newD, ...state];
@@ -101,7 +102,7 @@ export const deviceActions = {
     return newD;
   },
   update(id: string, patch: Partial<Device>) {
-    state = state.map((d) => (d.id === id ? { ...d, ...patch } : d));
+    state = state.map((d) => (d.id === id ? { ...d, ...patch, updateTime: nowStr() } : d));
     emit();
   },
   remove(id: string) {
