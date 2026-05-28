@@ -55,7 +55,7 @@ function ProductDetailPage() {
   const tabs: { key: TabKey; label: string; hidden?: boolean }[] = [
     { key: "info", label: "基础信息" },
     { key: "meta", label: "物模型" },
-    { key: "tree", label: "网关分路" },
+    { key: "tree", label: "网关分路", hidden: product.type !== "gateway" },
     { key: "rule", label: "告警规则" },
   ];
   const visible = tabs.filter((t) => !t.hidden);
