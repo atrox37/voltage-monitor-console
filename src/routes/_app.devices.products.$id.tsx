@@ -315,7 +315,7 @@ function TabMeta({ productId }: { productId: string }) {
         </div>
         <button
           onClick={() => sub === "prop"
-            ? setPropDraft({ data: { id: "", name: "", rw: "readwrite", valueType: { type: "double", unit: "", extra: { point: 2 } }, create: true }, index: -1 })
+            ? setPropDraft({ data: { id: "", name: "", rw: "readwrite", valueType: { type: "double", unit: "", extra: { point: 2 } }, tagId: selectedTagId !== "-1" ? selectedTagId : undefined, create: true }, index: -1 })
             : setFuncDraft({ data: { id: "", name: "", async: false, inputs: [], outputs: [] }, index: -1 })}
           className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:brightness-110"
         >
