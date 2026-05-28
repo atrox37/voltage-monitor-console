@@ -5,7 +5,7 @@ import {
   ChevronsDownUp, ChevronsUpDown, X, Crosshair, ArrowLeft,
 } from "lucide-react";
 import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
-import { ORG_TREE, type OrgNode, OrgTreeSelect, flattenOrgs, findOrg } from "@/components/org-tree-select";
+import { ORG_TREE, type OrgNode, OrgTreeSelect, flattenOrgs } from "@/components/org-tree-select";
 import { StatusBadge } from "@/components/list-page-template";
 import { useConfirm } from "@/components/confirm-dialog";
 
