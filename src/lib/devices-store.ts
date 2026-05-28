@@ -12,11 +12,14 @@ export type Device = {
   productType: "gateway" | "device" | "children";
   gatewayId?: string;
   gatewayName?: string;
+  collectGateway?: string;
+  collectMode?: string;
   org: string;
   creator: string;
   status: DeviceStatus;
   statusTime: string;
   createTime: string;
+  updateTime: string;
   tags: TagModel[];
 };
 
@@ -28,40 +31,45 @@ const initial: Device[] = [
   {
     id: "1", name: "1号逆变器", sn: "INV-2025-0001",
     productId: "1", productName: "PV 逆变器", productType: "device",
-    gatewayId: "3", gatewayName: "网关-华东",
+    gatewayId: "3", gatewayName: "网关-华东-01",
+    collectGateway: "mqtt-client网关", collectMode: "MQTT_CLIENT",
     org: "Group Root", creator: "admin",
     status: "online", statusTime: "2026-05-19 02:14:08",
-    createTime: "2026-05-01 09:21:00",
+    createTime: "2026-05-01 09:21:00", updateTime: "2026-05-19 02:14:08",
     tags: [{ tagKey: "model", tagName: "型号", tagValue: "PV-3000" }],
   },
   {
     id: "2", name: "B2 电池柜", sn: "ESS-2025-002",
     productId: "2", productName: "储能电池柜", productType: "children",
-    gatewayId: "3", gatewayName: "网关-华东",
+    gatewayId: "3", gatewayName: "网关-华东-01",
+    collectGateway: "mqtt-client网关", collectMode: "MQTT_CLIENT",
     org: "Group Children1", creator: "admin",
     status: "online", statusTime: "2026-05-19 01:52:31",
-    createTime: "2026-04-22 10:11:55", tags: [],
+    createTime: "2026-04-22 10:11:55", updateTime: "2026-05-19 01:52:31", tags: [],
   },
   {
     id: "3", name: "12 号组串", sn: "INV-2025-0012",
     productId: "1", productName: "PV 逆变器", productType: "device",
+    collectGateway: "modbus网关", collectMode: "MODBUS_TCP",
     org: "Group Children1", creator: "zhiyuan.wang",
     status: "disabled", statusTime: "2026-05-19 01:30:11",
-    createTime: "2026-05-02 11:01:21", tags: [],
+    createTime: "2026-05-02 11:01:21", updateTime: "2026-05-19 01:30:11", tags: [],
   },
   {
     id: "4", name: "网关-华南-03", sn: "GW-South-03",
     productId: "3", productName: "网关-华东", productType: "gateway",
+    collectGateway: "mqtt-client网关", collectMode: "MQTT_CLIENT",
     org: "Group Root", creator: "admin",
     status: "online", statusTime: "2026-05-19 00:48:02",
-    createTime: "2026-03-15 14:08:30", tags: [],
+    createTime: "2026-03-15 14:08:30", updateTime: "2026-05-19 00:48:02", tags: [],
   },
   {
     id: "5", name: "环境监测 #1", sn: "ENV-2025-0001",
     productId: "4", productName: "环境监测仪", productType: "device",
+    collectGateway: "http网关", collectMode: "HTTP",
     org: "Group Root", creator: "test222",
     status: "offline", statusTime: "2026-05-19 00:12:50",
-    createTime: "2026-02-08 08:45:12", tags: [],
+    createTime: "2026-02-08 08:45:12", updateTime: "2026-05-19 00:12:50", tags: [],
   },
 ];
 
