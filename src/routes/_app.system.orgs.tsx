@@ -50,12 +50,6 @@ function addChild(tree: OrgNode[], parentId: string, node: OrgNode): OrgNode[] {
     n.id === parentId ? { ...n, children: [...(n.children ?? []), node] } : n,
   );
 }
-function collectIds(tree: OrgNode[]): string[] {
-  const out: string[] = [];
-  const walk = (ns: OrgNode[]) => ns.forEach((n) => { out.push(n.id); if (n.children) walk(n.children); });
-  walk(tree);
-  return out;
-}
 /** keep nodes whose label matches OR any descendant matches; return matched ids for highlight */
 function filterTree(tree: OrgNode[], kw: string): { tree: OrgNode[]; matched: Set<string> } {
   const matched = new Set<string>();
