@@ -15,7 +15,11 @@ function AppLayout() {
   const crumbs = findCrumbs(pathname);
 
   // expand the group containing the active route
-  const activeGroup = NAV.find((g) => g.children.some((c) => c.to === pathname))?.key;
+  const activeGroup = NAV.find((g) =>
+    g.children.some((c) =>
+      c.to === "/" ? pathname === "/" : pathname === c.to || pathname.startsWith(c.to + "/"),
+    ),
+  )?.key;
   const [open, setOpen] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(NAV.map((g) => [g.key, true])),
   );
