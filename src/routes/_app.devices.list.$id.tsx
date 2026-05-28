@@ -114,13 +114,14 @@ function DeviceDetailPage() {
       </div>
 
       <div className="vt-glass mt-3 flex-1 overflow-hidden p-5">
-        {tab === "info"    && <TabInfo deviceId={device.id} />}
-        {tab === "meta"    && <TabMeta deviceId={device.id} />}
-        {tab === "runtime" && <TabRuntime deviceId={device.id} />}
-        {tab === "func"    && <TabFunc deviceId={device.id} />}
-        {tab === "events"  && <TabEvents deviceId={device.id} />}
-        {tab === "rules"   && <TabRules deviceId={device.id} />}
-        {tab === "alarm"   && <TabAlarm deviceId={device.id} />}
+        {tab === "info"     && <TabInfo deviceId={device.id} />}
+        {tab === "meta"     && <TabMeta deviceId={device.id} />}
+        {tab === "runtime"  && <TabRuntime deviceId={device.id} />}
+        {tab === "func"     && <TabFunc deviceId={device.id} />}
+        {tab === "events"   && <TabEvents deviceId={device.id} />}
+        {tab === "rules"    && <TabRules deviceId={device.id} />}
+        {tab === "alarm"    && <TabAlarm deviceId={device.id} />}
+        {tab === "children" && <TabChildren deviceId={device.id} />}
       </div>
 
       {!product && tab !== "info" && (
