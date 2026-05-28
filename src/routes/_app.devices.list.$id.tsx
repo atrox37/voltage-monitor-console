@@ -781,18 +781,46 @@ function TabEvents({ deviceId }: { deviceId: string }) {
   );
 }
 
-/* ========== 设备告警 ========== */
+/* ========== 告警规则 ========== */
 function TabRules({ deviceId }: { deviceId: string }) {
   const device = useDevice(deviceId)!;
   const product = useProduct(device.productId);
+  const { confirm, confirmNode } = useConfirm();
   const rules = product?.metadata.rules ?? [];
-  const [enabledMap, setEnabledMap] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(rules.map((r) => [r.id, (r.state ?? 1) === 1])),
-  );
-  const toggle = (id: string) => setEnabledMap((m) => ({ ...m, [id]: !m[id] }));
+  const [editing, setEditing] = useState<RuleModel | null>(null);
+
+  const save = (r: RuleModel) => {
+    if (!product) return;
+    productActions.updateMetadata(product.id, (m) => {
+      const list = m.rules ?? [];
+      const exists = list.some((x) => x.id === r.id);
+      return { ...m, rules: exists ? list.map((x) => (x.id === r.id ? r : x)) : [...list, r] };
+    });
+    setEditing(null);
+  };
+  const del = (r: RuleModel) => {
+    if (!product) return;
+    confirm({
+      description: <>确定删除规则 <span className="font-semibold text-foreground">「{r.name}」</span> 吗？</>,
+      onConfirm: () => productActions.updateMetadata(product.id, (m) => ({
+        ...m, rules: (m.rules ?? []).filter((x) => x.id !== r.id),
+      })),
+    });
+  };
+  const toggle = (r: RuleModel) => save({ ...r, state: (r.state ?? 1) === 1 ? 0 : 1 });
 
   return (
     <div className="flex h-full flex-col">
+      <div className="mb-2 flex items-center justify-end">
+        <button
+          onClick={() => setEditing({
+            id: `r${Date.now()}`, name: "", state: 1,
+            ruleData: { type: "time", cron: "0 0/5 * * * ?", count: 1 },
+          })}
+          className="inline-flex items-center gap-1 rounded bg-primary px-2.5 py-1 text-xs text-primary-foreground hover:opacity-90">
+          <Plus className="h-3 w-3" /> 添加规则
+        </button>
+      </div>
       <div className="flex-1 overflow-auto rounded border border-panel-border">
         <table className="w-full text-sm">
           <thead>
@@ -802,11 +830,7 @@ function TabRules({ deviceId }: { deviceId: string }) {
               <th className="px-3 py-2 text-left font-medium w-40">轮询周期</th>
               <th className="px-3 py-2 text-left font-medium w-28">阈值次数</th>
               <th className="px-3 py-2 text-left font-medium w-24">状态</th>
-              <th className="px-3 py-2 text-right font-medium w-28">
-                <button className="inline-flex items-center gap-1 rounded bg-primary px-2 py-0.5 text-xs text-primary-foreground hover:opacity-90">
-                  <Plus className="h-3 w-3" /> 添加
-                </button>
-              </th>
+              <th className="px-3 py-2 text-right font-medium w-44">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -815,7 +839,7 @@ function TabRules({ deviceId }: { deviceId: string }) {
                 <Bell className="mx-auto mb-1 h-6 w-6 opacity-50" /> 暂无数据
               </td></tr>
             ) : rules.map((r) => {
-              const on = enabledMap[r.id] ?? true;
+              const on = (r.state ?? 1) === 1;
               return (
                 <tr key={r.id} className="border-t border-panel-border/60">
                   <td className="px-3 py-2">{r.name}</td>
@@ -823,17 +847,19 @@ function TabRules({ deviceId }: { deviceId: string }) {
                   <td className="px-3 py-2 text-xs text-text-secondary">{r.ruleData?.cron ?? "—"}</td>
                   <td className="px-3 py-2 text-xs text-text-secondary">{r.ruleData?.count ?? 1}</td>
                   <td className="px-3 py-2">
-                    {on ? (
-                      <span className="rounded bg-status-online/15 px-1.5 py-0.5 text-[11px] text-status-online">启用</span>
-                    ) : (
-                      <span className="rounded bg-panel-heavy px-1.5 py-0.5 text-[11px] text-text-muted">禁用</span>
-                    )}
+                    {on
+                      ? <span className="rounded bg-status-online/15 px-1.5 py-0.5 text-[11px] text-status-online">启用</span>
+                      : <span className="rounded bg-panel-heavy px-1.5 py-0.5 text-[11px] text-text-muted">禁用</span>}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <button onClick={() => toggle(r.id)}
-                      className="rounded border border-panel-border px-2 py-0.5 text-xs text-text-secondary hover:border-primary/40 hover:text-primary">
+                    <button onClick={() => toggle(r)}
+                      className="mr-1 rounded border border-panel-border px-2 py-0.5 text-xs text-text-secondary hover:border-primary/40 hover:text-primary">
                       {on ? "禁用" : "启用"}
                     </button>
+                    <button onClick={() => setEditing(r)}
+                      className="mr-1 rounded p-1 text-text-muted hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => del(r)}
+                      className="rounded p-1 text-text-muted hover:text-status-critical"><Trash2 className="h-3.5 w-3.5" /></button>
                   </td>
                 </tr>
               );
@@ -841,24 +867,52 @@ function TabRules({ deviceId }: { deviceId: string }) {
           </tbody>
         </table>
       </div>
+      <RuleDrawer open={!!editing} value={editing} onClose={() => setEditing(null)} onSave={save} />
+      {confirmNode}
     </div>
+  );
+}
+
+function RuleDrawer({ open, value, onClose, onSave }: {
+  open: boolean; value: RuleModel | null; onClose: () => void; onSave: (r: RuleModel) => void;
+}) {
+  const [draft, setDraft] = useState<RuleModel>({ id: "", name: "" });
+  useEffect(() => { if (value) setDraft({ ...value, ruleData: value.ruleData ?? { type: "time" } }); }, [value]);
+  const setRD = (patch: Partial<NonNullable<RuleModel["ruleData"]>>) =>
+    setDraft({ ...draft, ruleData: { ...(draft.ruleData ?? { type: "time" }), ...patch } });
+  return (
+    <VtDrawer open={open} onClose={onClose} title={value && value.name ? "编辑告警规则" : "新增告警规则"}
+      footer={<><VtBtn variant="ghost" onClick={onClose}>取消</VtBtn>
+        <VtBtn onClick={() => draft.name && onSave(draft)}>保存</VtBtn></>}>
+      <VtField label="规则名称" required>
+        <input className={vtInputCls} value={draft.name}
+          onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+      </VtField>
+      <VtField label="触发方式">
+        <select className={vtInputCls} value={draft.ruleData?.type ?? "time"}
+          onChange={(e) => setRD({ type: e.target.value })}>
+          <option value="time">轮询 (time)</option>
+          <option value="cron">cron</option>
+        </select>
+      </VtField>
+      <VtField label="轮询周期">
+        <input className={vtInputCls} value={draft.ruleData?.cron ?? ""}
+          onChange={(e) => setRD({ cron: e.target.value })} placeholder="0 0/5 * * * ?" />
+      </VtField>
+      <VtField label="阈值次数">
+        <input className={vtInputCls} type="number" min={1} value={draft.ruleData?.count ?? 1}
+          onChange={(e) => setRD({ count: Number(e.target.value) || 1 })} />
+      </VtField>
+    </VtDrawer>
   );
 }
 
 /* ========== 告警记录 ========== */
 function TabAlarm({ deviceId }: { deviceId: string }) {
-  const { confirm, confirmNode } = useConfirm();
-  const [list, setList] = useState<AlarmLog[]>(() => mockAlarms(deviceId));
+  const [list] = useState<AlarmLog[]>(() => mockAlarms(deviceId));
   const [from, setFrom] = useState("2026-05-22");
   const [to, setTo] = useState("2026-05-29");
-
-  const ack = (id: string) =>
-    setList((l) => l.map((a) => a.id === id ? { ...a, acked: true } : a));
-  const del = (a: AlarmLog) =>
-    confirm({
-      description: <>确定删除告警记录 <span className="font-semibold text-foreground">「{a.ruleName}」</span> 吗？</>,
-      onConfirm: () => setList((l) => l.filter((x) => x.id !== a.id)),
-    });
+  const [detail, setDetail] = useState<AlarmLog | null>(null);
 
   return (
     <div className="flex h-full flex-col">
@@ -879,7 +933,7 @@ function TabAlarm({ deviceId }: { deviceId: string }) {
               <th className="px-3 py-2 text-left font-medium w-28">触发次数</th>
               <th className="px-3 py-2 text-left font-medium">数据</th>
               <th className="px-3 py-2 text-left font-medium w-32">通知</th>
-              <th className="px-3 py-2 text-right font-medium w-40">详情</th>
+              <th className="px-3 py-2 text-right font-medium w-28">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -902,19 +956,9 @@ function TabAlarm({ deviceId }: { deviceId: string }) {
                   </span>
                 </td>
                 <td className="px-3 py-2 text-right">
-                  {a.acked ? (
-                    <span className="mr-1 inline-flex items-center gap-1 text-xs text-status-online">
-                      <CheckCircle2 className="h-3 w-3" /> 已确认
-                    </span>
-                  ) : (
-                    <button onClick={() => ack(a.id)}
-                      className="mr-1 rounded border border-panel-border px-2 py-0.5 text-xs text-text-secondary hover:border-primary/40 hover:text-primary">
-                      确认
-                    </button>
-                  )}
-                  <button onClick={() => del(a)}
-                    className="rounded border border-status-critical/40 px-2 py-0.5 text-xs text-status-critical hover:bg-status-critical/10">
-                    删除
+                  <button onClick={() => setDetail(a)}
+                    className="inline-flex items-center gap-1 rounded border border-panel-border px-2 py-0.5 text-xs text-text-secondary hover:border-primary/40 hover:text-primary">
+                    <Eye className="h-3 w-3" /> 详情
                   </button>
                 </td>
               </tr>
@@ -923,10 +967,186 @@ function TabAlarm({ deviceId }: { deviceId: string }) {
         </table>
       </div>
       <Pager total={list.length} />
+
+      <VtDrawer open={!!detail} onClose={() => setDetail(null)} title="告警详情">
+        {detail && (
+          <div className="space-y-3 text-sm">
+            <VtField label="规则名称"><span className="text-text-secondary">{detail.ruleName}</span></VtField>
+            <VtField label="级别"><span className="text-text-secondary">{detail.level === "critical" ? "严重" : "警告"}</span></VtField>
+            <VtField label="时间"><span className="text-text-secondary">{detail.time}</span></VtField>
+            <VtField label="状态"><span className="text-text-secondary">{detail.acked ? "已确认" : "未确认"}</span></VtField>
+            <VtField label="数据" full>
+              <pre className="rounded border border-panel-border bg-panel/40 p-3 text-xs text-text-secondary">{detail.message}</pre>
+            </VtField>
+          </div>
+        )}
+      </VtDrawer>
+    </div>
+  );
+}
+
+/* ========== 子设备（网关） ========== */
+function TabChildren({ deviceId }: { deviceId: string }) {
+  const device = useDevice(deviceId)!;
+  const product = useProduct(device.productId);
+  const allDevices = useDevices();
+  const { confirm, confirmNode } = useConfirm();
+  const trees = product?.metadata.trees ?? [];
+  const children = allDevices.filter((d) => d.gatewayId === device.id);
+
+  const updateTrees = (next: SimpleTreeMetadata[]) => {
+    if (!product) return;
+    productActions.updateMetadata(product.id, (m) => ({ ...m, trees: next }));
+  };
+
+  const addChildNode = (parentId: string | null) => {
+    const name = window.prompt("节点名称")?.trim();
+    if (!name) return;
+    const newNode: SimpleTreeMetadata = { id: `n${Date.now()}`, name, children: [] };
+    if (parentId === null) { updateTrees([...trees, newNode]); return; }
+    const walk = (list: SimpleTreeMetadata[]): SimpleTreeMetadata[] =>
+      list.map((n) => n.id === parentId
+        ? { ...n, children: [...(n.children ?? []), newNode] }
+        : { ...n, children: walk(n.children ?? []) });
+    updateTrees(walk(trees));
+  };
+  const renameNode = (id: string) => {
+    const name = window.prompt("新名称")?.trim();
+    if (!name) return;
+    const walk = (list: SimpleTreeMetadata[]): SimpleTreeMetadata[] =>
+      list.map((n) => n.id === id
+        ? { ...n, name }
+        : { ...n, children: walk(n.children ?? []) });
+    updateTrees(walk(trees));
+  };
+  const deleteNode = (id: string) => {
+    const walk = (list: SimpleTreeMetadata[]): SimpleTreeMetadata[] =>
+      list.filter((n) => n.id !== id).map((n) => ({ ...n, children: walk(n.children ?? []) }));
+    updateTrees(walk(trees));
+  };
+
+  return (
+    <div className="grid h-full grid-cols-[300px_1fr] gap-4 overflow-hidden">
+      {/* 左侧结构分路 */}
+      <div className="flex flex-col overflow-hidden rounded border border-panel-border">
+        <div className="flex items-center justify-between border-b border-panel-border bg-panel/40 px-3 py-2">
+          <span className="text-xs font-medium text-foreground">结构分路</span>
+          <div className="flex gap-1">
+            <button onClick={() => addChildNode(null)}
+              className="rounded bg-primary/10 px-2 py-0.5 text-[11px] text-primary hover:bg-primary/20">新增</button>
+            <button className="rounded border border-panel-border px-2 py-0.5 text-[11px] text-text-secondary hover:border-primary/40">保存</button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto p-2">
+          {trees.length === 0
+            ? <div className="py-8 text-center text-xs text-text-muted">暂无节点</div>
+            : trees.map((n) => (
+                <TreeNode key={n.id} node={n} depth={0}
+                  onAdd={addChildNode} onRename={renameNode} onDelete={deleteNode} />
+              ))}
+        </div>
+      </div>
+
+      {/* 右侧子设备列表 */}
+      <div className="flex flex-col overflow-hidden rounded border border-panel-border">
+        <div className="flex items-center justify-between border-b border-panel-border bg-panel/40 px-3 py-2">
+          <span className="text-xs font-medium text-foreground">子设备列表</span>
+          <button className="inline-flex items-center gap-1 rounded bg-primary px-2 py-0.5 text-[11px] text-primary-foreground hover:opacity-90">
+            <Plus className="h-3 w-3" /> 添加
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-panel/60 text-xs text-text-muted">
+                <th className="px-3 py-2 text-left font-medium">设备名称</th>
+                <th className="px-3 py-2 text-left font-medium">产品名称</th>
+                <th className="px-3 py-2 text-left font-medium w-40">关联网关</th>
+                <th className="px-3 py-2 text-left font-medium w-32">所属机构</th>
+                <th className="px-3 py-2 text-left font-medium w-24">创建人</th>
+                <th className="px-3 py-2 text-left font-medium w-44">创建时间</th>
+                <th className="px-3 py-2 text-left font-medium w-20">状态</th>
+                <th className="px-3 py-2 text-right font-medium w-16"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {children.length === 0 ? (
+                <tr><td colSpan={8} className="px-3 py-16 text-center text-xs text-text-muted">
+                  <Inbox className="mx-auto mb-1 h-6 w-6 opacity-50" /> 暂无数据
+                </td></tr>
+              ) : children.map((c) => (
+                <tr key={c.id} className="border-t border-panel-border/60">
+                  <td className="px-3 py-2">{c.name}</td>
+                  <td className="px-3 py-2 text-text-secondary">{c.productName}</td>
+                  <td className="px-3 py-2 text-text-secondary">{c.collectGateway ?? "—"}</td>
+                  <td className="px-3 py-2 text-text-secondary">{c.org}</td>
+                  <td className="px-3 py-2 text-text-secondary">{c.creator}</td>
+                  <td className="px-3 py-2 text-text-secondary">{c.createTime}</td>
+                  <td className="px-3 py-2">
+                    <span className={`rounded px-1.5 py-0.5 text-[11px] ${
+                      c.status === "online" ? "bg-status-online/15 text-status-online" :
+                      c.status === "disabled" ? "bg-panel-heavy text-text-muted" :
+                      "bg-status-critical/15 text-status-critical"
+                    }`}>
+                      {c.status === "online" ? "在线" : c.status === "disabled" ? "禁用" : "离线"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button onClick={() => confirm({
+                      description: <>确定移除子设备 <span className="font-semibold text-foreground">「{c.name}」</span> 吗？</>,
+                      onConfirm: () => deviceActions.update(c.id, { gatewayId: undefined, gatewayName: undefined }),
+                    })}
+                      className="rounded p-1 text-text-muted hover:text-status-critical">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Pager total={children.length} />
+      </div>
       {confirmNode}
     </div>
   );
 }
+
+function TreeNode({ node, depth, onAdd, onRename, onDelete }: {
+  node: SimpleTreeMetadata; depth: number;
+  onAdd: (id: string) => void; onRename: (id: string) => void; onDelete: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const hasKids = (node.children?.length ?? 0) > 0;
+  return (
+    <div>
+      <div className="group flex items-center gap-1 rounded px-1 py-1 text-xs hover:bg-panel/60"
+        style={{ paddingLeft: depth * 14 + 4 }}>
+        <button onClick={() => setOpen((o) => !o)} className="text-text-muted">
+          {hasKids ? (open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />) : <span className="inline-block h-3 w-3" />}
+        </button>
+        <span className="flex-1 truncate text-foreground">{node.name}</span>
+        <div className="hidden gap-1 group-hover:flex">
+          <button onClick={() => onRename(node.id)}
+            className="rounded bg-panel px-1.5 py-0.5 text-[10px] text-text-secondary hover:text-primary">重命名</button>
+          <button onClick={() => onAdd(node.id)}
+            className="rounded bg-panel px-1.5 py-0.5 text-[10px] text-text-secondary hover:text-primary">新增</button>
+          <button onClick={() => onDelete(node.id)}
+            className="rounded bg-panel px-1.5 py-0.5 text-[10px] text-text-secondary hover:text-status-critical">删除</button>
+        </div>
+      </div>
+      {open && hasKids && (
+        <div>
+          {node.children!.map((c) => (
+            <TreeNode key={c.id} node={c} depth={depth + 1}
+              onAdd={onAdd} onRename={onRename} onDelete={onDelete} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 /* ========== 通用分页栏 ========== */
 function Pager({ total }: { total: number }) {
