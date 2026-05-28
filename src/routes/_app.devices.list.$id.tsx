@@ -2,14 +2,14 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, RefreshCw, Send, Plus, X, Activity,
-  CheckCircle2, AlertTriangle,
+  CheckCircle2, AlertTriangle, Save, FileText, Bell,
 } from "lucide-react";
 import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
 import { OrgTreeSelect } from "@/components/org-tree-select";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
-  deviceActions, useDevice, mockReadings, mockAlarms,
-  type AlarmLog,
+  deviceActions, useDevice, mockReadings, mockAlarms, mockEvents,
+  type AlarmLog, type EventLog,
 } from "@/lib/devices-store";
 import { useProduct, PRODUCT_TYPE_LABEL } from "@/lib/products-store";
 import type { TagModel, SimpleFunctionMetadata } from "@/types/api/metadata";
@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_app/devices/list/$id")({
   component: DeviceDetailPage,
 });
 
-type TabKey = "info" | "runtime" | "func" | "alarm";
+type TabKey = "info" | "meta" | "runtime" | "func" | "events" | "rules" | "alarm";
 
 function DeviceDetailPage() {
   const { id } = Route.useParams();
@@ -39,9 +39,12 @@ function DeviceDetailPage() {
   }
 
   const tabs: { key: TabKey; label: string }[] = [
-    { key: "info", label: "基础信息" },
+    { key: "info", label: "基本信息" },
+    { key: "meta", label: "模型属性" },
     { key: "runtime", label: "运行状态" },
-    { key: "func", label: "功能调用" },
+    { key: "func", label: "设备功能" },
+    { key: "events", label: "日志信息" },
+    { key: "rules", label: "设备告警" },
     { key: "alarm", label: "告警记录" },
   ];
 
@@ -55,7 +58,7 @@ function DeviceDetailPage() {
 
   return (
     <main className="vt-page-content">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate({ to: "/devices/list" })}
@@ -64,10 +67,12 @@ function DeviceDetailPage() {
             <ArrowLeft className="h-3.5 w-3.5" /> 返回
           </button>
           <h2 className="vt-section-title text-base">{device.name}</h2>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-text-muted">状态</span>
           <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs ${statusCls}`}>
             <span className="h-1.5 w-1.5 rounded-full bg-current" />{statusLabel}
           </span>
-          <span className="font-mono text-[11px] text-text-muted">SN: {device.sn}</span>
         </div>
       </div>
 
@@ -88,8 +93,11 @@ function DeviceDetailPage() {
 
       <div className="vt-glass mt-3 flex-1 overflow-hidden p-5">
         {tab === "info"    && <TabInfo deviceId={device.id} />}
+        {tab === "meta"    && <TabMeta deviceId={device.id} />}
         {tab === "runtime" && <TabRuntime deviceId={device.id} />}
         {tab === "func"    && <TabFunc deviceId={device.id} />}
+        {tab === "events"  && <TabEvents deviceId={device.id} />}
+        {tab === "rules"   && <TabRules deviceId={device.id} />}
         {tab === "alarm"   && <TabAlarm deviceId={device.id} />}
       </div>
 
@@ -102,12 +110,12 @@ function DeviceDetailPage() {
   );
 }
 
-/* ========== 基础信息 ========== */
+/* ========== 基本信息 ========== */
 function TabInfo({ deviceId }: { deviceId: string }) {
   const device = useDevice(deviceId)!;
   const [tagDraft, setTagDraft] = useState<{ tag: TagModel; index: number } | null>(null);
 
-  const setField = <K extends "name" | "sn" | "org">(k: K, v: string) =>
+  const setField = <K extends keyof typeof device>(k: K, v: (typeof device)[K]) =>
     deviceActions.update(deviceId, { [k]: v } as Partial<typeof device>);
 
   const removeTag = (i: number) =>
@@ -123,37 +131,56 @@ function TabInfo({ deviceId }: { deviceId: string }) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-x-8 gap-y-3 lg:grid-cols-2">
-      <DescField label="设备名称">
-        <input className={vtInputCls} value={device.name} onChange={(e) => setField("name", e.target.value)} />
-      </DescField>
-      <DescField label="设备 SN">
-        <input className={vtInputCls} value={device.sn} onChange={(e) => setField("sn", e.target.value)} />
-      </DescField>
-      <DescField label="所属产品">
-        <span className="text-text-secondary">
-          {device.productName}
-          <span className="ml-1.5 rounded bg-panel-heavy px-1 py-0.5 text-[10px]">
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-x-6 gap-y-1 md:grid-cols-2 xl:grid-cols-3">
+        <Row label="设备名称">
+          <input className={vtInputCls} value={device.name} onChange={(e) => setField("name", e.target.value)} />
+        </Row>
+        <Row label="设备SN">
+          <input className={vtInputCls} value={device.sn} onChange={(e) => setField("sn", e.target.value)} />
+        </Row>
+        <Row label="所属机构">
+          <OrgTreeSelect value={device.org} onChange={(v) => setField("org", v)} />
+        </Row>
+        <Row label="产品名称">
+          <Link to="/devices/products/$id" params={{ id: device.productId }} className="text-primary hover:underline">
+            {device.productName}
+          </Link>
+        </Row>
+        <Row label="产品类型">
+          <span className="inline-block rounded bg-panel-heavy px-2 py-0.5 text-xs text-text-secondary">
             {PRODUCT_TYPE_LABEL[device.productType]}
           </span>
-        </span>
-      </DescField>
-      <DescField label="关联网关">
-        <span className="text-text-secondary">{device.gatewayName ?? "—"}</span>
-      </DescField>
-      <DescField label="创建人">
-        <span className="text-text-secondary">{device.creator}</span>
-      </DescField>
-      <DescField label="创建时间">
-        <span className="font-mono text-xs text-text-secondary">{device.createTime}</span>
-      </DescField>
-      <DescField label="所属机构">
-        <OrgTreeSelect value={device.org} onChange={(v) => setField("org", v)} />
-      </DescField>
-      <DescField label="最近上报">
-        <span className="font-mono text-xs text-text-secondary">{device.statusTime}</span>
-      </DescField>
-      <DescField label="标签" full>
+        </Row>
+        <Row label="所属人">
+          <span className="text-text-secondary">{device.creator}</span>
+        </Row>
+        <Row label="网关设备">
+          <span className="text-text-secondary">{device.gatewayName ?? "—"}</span>
+        </Row>
+        <Row label="采集网关">
+          <span className="text-text-secondary">{device.collectGateway ?? "—"}</span>
+        </Row>
+        <Row label="采集方式">
+          {device.collectMode ? (
+            <span className="inline-block rounded bg-status-info/15 px-2 py-0.5 text-xs text-status-info">
+              {device.collectMode}
+            </span>
+          ) : <span className="text-text-muted">—</span>}
+        </Row>
+        <Row label="创建时间">
+          <span className="text-text-secondary">{device.createTime}</span>
+        </Row>
+        <Row label="更新时间">
+          <span className="text-text-secondary">{device.updateTime}</span>
+        </Row>
+        <Row label="最近上报">
+          <span className="text-text-secondary">{device.statusTime}</span>
+        </Row>
+      </div>
+
+      <div>
+        <div className="mb-2 text-xs text-text-muted">设备标签</div>
         <div className="flex flex-wrap items-center gap-2">
           {device.tags.map((t, i) => (
             <span key={i} className="inline-flex items-center gap-1 rounded border border-panel-border bg-panel/40 px-2 py-0.5 text-xs text-text-secondary">
@@ -172,7 +199,7 @@ function TabInfo({ deviceId }: { deviceId: string }) {
             <Plus className="h-3 w-3" /> 新增标签
           </button>
         </div>
-      </DescField>
+      </div>
 
       <VtDrawer
         open={!!tagDraft}
@@ -181,7 +208,7 @@ function TabInfo({ deviceId }: { deviceId: string }) {
         width={420}
         footer={<>
           <VtBtn variant="ghost" onClick={() => setTagDraft(null)}>取消</VtBtn>
-          <VtBtn onClick={saveTag}>保存</VtBtn>
+          <VtBtn onClick={saveTag}><Save className="mr-1 inline h-3 w-3" /> 保存</VtBtn>
         </>}
       >
         {tagDraft && (
@@ -205,16 +232,63 @@ function TabInfo({ deviceId }: { deviceId: string }) {
   );
 }
 
-function DescField({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className={`grid grid-cols-[88px_1fr] items-center gap-3 border-b border-panel-border/60 py-2 ${full ? "lg:col-span-2" : ""}`}>
+    <div className="grid grid-cols-[96px_1fr] items-center gap-3 border-b border-panel-border/40 py-2">
       <span className="text-xs text-text-muted">{label}</span>
-      <div>{children}</div>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
 
-/* ========== 运行状态(实时属性) ========== */
+/* ========== 模型属性 ========== */
+function TabMeta({ deviceId }: { deviceId: string }) {
+  const device = useDevice(deviceId)!;
+  const product = useProduct(device.productId);
+  const props = product?.metadata.properties ?? [];
+
+  if (props.length === 0) {
+    return <div className="py-16 text-center text-sm text-text-muted">所属产品未定义物模型属性。</div>;
+  }
+
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="mb-2 text-xs text-text-muted">
+        以下属性来自所属产品 <span className="text-text-secondary">{device.productName}</span> 的物模型定义，共 {props.length} 项。
+      </div>
+      <div className="flex-1 overflow-auto rounded border border-panel-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-panel/60 text-xs text-text-muted">
+              <th className="px-3 py-2 text-left font-medium">标识</th>
+              <th className="px-3 py-2 text-left font-medium">名称</th>
+              <th className="px-3 py-2 text-left font-medium">数据类型</th>
+              <th className="px-3 py-2 text-left font-medium">单位</th>
+              <th className="px-3 py-2 text-left font-medium">读写</th>
+            </tr>
+          </thead>
+          <tbody>
+            {props.map((p) => (
+              <tr key={p.id} className="border-t border-panel-border/60">
+                <td className="px-3 py-2 text-text-secondary">{p.id}</td>
+                <td className="px-3 py-2">{p.name}</td>
+                <td className="px-3 py-2 text-text-secondary">{p.valueType?.type ?? "—"}</td>
+                <td className="px-3 py-2 text-text-secondary">{p.valueType?.unit ?? "—"}</td>
+                <td className="px-3 py-2">
+                  <span className="rounded bg-panel-heavy px-1.5 py-0.5 text-[11px] text-text-secondary">
+                    {p.rw ?? "readwrite"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ========== 运行状态 ========== */
 function TabRuntime({ deviceId }: { deviceId: string }) {
   const device = useDevice(deviceId)!;
   const product = useProduct(device.productId);
@@ -258,10 +332,10 @@ function TabRuntime({ deviceId }: { deviceId: string }) {
           <div key={r.id} className="rounded-lg border border-panel-border bg-panel/40 p-4">
             <div className="text-xs text-text-muted">{r.name}</div>
             <div className="mt-1 flex items-baseline gap-1">
-              <span className="font-mono text-2xl font-semibold text-foreground">{r.value}</span>
+              <span className="text-2xl font-semibold text-foreground">{r.value}</span>
               {r.unit && <span className="text-xs text-text-secondary">{r.unit}</span>}
             </div>
-            <div className="mt-2 font-mono text-[10px] text-text-muted">{r.updateTime}</div>
+            <div className="mt-2 text-[10px] text-text-muted">{r.updateTime}</div>
           </div>
         ))}
       </div>
@@ -269,7 +343,7 @@ function TabRuntime({ deviceId }: { deviceId: string }) {
   );
 }
 
-/* ========== 功能调用 ========== */
+/* ========== 设备功能 ========== */
 function TabFunc({ deviceId }: { deviceId: string }) {
   const device = useDevice(deviceId)!;
   const product = useProduct(device.productId);
@@ -309,7 +383,7 @@ function TabFunc({ deviceId }: { deviceId: string }) {
               <span className="text-sm text-foreground">{f.name}</span>
               {f.async && <span className="rounded bg-status-warning/15 px-1.5 py-0.5 text-[10px] text-status-warning">异步</span>}
             </div>
-            <div className="mt-0.5 font-mono text-[11px] text-text-muted">
+            <div className="mt-0.5 text-[11px] text-text-muted">
               {f.id} · 入 {f.inputs?.length ?? 0} / 出 {f.outputs?.length ?? 0}
             </div>
           </button>
@@ -327,7 +401,7 @@ function TabFunc({ deviceId }: { deviceId: string }) {
                 <li key={l.id} className="px-4 py-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-foreground">{l.fn}</span>
-                    <span className="font-mono text-[10px] text-text-muted">{l.time}</span>
+                    <span className="text-[10px] text-text-muted">{l.time}</span>
                   </div>
                   <div className="mt-0.5 text-xs text-text-secondary">{l.result}</div>
                 </li>
@@ -359,6 +433,144 @@ function TabFunc({ deviceId }: { deviceId: string }) {
           ))
         )}
       </VtDrawer>
+    </div>
+  );
+}
+
+/* ========== 日志信息 ========== */
+function TabEvents({ deviceId }: { deviceId: string }) {
+  const [list, setList] = useState<EventLog[]>(() => mockEvents(deviceId));
+  const [filter, setFilter] = useState<"all" | EventLog["type"]>("all");
+
+  const filtered = filter === "all" ? list : list.filter((e) => e.type === filter);
+  const typeMap: Record<EventLog["type"], { label: string; cls: string }> = {
+    property: { label: "属性",   cls: "bg-status-info/15 text-status-info" },
+    function: { label: "功能",   cls: "bg-primary/15 text-primary" },
+    online:   { label: "上线",   cls: "bg-status-online/15 text-status-online" },
+    offline:  { label: "下线",   cls: "bg-panel-heavy text-text-muted" },
+    error:    { label: "错误",   cls: "bg-status-critical/15 text-status-critical" },
+  };
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs text-text-secondary">
+          <FileText className="h-3.5 w-3.5" /> 共 {filtered.length} 条记录
+        </div>
+        <div className="flex items-center gap-1">
+          {(["all", "property", "function", "online", "offline", "error"] as const).map((k) => (
+            <button key={k} onClick={() => setFilter(k)}
+              className={`rounded border px-2 py-0.5 text-xs transition ${
+                filter === k
+                  ? "border-primary/60 bg-primary/15 text-primary"
+                  : "border-panel-border text-text-secondary hover:border-primary/40"
+              }`}>
+              {k === "all" ? "全部" : typeMap[k].label}
+            </button>
+          ))}
+          <VtBtn variant="ghost" onClick={() => setList(mockEvents(deviceId))}>
+            <RefreshCw className="mr-1 inline h-3 w-3" /> 刷新
+          </VtBtn>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto rounded border border-panel-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-panel/60 text-xs text-text-muted">
+              <th className="px-3 py-2 text-left font-medium w-20">类型</th>
+              <th className="px-3 py-2 text-left font-medium">来源</th>
+              <th className="px-3 py-2 text-left font-medium">内容</th>
+              <th className="px-3 py-2 text-left font-medium w-44">时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan={4} className="px-3 py-10 text-center text-xs text-text-muted">暂无日志</td></tr>
+            ) : filtered.map((e) => (
+              <tr key={e.id} className="border-t border-panel-border/60">
+                <td className="px-3 py-2">
+                  <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] ${typeMap[e.type].cls}`}>
+                    {typeMap[e.type].label}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-text-secondary">{e.source}</td>
+                <td className="px-3 py-2 text-text-secondary text-xs">{e.payload}</td>
+                <td className="px-3 py-2 text-xs text-text-secondary">{e.time}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ========== 设备告警 (产品级规则在该设备下的启停) ========== */
+function TabRules({ deviceId }: { deviceId: string }) {
+  const device = useDevice(deviceId)!;
+  const product = useProduct(device.productId);
+  const rules = product?.metadata.rules ?? [];
+  const [enabledMap, setEnabledMap] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(rules.map((r) => [r.id, (r.state ?? 1) === 1])),
+  );
+
+  if (rules.length === 0) {
+    return <div className="py-16 text-center text-sm text-text-muted">所属产品未定义告警规则。</div>;
+  }
+
+  const toggle = (id: string) => setEnabledMap((m) => ({ ...m, [id]: !m[id] }));
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="mb-2 flex items-center gap-2 text-xs text-text-secondary">
+        <Bell className="h-3.5 w-3.5" />
+        以下告警规则继承自产品 <span className="text-foreground">{device.productName}</span>，可在本设备下启停。
+      </div>
+      <div className="flex-1 overflow-auto rounded border border-panel-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-panel/60 text-xs text-text-muted">
+              <th className="px-3 py-2 text-left font-medium">规则名称</th>
+              <th className="px-3 py-2 text-left font-medium">触发方式</th>
+              <th className="px-3 py-2 text-left font-medium">规则 SQL</th>
+              <th className="px-3 py-2 text-left font-medium">状态</th>
+              <th className="px-3 py-2 text-right font-medium">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rules.map((r) => {
+              const on = enabledMap[r.id] ?? true;
+              return (
+                <tr key={r.id} className="border-t border-panel-border/60">
+                  <td className="px-3 py-2">{r.name}</td>
+                  <td className="px-3 py-2 text-text-secondary text-xs">
+                    {r.ruleData?.type === "cron" ? `cron · ${r.ruleData.cron ?? "-"}` : `time · ${r.ruleData?.cron ?? "-"}`}
+                  </td>
+                  <td className="px-3 py-2 text-text-secondary text-xs">{r.ruleMeta?.sql ?? "—"}</td>
+                  <td className="px-3 py-2">
+                    {on ? (
+                      <span className="inline-flex items-center gap-1 rounded bg-status-online/15 px-1.5 py-0.5 text-[11px] text-status-online">
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" /> 启用
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded bg-panel-heavy px-1.5 py-0.5 text-[11px] text-text-muted">
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" /> 禁用
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button onClick={() => toggle(r.id)}
+                      className="inline-flex items-center gap-1 rounded border border-panel-border px-2 py-1 text-xs text-text-secondary hover:border-primary/40 hover:text-primary">
+                      {on ? "禁用" : "启用"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -405,7 +617,7 @@ function TabAlarm({ deviceId }: { deviceId: string }) {
                   </span>
                 </td>
                 <td className="px-3 py-2 text-text-secondary">{a.message}</td>
-                <td className="px-3 py-2 font-mono text-xs text-text-secondary">{a.time}</td>
+                <td className="px-3 py-2 text-xs text-text-secondary">{a.time}</td>
                 <td className="px-3 py-2">
                   {a.acked ? (
                     <span className="inline-flex items-center gap-1 text-xs text-status-online">
