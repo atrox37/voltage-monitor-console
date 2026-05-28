@@ -102,14 +102,16 @@ function NotifyConfigsPage() {
         <ConfirmDialog
           open
           title="删除通知配置"
-          message={`确定删除「${delTarget.name}」吗？`}
-          onCancel={() => setDelTarget(null)}
+          description={`确定删除「${delTarget.name}」吗？`}
+          danger
+          onClose={() => setDelTarget(null)}
           onConfirm={() => {
             setRows((rs) => rs.filter((x) => x.id !== delTarget.id));
             setDelTarget(null);
           }}
         />
       )}
+
     </>
   );
 }
