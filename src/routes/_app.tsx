@@ -26,7 +26,7 @@ function AppLayout() {
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-panel-border bg-background/60 backdrop-blur-md md:flex">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-panel-border bg-background/60 backdrop-blur-md md:flex">
         <div className="flex h-14 items-center gap-2 px-4">
           <div className="flex h-8 w-8 items-center justify-center rounded bg-primary/15 text-primary ring-1 ring-primary/40">
             <Zap className="h-4 w-4" />
@@ -44,10 +44,10 @@ function AppLayout() {
               <div key={g.key} className="mb-1">
                 <button
                   onClick={() => setOpen((o) => ({ ...o, [g.key]: !o[g.key] }))}
-                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wider text-text-secondary hover:bg-panel hover:text-foreground"
+                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-semibold uppercase tracking-wider text-text-secondary hover:bg-panel hover:text-foreground"
                 >
                   <span className="flex items-center gap-2">
-                    <GroupIcon className="h-3.5 w-3.5" />
+                    <GroupIcon className="h-4 w-4" />
                     {g.label}
                   </span>
                   {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
@@ -61,7 +61,7 @@ function AppLayout() {
                           key={c.to}
                           to={c.to}
                           activeOptions={{ exact: true }}
-                          className="group relative flex items-center gap-2.5 rounded-md px-3 py-1.5 pl-7 text-sm text-text-secondary transition hover:text-foreground"
+                          className="group relative flex items-center gap-2.5 rounded-md px-3 py-2 pl-8 text-[15px] text-text-secondary transition hover:text-foreground"
                           activeProps={{
                             className: "bg-primary/15 text-foreground",
                           }}
@@ -71,7 +71,7 @@ function AppLayout() {
                               {isActive && (
                                 <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r bg-primary" />
                               )}
-                              <Icon className={`h-3.5 w-3.5 ${isActive ? "text-primary" : ""}`} />
+                              <Icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
                               <span>{c.label}</span>
                             </>
                           )}
@@ -98,7 +98,7 @@ function AppLayout() {
 
       {/* Main */}
       <div className="vt-page-shell flex-1 min-w-0">
-        <header className="vt-page-header border-b border-panel-border bg-background/40 backdrop-blur-md">
+        <header className="vt-page-header sticky top-0 z-30 border-b border-panel-border bg-background/80 backdrop-blur-md">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-text-secondary">{crumbs.group ?? "首页"}</span>
             <span className="text-text-muted">/</span>
