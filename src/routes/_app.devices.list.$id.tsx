@@ -241,6 +241,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function TabMeta({ deviceId }: { deviceId: string }) {
   const device = useDevice(deviceId)!;
   const product = useProduct(device.productId);
+  const { confirm, confirmNode } = useConfirm();
   const props = product?.metadata.properties ?? [];
   const fns   = product?.metadata.functions ?? [];
   const propertyTags: PropertyTagMetadata[] = product?.metadata.propertyTags ?? [
@@ -250,27 +251,82 @@ function TabMeta({ deviceId }: { deviceId: string }) {
   ];
 
   const [sub, setSub] = useState<"prop" | "fn">("prop");
-  const [filterTag, setFilterTag] = useState<string>("properties");
+  const [filterTag, setFilterTag] = useState<string>("all");
+
+  const [editingProp, setEditingProp] = useState<SimplePropertyMetadata | null>(null);
+  const [editingFn, setEditingFn] = useState<SimpleFunctionMetadata | null>(null);
 
   const filteredProps = useMemo(
-    () => props.filter((p) => !p.tagId || p.tagId === filterTag || filterTag === "all"),
+    () => props.filter((p) => filterTag === "all" || !p.tagId || p.tagId === filterTag),
     [props, filterTag],
   );
 
+  const saveProp = (p: SimplePropertyMetadata) => {
+    if (!product) return;
+    productActions.updateMetadata(product.id, (m) => {
+      const list = m.properties ?? [];
+      const exists = list.some((x) => x.id === p.id);
+      return {
+        ...m,
+        properties: exists ? list.map((x) => (x.id === p.id ? p : x)) : [...list, p],
+      };
+    });
+    setEditingProp(null);
+  };
+  const delProp = (p: SimplePropertyMetadata) => {
+    if (!product) return;
+    confirm({
+      description: <>确定删除属性 <span className="font-semibold text-foreground">「{p.name}」</span> 吗？</>,
+      onConfirm: () => productActions.updateMetadata(product.id, (m) => ({
+        ...m, properties: (m.properties ?? []).filter((x) => x.id !== p.id),
+      })),
+    });
+  };
+
+  const saveFn = (f: SimpleFunctionMetadata) => {
+    if (!product) return;
+    productActions.updateMetadata(product.id, (m) => {
+      const list = m.functions ?? [];
+      const exists = list.some((x) => x.id === f.id);
+      return {
+        ...m,
+        functions: exists ? list.map((x) => (x.id === f.id ? f : x)) : [...list, f],
+      };
+    });
+    setEditingFn(null);
+  };
+  const delFn = (f: SimpleFunctionMetadata) => {
+    if (!product) return;
+    confirm({
+      description: <>确定删除功能 <span className="font-semibold text-foreground">「{f.name}」</span> 吗？</>,
+      onConfirm: () => productActions.updateMetadata(product.id, (m) => ({
+        ...m, functions: (m.functions ?? []).filter((x) => x.id !== f.id),
+      })),
+    });
+  };
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      {/* 二级 tab */}
-      <div className="mb-2 flex gap-1 border-b border-panel-border/60">
-        {([["prop", "属性"], ["fn", "功能"]] as const).map(([k, l]) => {
-          const a = sub === k;
-          return (
-            <button key={k} onClick={() => setSub(k)}
-              className={`relative px-4 py-1.5 text-xs ${a ? "text-primary" : "text-text-secondary"}`}>
-              {l}
-              {a && <span className="absolute inset-x-2 -bottom-px h-0.5 bg-primary" />}
-            </button>
-          );
-        })}
+      <div className="mb-2 flex items-center justify-between border-b border-panel-border/60">
+        <div className="flex gap-1">
+          {([["prop", "属性"], ["fn", "功能"]] as const).map(([k, l]) => {
+            const a = sub === k;
+            return (
+              <button key={k} onClick={() => setSub(k)}
+                className={`relative px-4 py-1.5 text-xs ${a ? "text-primary" : "text-text-secondary"}`}>
+                {l}
+                {a && <span className="absolute inset-x-2 -bottom-px h-0.5 bg-primary" />}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => sub === "prop"
+            ? setEditingProp({ id: "", name: "", valueType: { type: "double", unit: "" } })
+            : setEditingFn({ id: "", name: "", async: false, inputs: [], outputs: [] })}
+          className="mb-1 inline-flex items-center gap-1 rounded bg-primary px-2.5 py-1 text-xs text-primary-foreground hover:opacity-90">
+          <Plus className="h-3 w-3" /> 添加{sub === "prop" ? "属性" : "功能"}
+        </button>
       </div>
 
       <div className="flex-1 overflow-auto rounded border border-panel-border">
@@ -279,24 +335,31 @@ function TabMeta({ deviceId }: { deviceId: string }) {
             <thead>
               <tr className="bg-panel/60 text-xs text-text-muted">
                 <th className="px-3 py-2 text-left font-medium">名称</th>
+                <th className="px-3 py-2 text-left font-medium w-40">标识</th>
                 <th className="px-3 py-2 text-left font-medium w-32">类型</th>
-                <th className="px-3 py-2 text-left font-medium w-40">单位</th>
-                <th className="px-3 py-2 text-left font-medium w-40">标签</th>
-                <th className="px-3 py-2 text-right font-medium w-20"></th>
+                <th className="px-3 py-2 text-left font-medium w-24">单位</th>
+                <th className="px-3 py-2 text-left font-medium w-32">标签</th>
+                <th className="px-3 py-2 text-right font-medium w-32">操作</th>
               </tr>
             </thead>
             <tbody>
               {filteredProps.length === 0 ? (
-                <tr><td colSpan={5} className="px-3 py-12 text-center text-xs text-text-muted">暂无数据</td></tr>
+                <tr><td colSpan={6} className="px-3 py-12 text-center text-xs text-text-muted">暂无数据</td></tr>
               ) : filteredProps.map((p) => (
                 <tr key={p.id} className="border-t border-panel-border/60">
                   <td className="px-3 py-2">{p.name}</td>
+                  <td className="px-3 py-2 text-text-secondary">{p.id}</td>
                   <td className="px-3 py-2 text-text-secondary">{p.valueType?.type ?? "—"}</td>
-                  <td className="px-3 py-2 text-text-secondary">{p.valueType?.unit ?? "—"}</td>
+                  <td className="px-3 py-2 text-text-secondary">{p.valueType?.unit || "—"}</td>
                   <td className="px-3 py-2 text-text-secondary">
                     {propertyTags.find((t) => t.id === p.tagId)?.name ?? "Properties"}
                   </td>
-                  <td className="px-3 py-2 text-right text-text-muted">—</td>
+                  <td className="px-3 py-2 text-right">
+                    <button onClick={() => setEditingProp(p)}
+                      className="mr-1 rounded p-1 text-text-muted hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => delProp(p)}
+                      className="rounded p-1 text-text-muted hover:text-status-critical"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -306,14 +369,15 @@ function TabMeta({ deviceId }: { deviceId: string }) {
             <thead>
               <tr className="bg-panel/60 text-xs text-text-muted">
                 <th className="px-3 py-2 text-left font-medium">名称</th>
-                <th className="px-3 py-2 text-left font-medium w-24">标识</th>
+                <th className="px-3 py-2 text-left font-medium w-40">标识</th>
                 <th className="px-3 py-2 text-left font-medium w-24">异步</th>
                 <th className="px-3 py-2 text-left font-medium w-32">入/出参</th>
+                <th className="px-3 py-2 text-right font-medium w-32">操作</th>
               </tr>
             </thead>
             <tbody>
               {fns.length === 0 ? (
-                <tr><td colSpan={4} className="px-3 py-12 text-center text-xs text-text-muted">暂无数据</td></tr>
+                <tr><td colSpan={5} className="px-3 py-12 text-center text-xs text-text-muted">暂无数据</td></tr>
               ) : fns.map((f) => (
                 <tr key={f.id} className="border-t border-panel-border/60">
                   <td className="px-3 py-2">{f.name}</td>
@@ -322,6 +386,12 @@ function TabMeta({ deviceId }: { deviceId: string }) {
                   <td className="px-3 py-2 text-text-secondary">
                     {(f.inputs?.length ?? 0)} / {(f.outputs?.length ?? 0)}
                   </td>
+                  <td className="px-3 py-2 text-right">
+                    <button onClick={() => setEditingFn(f)}
+                      className="mr-1 rounded p-1 text-text-muted hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => delFn(f)}
+                      className="rounded p-1 text-text-muted hover:text-status-critical"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -329,7 +399,6 @@ function TabMeta({ deviceId }: { deviceId: string }) {
         )}
       </div>
 
-      {/* 属性分组芯片 */}
       {sub === "prop" && (
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-panel-border/60 pt-3">
           {[{ id: "all", name: "全部" }, ...propertyTags].map((t) => {
@@ -343,14 +412,98 @@ function TabMeta({ deviceId }: { deviceId: string }) {
               </button>
             );
           })}
-          <button className="inline-flex items-center gap-1 rounded border border-dashed border-panel-border px-2 py-0.5 text-xs text-text-muted hover:border-primary/40 hover:text-primary">
-            <Plus className="h-3 w-3" /> New Tag
-          </button>
         </div>
       )}
+
+      <PropertyDrawer
+        open={!!editingProp}
+        value={editingProp}
+        onClose={() => setEditingProp(null)}
+        onSave={saveProp}
+        tags={propertyTags}
+      />
+      <FunctionDrawer
+        open={!!editingFn}
+        value={editingFn}
+        onClose={() => setEditingFn(null)}
+        onSave={saveFn}
+      />
+      {confirmNode}
     </div>
   );
 }
+
+function PropertyDrawer({ open, value, onClose, onSave, tags }: {
+  open: boolean; value: SimplePropertyMetadata | null; onClose: () => void;
+  onSave: (p: SimplePropertyMetadata) => void; tags: PropertyTagMetadata[];
+}) {
+  const [draft, setDraft] = useState<SimplePropertyMetadata>({ id: "", name: "" });
+  useEffect(() => { if (value) setDraft({ ...value, valueType: value.valueType ?? { type: "double" } }); }, [value]);
+  return (
+    <VtDrawer open={open} onClose={onClose} title={value?.id ? "编辑属性" : "新增属性"}
+      footer={<><VtBtn variant="ghost" onClick={onClose}>取消</VtBtn>
+        <VtBtn onClick={() => draft.name && draft.id && onSave(draft)}>保存</VtBtn></>}>
+      <VtField label="标识" required>
+        <input className={vtInputCls} value={draft.id} disabled={!!value?.id}
+          onChange={(e) => setDraft({ ...draft, id: e.target.value })} />
+      </VtField>
+      <VtField label="名称" required>
+        <input className={vtInputCls} value={draft.name}
+          onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+      </VtField>
+      <VtField label="类型">
+        <select className={vtInputCls} value={draft.valueType?.type ?? "double"}
+          onChange={(e) => setDraft({ ...draft, valueType: { ...draft.valueType, type: e.target.value } })}>
+          {DATA_TYPES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      </VtField>
+      <VtField label="单位">
+        <select className={vtInputCls} value={draft.valueType?.unit ?? ""}
+          onChange={(e) => setDraft({ ...draft, valueType: { ...draft.valueType!, unit: e.target.value } })}>
+          <option value="">无</option>
+          {DATA_UNITS.map((u) => <option key={u.unit} value={u.unit}>{u.unit} — {u.en}</option>)}
+        </select>
+      </VtField>
+      <VtField label="标签">
+        <select className={vtInputCls} value={draft.tagId ?? ""}
+          onChange={(e) => setDraft({ ...draft, tagId: e.target.value || undefined })}>
+          <option value="">未分组</option>
+          {tags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      </VtField>
+    </VtDrawer>
+  );
+}
+
+function FunctionDrawer({ open, value, onClose, onSave }: {
+  open: boolean; value: SimpleFunctionMetadata | null; onClose: () => void;
+  onSave: (f: SimpleFunctionMetadata) => void;
+}) {
+  const [draft, setDraft] = useState<SimpleFunctionMetadata>({ id: "", name: "" });
+  useEffect(() => { if (value) setDraft({ ...value, inputs: value.inputs ?? [], outputs: value.outputs ?? [] }); }, [value]);
+  return (
+    <VtDrawer open={open} onClose={onClose} title={value?.id ? "编辑功能" : "新增功能"}
+      footer={<><VtBtn variant="ghost" onClick={onClose}>取消</VtBtn>
+        <VtBtn onClick={() => draft.name && draft.id && onSave(draft)}>保存</VtBtn></>}>
+      <VtField label="标识" required>
+        <input className={vtInputCls} value={draft.id} disabled={!!value?.id}
+          onChange={(e) => setDraft({ ...draft, id: e.target.value })} />
+      </VtField>
+      <VtField label="名称" required>
+        <input className={vtInputCls} value={draft.name}
+          onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+      </VtField>
+      <VtField label="异步">
+        <label className="inline-flex items-center gap-2 text-xs text-text-secondary">
+          <input type="checkbox" checked={!!draft.async} className="h-3.5 w-3.5 accent-primary"
+            onChange={(e) => setDraft({ ...draft, async: e.target.checked })} />
+          异步执行
+        </label>
+      </VtField>
+    </VtDrawer>
+  );
+}
+
 
 /* ========== 运行状态 ========== */
 function TabRuntime({ deviceId }: { deviceId: string }) {
