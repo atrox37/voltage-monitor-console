@@ -15,8 +15,8 @@ export const Route = createFileRoute("/_app/devices/products/")({
   component: ProductsPage,
 });
 
-type Draft = { name: string; sn: string; type: ProductType; org: string };
-const emptyDraft = (): Draft => ({ name: "", sn: "", type: "device", org: "Group Root" });
+type Draft = { name: string; sn: string; type: ProductType };
+const emptyDraft = (): Draft => ({ name: "", sn: "", type: "device" });
 
 function ProductsPage() {
   const navigate = useNavigate();
