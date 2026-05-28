@@ -40,16 +40,8 @@ function ProductsPage() {
     setDraft(emptyDraft());
   };
 
-  const saveEdit = () => {
-    if (!editing) return;
-    productActions.update(editing.id, {
-      name: editing.name,
-      sn: editing.sn,
-      type: editing.type,
-      org: editing.org,
-    });
-    setEditing(null);
-  };
+
+
 
   return (
     <>
