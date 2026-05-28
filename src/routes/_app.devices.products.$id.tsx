@@ -55,7 +55,7 @@ function ProductDetailPage() {
   const tabs: { key: TabKey; label: string; hidden?: boolean }[] = [
     { key: "info", label: "基础信息" },
     { key: "meta", label: "物模型" },
-    { key: "tree", label: "网关分路" },
+    { key: "tree", label: "网关分路", hidden: product.type !== "gateway" },
     { key: "rule", label: "告警规则" },
   ];
   const visible = tabs.filter((t) => !t.hidden);
@@ -315,7 +315,7 @@ function TabMeta({ productId }: { productId: string }) {
         </div>
         <button
           onClick={() => sub === "prop"
-            ? setPropDraft({ data: { id: "", name: "", rw: "readwrite", valueType: { type: "double", unit: "", extra: { point: 2 } }, create: true }, index: -1 })
+            ? setPropDraft({ data: { id: "", name: "", rw: "readwrite", valueType: { type: "double", unit: "", extra: { point: 2 } }, tagId: selectedTagId !== "-1" ? selectedTagId : undefined, create: true }, index: -1 })
             : setFuncDraft({ data: { id: "", name: "", async: false, inputs: [], outputs: [] }, index: -1 })}
           className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:brightness-110"
         >

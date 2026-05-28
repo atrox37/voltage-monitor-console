@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
 import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
-import { OrgTreeSelect } from "@/components/org-tree-select";
 import {
   type Product,
   type ProductType,
@@ -15,15 +14,15 @@ export const Route = createFileRoute("/_app/devices/products/")({
   component: ProductsPage,
 });
 
-type Draft = { name: string; sn: string; type: ProductType; org: string };
-const emptyDraft = (): Draft => ({ name: "", sn: "", type: "device", org: "Group Root" });
+type Draft = { name: string; sn: string; type: ProductType };
+const emptyDraft = (): Draft => ({ name: "", sn: "", type: "device" });
 
 function ProductsPage() {
   const navigate = useNavigate();
   const rows = useProducts();
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
-  const [editing, setEditing] = useState<Product | null>(null);
+
 
   const goDetail = (id: string) => navigate({ to: "/devices/products/$id", params: { id } });
 
@@ -33,23 +32,15 @@ function ProductsPage() {
       name: draft.name.trim(),
       sn: draft.sn.trim(),
       type: draft.type,
-      org: draft.org,
+      org: "Group Root",
       creator: "admin",
     });
     setAddOpen(false);
     setDraft(emptyDraft());
   };
 
-  const saveEdit = () => {
-    if (!editing) return;
-    productActions.update(editing.id, {
-      name: editing.name,
-      sn: editing.sn,
-      type: editing.type,
-      org: editing.org,
-    });
-    setEditing(null);
-  };
+
+
 
   return (
     <>
@@ -95,7 +86,6 @@ function ProductsPage() {
         rowActions={(r) => (
           <>
             <RowBtn onClick={() => goDetail(r.id)}>详情</RowBtn>
-            <RowBtn onClick={() => setEditing({ ...r })}>编辑</RowBtn>
             <RowBtn
               danger
               confirm={{ description: <>确定要删除产品 <span className="font-semibold text-foreground">「{r.name}」</span> 吗？该操作不可恢复。</> }}
@@ -116,24 +106,6 @@ function ProductsPage() {
         </>}
       >
         <ProductForm value={draft} onChange={setDraft} />
-      </VtDrawer>
-
-      {/* Edit Drawer */}
-      <VtDrawer
-        open={!!editing}
-        onClose={() => setEditing(null)}
-        title="编辑产品"
-        footer={<>
-          <VtBtn variant="ghost" onClick={() => setEditing(null)}>关闭</VtBtn>
-          <VtBtn onClick={saveEdit}>保存提交</VtBtn>
-        </>}
-      >
-        {editing && (
-          <ProductForm
-            value={{ name: editing.name, sn: editing.sn, type: editing.type, org: editing.org }}
-            onChange={(v) => setEditing({ ...editing, ...v })}
-          />
-        )}
       </VtDrawer>
     </>
   );
@@ -169,9 +141,7 @@ function ProductForm({ value, onChange }: { value: Draft; onChange: (v: Draft) =
           <option value="children">子设备</option>
         </select>
       </VtField>
-      <VtField label="所属机构" required>
-        <OrgTreeSelect value={value.org} onChange={(v) => onChange({ ...value, org: v })} />
-      </VtField>
     </>
   );
 }
+
