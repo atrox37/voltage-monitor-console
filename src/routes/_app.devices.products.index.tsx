@@ -33,7 +33,7 @@ function ProductsPage() {
       name: draft.name.trim(),
       sn: draft.sn.trim(),
       type: draft.type,
-      org: draft.org,
+      org: "Group Root",
       creator: "admin",
     });
     setAddOpen(false);
