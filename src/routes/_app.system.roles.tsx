@@ -187,9 +187,7 @@ function RolesPage() {
         onAdd={() => setAddOpen(true)}
         rowActions={(r) => (
           <>
-            <RowBtn onClick={() => setEditing({ ...r, menus: new Set(r.menus), perms: { ...r.perms } })}>
-              编辑
-            </RowBtn>
+            <RowBtn onClick={() => openMenu(r)}>编辑</RowBtn>
             <RowBtn
               danger
               confirm={{ description: <>确定要删除角色 <span className="font-semibold text-foreground">「{r.name}」</span> 吗？该操作不可恢复。</> }}
