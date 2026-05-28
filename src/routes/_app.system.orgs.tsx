@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Pencil, UsersRound, Plus, Trash2 } from "lucide-react";
+import {
+  Pencil, UsersRound, Plus, Trash2, Search, Minus,
+  ChevronsDownUp, ChevronsUpDown, X, Crosshair, ArrowLeft,
+} from "lucide-react";
 import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
-import { ORG_TREE, type OrgNode } from "@/components/org-tree-select";
+import { ORG_TREE, type OrgNode, OrgTreeSelect, flattenOrgs } from "@/components/org-tree-select";
 import { StatusBadge } from "@/components/list-page-template";
 import { useConfirm } from "@/components/confirm-dialog";
 
@@ -47,17 +50,53 @@ function addChild(tree: OrgNode[], parentId: string, node: OrgNode): OrgNode[] {
     n.id === parentId ? { ...n, children: [...(n.children ?? []), node] } : n,
   );
 }
+/** keep nodes whose label matches OR any descendant matches; return matched ids for highlight */
+function filterTree(tree: OrgNode[], kw: string): { tree: OrgNode[]; matched: Set<string> } {
+  const matched = new Set<string>();
+  if (!kw.trim()) return { tree, matched };
+  const k = kw.trim().toLowerCase();
+  const walk = (ns: OrgNode[]): OrgNode[] =>
+    ns
+      .map((n) => {
+        const kids = n.children ? walk(n.children) : [];
+        const hit = n.label.toLowerCase().includes(k);
+        if (hit) matched.add(n.id);
+        if (hit || kids.length) return { ...n, children: kids };
+        return null;
+      })
+      .filter(Boolean) as OrgNode[];
+  return { tree: walk(tree), matched };
+}
 
 function OrgsPage() {
   const [tree, setTree] = useState<OrgNode[]>(ORG_TREE);
   const [editing, setEditing] = useState<{ mode: "edit" | "add"; id?: string; parentId?: string; name: string } | null>(null);
   const [membersOf, setMembersOf] = useState<OrgNode | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [keyword, setKeyword] = useState("");
+  const [focusLabel, setFocusLabel] = useState(""); // label of focused subtree root
   const { confirm, confirmNode } = useConfirm();
 
-  const handleAction = (cmd: "edit" | "members" | "add" | "delete", node: OrgNode) => {
+  const allOrgs = useMemo(() => flattenOrgs(tree), [tree]);
+  const focusedNode = useMemo(
+    () => (focusLabel ? allOrgs.find((n) => n.label === focusLabel) : undefined),
+    [focusLabel, allOrgs],
+  );
+  const baseTree = focusedNode ? [focusedNode] : tree;
+  const { tree: viewTree, matched } = useMemo(() => filterTree(baseTree, keyword), [baseTree, keyword]);
+
+  const handleAction = (cmd: "edit" | "members" | "add" | "delete" | "toggle" | "focus", node: OrgNode) => {
     if (cmd === "edit") setEditing({ mode: "edit", id: node.id, name: node.label });
     if (cmd === "members") setMembersOf(node);
     if (cmd === "add") setEditing({ mode: "add", parentId: node.id, name: "" });
+    if (cmd === "focus") setFocusLabel(node.label);
+    if (cmd === "toggle") {
+      setCollapsed((s) => {
+        const next = new Set(s);
+        if (next.has(node.id)) next.delete(node.id); else next.add(node.id);
+        return next;
+      });
+    }
     if (cmd === "delete") {
       confirm({
         description: <>确定要删除组织 <span className="font-semibold text-foreground">「{node.label}」</span> 吗？该操作不可恢复。</>,
@@ -77,18 +116,85 @@ function OrgsPage() {
     setEditing(null);
   };
 
+  const expandAll = () => setCollapsed(new Set());
+  const collapseAll = () => {
+    // collapse everything that has children
+    const ids = new Set<string>();
+    const walk = (ns: OrgNode[]) => ns.forEach((n) => {
+      if (n.children?.length) { ids.add(n.id); walk(n.children); }
+    });
+    walk(tree);
+    setCollapsed(ids);
+  };
+
   const members = useMemo(() => (membersOf ? MEMBERS[membersOf.id] ?? [] : []), [membersOf]);
 
   return (
     <main className="vt-page-content">
-      <h2 className="vt-section-title text-base">机构管理</h2>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="vt-section-title text-base">机构管理</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
+            <input
+              className={`${vtInputCls} pl-7 pr-7 w-56`}
+              placeholder="搜索机构名称"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+            />
+            {keyword && (
+              <button
+                onClick={() => setKeyword("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <div className="w-56">
+            <OrgTreeSelect
+              value={focusLabel}
+              onChange={setFocusLabel}
+              placeholder="聚焦某个机构"
+              allowAll
+            />
+          </div>
+          <VtBtn variant="ghost" onClick={expandAll}>
+            <ChevronsUpDown className="h-3.5 w-3.5" /> 展开
+          </VtBtn>
+          <VtBtn variant="ghost" onClick={collapseAll}>
+            <ChevronsDownUp className="h-3.5 w-3.5" /> 收起
+          </VtBtn>
+        </div>
+      </div>
+
+      {focusLabel && (
+        <div className="flex items-center gap-2 text-xs text-text-secondary">
+          <ArrowLeft className="h-3 w-3" />
+          <button onClick={() => setFocusLabel("")} className="hover:text-primary">
+            返回完整结构
+          </button>
+          <span className="text-text-muted">当前聚焦：</span>
+          <span className="text-primary font-medium">{focusLabel}</span>
+        </div>
+      )}
 
       <div className="vt-glass flex-1 overflow-auto p-8">
-        <div className="flex min-w-max justify-center">
-          {tree.map((root) => (
-            <OrgChartNode key={root.id} node={root} onAction={handleAction} />
-          ))}
-        </div>
+        {viewTree.length === 0 ? (
+          <div className="py-20 text-center text-sm text-text-muted">未找到匹配的机构</div>
+        ) : (
+          <div className="flex min-w-max justify-center">
+            {viewTree.map((root) => (
+              <OrgChartNode
+                key={root.id}
+                node={root}
+                collapsed={collapsed}
+                matched={matched}
+                onAction={handleAction}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Edit / Add Drawer */}
@@ -164,23 +270,29 @@ function OrgsPage() {
   );
 }
 
-/* ===== Org chart node =====
- * Classic CSS approach: each child cell gets a top half-border to fake
- * the horizontal trunk between siblings, plus a vertical drop line.
- */
+/* ===== Org chart node ===== */
 function OrgChartNode({
-  node, onAction,
+  node, collapsed, matched, onAction,
 }: {
   node: OrgNode;
-  onAction: (cmd: "edit" | "members" | "add" | "delete", n: OrgNode) => void;
+  collapsed: Set<string>;
+  matched: Set<string>;
+  onAction: (cmd: "edit" | "members" | "add" | "delete" | "toggle" | "focus", n: OrgNode) => void;
 }) {
   const children = node.children ?? [];
   const hasChildren = children.length > 0;
+  const isCollapsed = collapsed.has(node.id);
+  const showChildren = hasChildren && !isCollapsed;
   return (
     <div className="flex flex-col items-center">
-      <NodeCard node={node} onAction={onAction} />
+      <NodeCard
+        node={node}
+        collapsed={isCollapsed}
+        highlighted={matched.has(node.id)}
+        onAction={onAction}
+      />
 
-      {hasChildren && (
+      {showChildren && (
         <>
           <div className="h-6 w-px bg-panel-border" />
           <div className="flex items-start">
@@ -200,7 +312,7 @@ function OrgChartNode({
                 <div key={c.id} className="flex flex-col items-center px-3">
                   <div className={`h-0 ${topClass}`} />
                   <div className="h-6 w-px bg-panel-border" />
-                  <OrgChartNode node={c} onAction={onAction} />
+                  <OrgChartNode node={c} collapsed={collapsed} matched={matched} onAction={onAction} />
                 </div>
               );
             })}
@@ -212,14 +324,21 @@ function OrgChartNode({
 }
 
 function NodeCard({
-  node, onAction,
+  node, collapsed, highlighted, onAction,
 }: {
   node: OrgNode;
-  onAction: (cmd: "edit" | "members" | "add" | "delete", n: OrgNode) => void;
+  collapsed: boolean;
+  highlighted: boolean;
+  onAction: (cmd: "edit" | "members" | "add" | "delete" | "toggle" | "focus", n: OrgNode) => void;
 }) {
   const count = node.children?.length ?? 0;
+  const hasChildren = count > 0;
   return (
-    <div className="vt-glass relative w-56 overflow-hidden">
+    <div
+      className={`vt-glass relative w-56 overflow-hidden transition ${
+        highlighted ? "ring-2 ring-primary/60 shadow-lg shadow-primary/20" : ""
+      }`}
+    >
       <div className="bg-primary/15 px-3 py-2 text-center text-sm font-semibold text-primary border-b border-primary/30">
         {node.label}
       </div>
@@ -227,7 +346,28 @@ function NodeCard({
         <span className="inline-flex items-center gap-1">
           <UsersRound className="h-3 w-3" />
           子节点 <span className="font-mono text-foreground">{count}</span>
+          {collapsed && hasChildren && (
+            <span className="ml-1 rounded bg-panel px-1 py-px text-[10px] text-text-muted">已收起</span>
+          )}
         </span>
+        <div className="flex items-center gap-1">
+          {hasChildren && (
+            <button
+              onClick={() => onAction("toggle", node)}
+              title={collapsed ? "展开" : "收起"}
+              className="text-text-muted hover:text-primary"
+            >
+              {collapsed ? <Plus className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+            </button>
+          )}
+          <button
+            onClick={() => onAction("focus", node)}
+            title="聚焦此机构"
+            className="text-text-muted hover:text-primary"
+          >
+            <Crosshair className="h-3 w-3" />
+          </button>
+        </div>
       </div>
       <div className="flex items-stretch divide-x divide-panel-border/60">
         <IconBtn icon={Pencil}     label="编辑"     onClick={() => onAction("edit", node)} />
