@@ -26,7 +26,7 @@ function AppLayout() {
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-panel-border bg-background/60 backdrop-blur-md md:flex">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-panel-border bg-background/60 backdrop-blur-md md:flex">
         <div className="flex h-14 items-center gap-2 px-4">
           <div className="flex h-8 w-8 items-center justify-center rounded bg-primary/15 text-primary ring-1 ring-primary/40">
             <Zap className="h-4 w-4" />
