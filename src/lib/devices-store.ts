@@ -157,3 +157,26 @@ export function mockAlarms(deviceId: string): AlarmLog[] {
       message: "心跳缺失 30s", time: "2026-05-18 22:14:08", acked: true },
   ];
 }
+
+export type EventLog = {
+  id: string;
+  type: "property" | "function" | "online" | "offline" | "error";
+  source: string;
+  payload: string;
+  time: string;
+};
+
+export function mockEvents(deviceId: string): EventLog[] {
+  return [
+    { id: `${deviceId}-e1`, type: "property", source: "voltage",
+      payload: `{"value": 235.6, "unit": "V"}`, time: "2026-05-19 02:14:08" },
+    { id: `${deviceId}-e2`, type: "property", source: "power",
+      payload: `{"value": 4.21, "unit": "kW"}`, time: "2026-05-19 02:13:08" },
+    { id: `${deviceId}-e3`, type: "function", source: "restart",
+      payload: `{"result": "success", "code": 0}`, time: "2026-05-19 02:00:11" },
+    { id: `${deviceId}-e4`, type: "online", source: "session",
+      payload: `device online from 10.0.12.55`, time: "2026-05-19 01:48:02" },
+    { id: `${deviceId}-e5`, type: "error", source: "decoder",
+      payload: `parse frame failed: invalid CRC`, time: "2026-05-18 23:11:30" },
+  ];
+}
