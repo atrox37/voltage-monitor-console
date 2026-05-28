@@ -1,24 +1,29 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, RefreshCw, Send, Plus, BarChart3,
-  CheckCircle2, AlertTriangle, Save, FileText, Bell, RotateCw, Inbox,
+  ArrowLeft, RefreshCw, Send, Plus, BarChart3, Trash2, Pencil,
+  AlertTriangle, Save, FileText, Bell, RotateCw, Inbox, Eye,
+  ChevronRight, ChevronDown,
 } from "lucide-react";
-import { VtBtn, vtInputCls } from "@/components/vt-drawer";
+import { VtBtn, VtDrawer, VtField, vtInputCls } from "@/components/vt-drawer";
 import { OrgTreeSelect } from "@/components/org-tree-select";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
-  deviceActions, useDevice, mockReadings, mockAlarms, mockEvents,
+  deviceActions, useDevice, useDevices, mockReadings, mockAlarms, mockEvents,
   type AlarmLog, type EventLog,
 } from "@/lib/devices-store";
-import { useProduct, PRODUCT_TYPE_LABEL } from "@/lib/products-store";
-import type { PropertyTagMetadata } from "@/types/api/metadata";
+import { useProduct, productActions, PRODUCT_TYPE_LABEL } from "@/lib/products-store";
+import type {
+  PropertyTagMetadata, SimplePropertyMetadata, SimpleFunctionMetadata,
+  SimpleTreeMetadata, RuleModel,
+} from "@/types/api/metadata";
+import { DATA_TYPES, DATA_UNITS } from "@/lib/data-types";
 
 export const Route = createFileRoute("/_app/devices/list/$id")({
   component: DeviceDetailPage,
 });
 
-type TabKey = "info" | "meta" | "runtime" | "func" | "events" | "rules" | "alarm";
+type TabKey = "info" | "meta" | "runtime" | "func" | "events" | "rules" | "alarm" | "children";
 
 /* 默认的设备标签字段集（对照原项目截图） */
 const DEFAULT_TAG_FIELDS = [
