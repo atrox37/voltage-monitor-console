@@ -98,7 +98,7 @@ function AppLayout() {
 
       {/* Main */}
       <div className="vt-page-shell flex-1 min-w-0">
-        <header className="vt-page-header border-b border-panel-border bg-background/40 backdrop-blur-md">
+        <header className="vt-page-header sticky top-0 z-30 border-b border-panel-border bg-background/80 backdrop-blur-md">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-text-secondary">{crumbs.group ?? "首页"}</span>
             <span className="text-text-muted">/</span>
