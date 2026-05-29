@@ -230,6 +230,39 @@ export function ListPageTemplate<T extends { id: string | number }>({
   );
 }
 
+function ActionsDropdown({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+  return (
+    <div ref={ref} className="relative inline-block text-left">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-7 w-7 items-center justify-center rounded border border-panel-border bg-panel text-text-secondary transition hover:border-primary/40 hover:text-primary"
+        aria-label="更多操作"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className="absolute right-0 top-full z-50 mt-1 flex min-w-[8rem] flex-col items-stretch gap-1 rounded-md border border-panel-border bg-panel p-2 text-left shadow-lg [&_button]:mx-0 [&_button]:w-full [&_button]:justify-start"
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---- helpers ---- */
 export function StatusBadge({
   status,
