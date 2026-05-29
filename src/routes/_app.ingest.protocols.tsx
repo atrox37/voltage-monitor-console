@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { RefreshCw } from "lucide-react";
-import { RefreshCw, PlayCircle, Pencil, Trash2 } from "lucide-react";
+import { RefreshCw, PlayCircle } from "lucide-react";
+import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
 import { VtDrawer, VtField, vtInputCls, VtBtn, VtSegmented } from "@/components/vt-drawer";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
