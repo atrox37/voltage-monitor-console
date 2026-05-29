@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState, useCallback } from "react";
+import { type ReactNode, useEffect, useState, useCallback, type ComponentType } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { VtBtn } from "@/components/vt-drawer";
 
