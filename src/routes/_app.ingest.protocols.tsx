@@ -134,6 +134,8 @@ function ProtocolsPage() {
       <ConfirmDialog
         open={!!syncTarget}
         title="同步协议"
+        icon={RefreshCw}
+        danger={false}
         description={<>确定要同步协议 <span className="font-semibold text-foreground">{syncTarget?.name}</span> 到所有已绑定的网关吗？</>}
         confirmText="同步"
         onConfirm={() => syncTarget && handleSync(syncTarget)}
