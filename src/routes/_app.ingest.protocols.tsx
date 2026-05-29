@@ -202,10 +202,20 @@ function ProtocolDrawer({
 
       <VtField label="上传" required>
         <div className="flex gap-2">
-          <input className={vtInputCls} placeholder=""
-            value={draft.uploadUrl} onChange={(e) => set("uploadUrl", e.target.value)} />
+          <input
+            className={`${vtInputCls} cursor-default`}
+            readOnly
+            placeholder="请选择文件"
+            value={fileNameFromUrl(draft.uploadUrl)}
+          />
           <button
             type="button"
+            onClick={() =>
+              set(
+                "uploadUrl",
+                `http://192.168.30.10:39000/protocol/protocol/${draft.name || "upload"}.jar`,
+              )
+            }
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-panel-border bg-panel text-text-secondary hover:text-foreground"
             title="选择文件"
           >
