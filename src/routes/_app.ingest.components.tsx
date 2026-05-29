@@ -299,9 +299,6 @@ function ComponentDrawer({
             }`}
           >
             <span className="h-5 w-5 rounded-full bg-white shadow" />
-            <span className={`ml-2 mr-1 text-[10px] ${d.ssl ? "text-primary-foreground" : "text-text-secondary"}`}>
-              {d.ssl ? "开启" : "关闭"}
-            </span>
           </button>
         </VtField>
 
