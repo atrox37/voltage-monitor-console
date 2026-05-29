@@ -9,6 +9,7 @@ export function ConfirmDialog({
   confirmText = "删除",
   cancelText = "取消",
   danger = true,
+  icon: Icon,
   onConfirm,
   onClose,
 }: {
@@ -18,6 +19,7 @@ export function ConfirmDialog({
   confirmText?: string;
   cancelText?: string;
   danger?: boolean;
+  icon?: ComponentType<{ className?: string }>;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -29,13 +31,19 @@ export function ConfirmDialog({
   }, [open, onClose]);
 
   if (!open) return null;
+  const IconComp = Icon ?? AlertTriangle;
+  const iconColor = Icon
+    ? "text-primary"
+    : danger
+      ? "text-status-critical"
+      : "text-status-warn";
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-[400px] overflow-hidden rounded-lg border border-panel-border bg-background shadow-2xl">
         <header className="flex items-center justify-between border-b border-panel-border px-5 py-3">
           <div className="flex items-center gap-2">
-            <AlertTriangle className={`h-4 w-4 ${danger ? "text-status-critical" : "text-status-warn"}`} />
+            <IconComp className={`h-4 w-4 ${iconColor}`} />
             <h3 className="font-heading text-sm font-semibold tracking-wider text-foreground">{title}</h3>
           </div>
           <button onClick={onClose} className="rounded p-1 text-text-muted transition hover:bg-panel hover:text-foreground">
