@@ -104,33 +104,12 @@ function NetworkComponentsPage() {
           { key: "type", title: "类型", render: (r) => TYPE_LABEL[r.type] },
           { key: "org", title: "所属机构" },
           { key: "updateTime", title: "更新日期", render: (r) => <span className="text-text-secondary">{r.updateTime}</span> },
-          { key: "enabled", title: "开关状态", render: (r) => (
-            <button
-              onClick={() =>
-                setRows((rs) => rs.map((x) => (x.id === r.id ? { ...x, enabled: !x.enabled } : x)))
-              }
-              className={`rounded px-2 py-0.5 text-[11px] ${
-                r.enabled
-                  ? "bg-status-online/15 text-status-online"
-                  : "bg-panel-heavy text-text-muted"
-              }`}
-            >
-              {r.enabled ? "启动" : "关闭"}
-            </button>
-          ) },
         ]}
         rows={rows}
         onAdd={() => setPickingType(true)}
         rowActions={(r) => (
           <>
             <RowBtn onClick={() => setEditing(r)}>编辑</RowBtn>
-            <RowBtn
-              onClick={() =>
-                setRows((rs) => rs.map((x) => (x.id === r.id ? { ...x, enabled: !x.enabled } : x)))
-              }
-            >
-              {r.enabled ? "停用" : "启用"}
-            </RowBtn>
             <RowBtn danger onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}>删除</RowBtn>
           </>
         )}
