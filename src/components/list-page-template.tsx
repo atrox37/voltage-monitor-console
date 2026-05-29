@@ -302,30 +302,35 @@ const ROW_ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
 };
 
 export function RowBtn({
-  children, onClick, danger, icon: IconProp, confirm,
+  children, onClick, danger, icon: IconProp, confirm, disabled,
 }: {
   children: ReactNode;
   onClick?: () => void;
   danger?: boolean;
   icon?: ComponentType<{ className?: string }>;
+  disabled?: boolean;
   /** If provided, clicking opens a confirm dialog before invoking onClick. */
   confirm?: { description: ReactNode; title?: string; confirmText?: string };
 }) {
   const label = typeof children === "string" ? children : "";
   const Icon = IconProp ?? ROW_ICON_MAP[label];
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const triggerConfirm = danger || !!confirm;
+  const triggerConfirm = (danger || !!confirm) && !disabled;
   return (
     <>
       <button
+        disabled={disabled}
         onClick={() => {
+          if (disabled) return;
           if (triggerConfirm) setConfirmOpen(true);
           else onClick?.();
         }}
         className={`mx-0.5 inline-flex items-center gap-1 rounded border px-2 py-1 text-xs transition ${
-          danger
-            ? "border-status-critical/40 text-status-critical hover:bg-status-critical/10"
-            : "border-panel-border text-text-secondary hover:border-primary/40 hover:text-primary"
+          disabled
+            ? "cursor-not-allowed border-panel-border/50 text-text-muted opacity-50"
+            : danger
+              ? "border-status-critical/40 text-status-critical hover:bg-status-critical/10"
+              : "border-panel-border text-text-secondary hover:border-primary/40 hover:text-primary"
         }`}
       >
         {Icon && <Icon className="h-3.5 w-3.5" />}
@@ -347,3 +352,4 @@ export function RowBtn({
     </>
   );
 }
+

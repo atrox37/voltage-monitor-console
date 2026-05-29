@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, PlayCircle } from "lucide-react";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
 import { VtDrawer, VtField, vtInputCls, VtBtn, VtSegmented } from "@/components/vt-drawer";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -100,12 +100,16 @@ function ProtocolsPage() {
         onAdd={() => setAdding(true)}
         rowActions={(r) => (
           <>
-            <RowBtn icon={RefreshCw} onClick={() => setSyncTarget(r)}>同步</RowBtn>
-            {r.type === "kafka客户端" && (
-              <RowBtn onClick={() => setTesting(r)}>测试</RowBtn>
-            )}
             <RowBtn onClick={() => setEditing(r)}>编辑</RowBtn>
-            <RowBtn danger onClick={() => handleDelete(r.id)}>删除</RowBtn>
+            <RowBtn icon={RefreshCw} onClick={() => setSyncTarget(r)}>同步</RowBtn>
+            <RowBtn icon={PlayCircle} onClick={() => setTesting(r)}>测试</RowBtn>
+            <RowBtn
+              danger
+              disabled={r.gatewayCount > 0}
+              onClick={() => handleDelete(r.id)}
+            >
+              删除
+            </RowBtn>
           </>
         )}
       />
@@ -130,6 +134,8 @@ function ProtocolsPage() {
       <ConfirmDialog
         open={!!syncTarget}
         title="同步协议"
+        icon={RefreshCw}
+        danger={false}
         description={<>确定要同步协议 <span className="font-semibold text-foreground">{syncTarget?.name}</span> 到所有已绑定的网关吗？</>}
         confirmText="同步"
         onConfirm={() => syncTarget && handleSync(syncTarget)}
@@ -143,6 +149,12 @@ function ProtocolsPage() {
       )}
     </>
   );
+}
+
+function fileNameFromUrl(url: string) {
+  if (!url) return "";
+  const m = url.split("/").pop() ?? "";
+  return m;
 }
 
 function ProtocolDrawer({
@@ -196,10 +208,20 @@ function ProtocolDrawer({
 
       <VtField label="上传" required>
         <div className="flex gap-2">
-          <input className={vtInputCls} placeholder=""
-            value={draft.uploadUrl} onChange={(e) => set("uploadUrl", e.target.value)} />
+          <input
+            className={`${vtInputCls} cursor-default`}
+            readOnly
+            placeholder="请选择文件"
+            value={fileNameFromUrl(draft.uploadUrl)}
+          />
           <button
             type="button"
+            onClick={() =>
+              set(
+                "uploadUrl",
+                `http://192.168.30.10:39000/protocol/protocol/${draft.name || "upload"}.jar`,
+              )
+            }
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-panel-border bg-panel text-text-secondary hover:text-foreground"
             title="选择文件"
           >
