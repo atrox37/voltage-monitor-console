@@ -377,6 +377,7 @@ function ComponentDrawer({
               ))
             )}
           </div>
+        </VtField>
       </VtDrawer>
 
       {recruitOpen && (
