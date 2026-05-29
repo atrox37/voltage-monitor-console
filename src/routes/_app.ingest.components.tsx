@@ -377,20 +377,6 @@ function ComponentDrawer({
               ))
             )}
           </div>
-        </VtField>
-
-        <VtField label="状态">
-          <button
-            type="button"
-            onClick={() => set("enabled", !d.enabled)}
-            className={`inline-flex h-6 w-12 items-center rounded-full px-0.5 transition ${
-              d.enabled ? "bg-primary justify-end" : "bg-panel-heavy justify-start"
-            }`}
-          >
-            <span className="h-5 w-5 rounded-full bg-white shadow" />
-          </button>
-          <span className="ml-2 text-xs text-text-secondary">{d.enabled ? "开启" : "关闭"}</span>
-        </VtField>
       </VtDrawer>
 
       {recruitOpen && (
