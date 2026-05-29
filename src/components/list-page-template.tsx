@@ -147,7 +147,7 @@ export function ListPageTemplate<T extends { id: string | number }>({
             </button>
           )}
         </div>
-        <div className="overflow-x-auto">
+        <div ref={tableWrapRef} className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs uppercase tracking-wider text-text-muted">
