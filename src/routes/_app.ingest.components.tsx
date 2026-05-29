@@ -391,11 +391,18 @@ function ComponentDrawer({
 }
 
 function UploadInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const fileName = value ? value.split("/").pop() ?? "" : "";
   return (
     <div className="flex gap-2">
-      <input className={vtInputCls} value={value} onChange={(e) => onChange(e.target.value)} />
+      <input
+        className={`${vtInputCls} cursor-default`}
+        readOnly
+        placeholder="请选择文件"
+        value={fileName}
+      />
       <button
         type="button"
+        onClick={() => onChange(`http://192.168.30.10:9000/protocol/ssl/uploaded-${Date.now()}.pem`)}
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-panel-border bg-panel text-text-secondary hover:text-foreground"
       >
         ↑
