@@ -42,6 +42,18 @@ export function ListPageTemplate<T extends { id: string | number }>({
   const [filterState, setFilterState] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const [compactActions, setCompactActions] = useState(false);
+
+  useEffect(() => {
+    const el = tableWrapRef.current;
+    if (!el) return;
+    const check = () => setCompactActions(el.clientWidth < 820);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const filtered = useMemo(() => {
     return rows.filter((r) =>
