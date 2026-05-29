@@ -151,6 +151,12 @@ function ProtocolsPage() {
   );
 }
 
+function fileNameFromUrl(url: string) {
+  if (!url) return "";
+  const m = url.split("/").pop() ?? "";
+  return m;
+}
+
 function ProtocolDrawer({
   mode, value, onClose, onSave,
 }: {
