@@ -100,12 +100,16 @@ function ProtocolsPage() {
         onAdd={() => setAdding(true)}
         rowActions={(r) => (
           <>
-            <RowBtn icon={RefreshCw} onClick={() => setSyncTarget(r)}>同步</RowBtn>
-            {r.type === "kafka客户端" && (
-              <RowBtn onClick={() => setTesting(r)}>测试</RowBtn>
-            )}
             <RowBtn onClick={() => setEditing(r)}>编辑</RowBtn>
-            <RowBtn danger onClick={() => handleDelete(r.id)}>删除</RowBtn>
+            <RowBtn icon={RefreshCw} onClick={() => setSyncTarget(r)}>同步</RowBtn>
+            <RowBtn icon={PlayCircle} onClick={() => setTesting(r)}>测试</RowBtn>
+            <RowBtn
+              danger
+              disabled={r.gatewayCount > 0}
+              onClick={() => handleDelete(r.id)}
+            >
+              删除
+            </RowBtn>
           </>
         )}
       />
