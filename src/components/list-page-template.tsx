@@ -189,7 +189,13 @@ export function ListPageTemplate<T extends { id: string | number }>({
                       </td>
                     ))}
                     {rowActions && (
-                      <td className="px-4 py-3 text-right">{rowActions(row)}</td>
+                      <td className="px-4 py-3 text-right">
+                        {compactActions ? (
+                          <ActionsDropdown>{rowActions(row)}</ActionsDropdown>
+                        ) : (
+                          <div className="whitespace-nowrap">{rowActions(row)}</div>
+                        )}
+                      </td>
                     )}
                   </tr>
                 ))
