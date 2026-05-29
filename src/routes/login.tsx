@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Zap, Shield, RefreshCw } from "lucide-react";
+import { Zap, RefreshCw } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -48,7 +48,6 @@ function LoginPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden">
-      {/* Decorative grid */}
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{
@@ -61,68 +60,22 @@ function LoginPage() {
       <div className="pointer-events-none absolute -bottom-32 -right-32 h-[28rem] w-[28rem] rounded-full bg-energy-ess/25 blur-3xl" />
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-12">
-        <div className="grid w-full max-w-5xl grid-cols-1 gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
-          {/* Brand panel */}
-          <div className="hidden flex-col justify-between lg:flex">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-md bg-primary/15 text-primary ring-1 ring-primary/40">
-                <Zap className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="font-heading text-xl font-bold tracking-wide text-foreground">
-                  VOLTAGE <span className="text-primary">EMS</span>
-                </div>
-                <div className="text-xs text-text-secondary">Cloud Management Console</div>
-              </div>
+        <div className="w-full max-w-md">
+          {/* Platform name */}
+          <div className="mb-8 flex flex-col items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary/15 text-primary ring-1 ring-primary/40">
+              <Zap className="h-6 w-6" />
             </div>
-
-            <div>
-              <h1 className="font-heading text-4xl font-bold leading-tight text-foreground">
-                工业级
-                <span className="text-primary"> 能源管理 </span>
-                云平台
-              </h1>
-              <p className="mt-4 max-w-md text-sm leading-relaxed text-text-secondary">
-                统一接入 PV / ESS / DG 设备，实时监控运行状态、告警与能效。
-                为多站点、多机构提供一体化的远程运维体验。
-              </p>
-
-              <div className="mt-8 grid grid-cols-3 gap-3">
-                {[
-                  { label: "在线设备", value: "1,284", unit: "台", color: "text-status-online" },
-                  { label: "今日产能", value: "32.6", unit: "MWh", color: "text-energy-pv" },
-                  { label: "活跃告警", value: "07", unit: "条", color: "text-status-warning" },
-                ].map((k) => (
-                  <div key={k.label} className="vt-glass p-3">
-                    <div className="text-[11px] uppercase tracking-wider text-text-muted">
-                      {k.label}
-                    </div>
-                    <div className="mt-1 flex items-baseline">
-                      <span className={`vt-kpi-value text-2xl ${k.color}`}>{k.value}</span>
-                      <span className="vt-kpi-unit">{k.unit}</span>
-                    </div>
-                  </div>
-                ))}
+            <div className="text-center">
+              <div className="font-heading text-2xl font-bold tracking-wide text-foreground">
+                VOLTAGE <span className="text-primary">EMS</span>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-text-muted">
-              <Shield className="h-3.5 w-3.5" />
-              加密传输 · 多因素鉴权 · 操作审计
+              <div className="mt-1 text-xs text-text-secondary">Cloud Management Console</div>
             </div>
           </div>
 
           {/* Login form */}
           <div className="vt-glass vt-glass-strong p-8">
-            <div className="mb-6 flex items-center gap-3 lg:hidden">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/15 text-primary ring-1 ring-primary/40">
-                <Zap className="h-5 w-5" />
-              </div>
-              <div className="font-heading text-lg font-bold text-foreground">
-                VOLTAGE <span className="text-primary">EMS</span>
-              </div>
-            </div>
-
             <h2 className="vt-section-title text-lg">登录</h2>
             <p className="mt-1 text-xs text-text-secondary">使用授权账号进入云端管理控制台</p>
 
@@ -197,17 +150,8 @@ function LoginPage() {
                 disabled={loading}
                 className="relative w-full overflow-hidden rounded-md bg-primary px-4 py-2.5 font-heading text-sm font-semibold tracking-wider text-primary-foreground transition hover:brightness-110 disabled:opacity-60"
               >
-                <span className="absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-white/20 opacity-0 transition group-hover:opacity-100" />
                 {loading ? "登录中…" : "登 录"}
               </button>
-
-              <div className="flex justify-between text-xs text-text-secondary">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" className="accent-primary" />
-                  记住账号
-                </label>
-                <a href="#" className="hover:text-primary">忘记密码？</a>
-              </div>
             </form>
 
             <div className="mt-8 border-t border-panel-border pt-4 text-center text-[11px] text-text-muted">
