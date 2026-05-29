@@ -424,39 +424,14 @@ function RecruitDialog({
   const [direct, setDirect] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-[520px] overflow-hidden rounded-lg border border-panel-border bg-background shadow-2xl">
-        <header className="flex items-center justify-between border-b border-panel-border px-5 py-3">
-          <h3 className="font-heading text-sm font-semibold tracking-wider text-foreground">新增</h3>
-          <button onClick={onClose} className="rounded p-1 text-text-muted hover:bg-panel hover:text-foreground">
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-        <div className="space-y-3 px-5 py-5">
-          <Row label="名称">
-            <input className={vtInputCls} placeholder="Please input" value={name} onChange={(e) => setName(e.target.value)} />
-          </Row>
-          <Row label="主题">
-            <input className={vtInputCls} placeholder="Please input" value={topic} onChange={(e) => setTopic(e.target.value)} />
-          </Row>
-          <Row label="报文">
-            <input className={vtInputCls} placeholder="Please input" value={payload} onChange={(e) => setPayload(e.target.value)} />
-          </Row>
-          <Row label="目标">
-            <div className="flex items-center gap-5 text-xs text-foreground">
-              <label className="flex items-center gap-1.5">
-                <input type="checkbox" checked={gateway} onChange={(e) => setGateway(e.target.checked)} />
-                网关
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input type="checkbox" checked={direct} onChange={(e) => setDirect(e.target.checked)} />
-                直连设备
-              </label>
-            </div>
-          </Row>
-        </div>
-        <footer className="flex justify-end gap-2 border-t border-panel-border px-5 py-3">
+    <VtDrawer
+      open
+      onClose={onClose}
+      title="新增总招"
+      width={480}
+      footer={
+        <>
+          <VtBtn variant="ghost" onClick={onClose}>取消</VtBtn>
           <VtBtn
             onClick={() =>
               onAdd({
@@ -468,17 +443,31 @@ function RecruitDialog({
           >
             确定
           </VtBtn>
-        </footer>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <VtField label="名称" required>
+        <input className={vtInputCls} placeholder="请输入名称" value={name} onChange={(e) => setName(e.target.value)} />
+      </VtField>
+      <VtField label="主题" required>
+        <input className={vtInputCls} placeholder="请输入主题" value={topic} onChange={(e) => setTopic(e.target.value)} />
+      </VtField>
+      <VtField label="报文" full>
+        <textarea className={`${vtInputCls} h-24 py-2`} placeholder="请输入报文" value={payload} onChange={(e) => setPayload(e.target.value)} />
+      </VtField>
+      <VtField label="目标">
+        <div className="flex items-center gap-5 text-xs text-foreground">
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={gateway} onChange={(e) => setGateway(e.target.checked)} />
+            网关
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={direct} onChange={(e) => setDirect(e.target.checked)} />
+            直连设备
+          </label>
+        </div>
+      </VtField>
+    </VtDrawer>
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[60px_1fr] items-center gap-3">
-      <label className="text-right text-xs text-text-secondary">{label}</label>
-      <div>{children}</div>
-    </div>
-  );
-}
