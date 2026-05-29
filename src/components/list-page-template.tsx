@@ -1,8 +1,8 @@
-import { type ReactNode, type ComponentType, useState, useMemo } from "react";
+import { type ReactNode, type ComponentType, useState, useMemo, useEffect, useRef } from "react";
 import {
   ChevronLeft, ChevronRight, Plus, RotateCcw,
   Pencil, Trash2, Eye, Download, Power, RotateCw, Link2Off, Activity,
-  Boxes, GitBranch, Send, Search,
+  Boxes, GitBranch, Send, Search, MoreVertical,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 
