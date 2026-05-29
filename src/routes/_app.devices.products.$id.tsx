@@ -151,30 +151,36 @@ function TabInfo({ productId }: { productId: string }) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-x-8 gap-y-3 lg:grid-cols-2">
-      <DescField label="产品名称">
-        <input className={vtInputCls} value={product.name} onChange={(e) => setField("name", e.target.value)} />
-      </DescField>
-      <DescField label="产品类型">
-        <span className={`inline-flex items-center rounded px-2 py-1 text-xs ${
-          product.type === "gateway"  ? "bg-primary/15 text-primary" :
-          product.type === "device"   ? "bg-status-online/15 text-status-online" :
-          "bg-status-warning/15 text-status-warning"
-        }`}>{PRODUCT_TYPE_LABEL[product.type]}</span>
-      </DescField>
-      <DescField label="产品型号">
-        <input className={vtInputCls} value={product.sn} onChange={(e) => setField("sn", e.target.value)} />
-      </DescField>
-      <DescField label="创建人">
-        <span className="text-text-secondary">{product.creator}</span>
-      </DescField>
-      <DescField label="所属机构">
-        <OrgTreeSelect value={product.org} onChange={(v) => setField("org", v)} />
-      </DescField>
-      <DescField label="更新时间">
-        <span className="font-mono text-xs text-text-secondary">{product.updateTime}</span>
-      </DescField>
-      <DescField label="标签" full>
+    <div className="flex h-full flex-col gap-5 overflow-auto">
+      <div className="text-sm font-semibold text-foreground">{product.name}</div>
+
+      <div className="grid grid-cols-1 gap-x-6 gap-y-1 md:grid-cols-2 xl:grid-cols-3">
+        <DescField label="产品名称">
+          <input className={vtInputCls} value={product.name} onChange={(e) => setField("name", e.target.value)} />
+        </DescField>
+        <DescField label="产品型号">
+          <input className={vtInputCls} value={product.sn} onChange={(e) => setField("sn", e.target.value)} />
+        </DescField>
+        <DescField label="产品类型">
+          <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs ${
+            product.type === "gateway"  ? "bg-primary/15 text-primary" :
+            product.type === "device"   ? "bg-status-online/15 text-status-online" :
+            "bg-status-warning/15 text-status-warning"
+          }`}>{PRODUCT_TYPE_LABEL[product.type]}</span>
+        </DescField>
+        <DescField label="创建人">
+          <span className="text-text-secondary">{product.creator}</span>
+        </DescField>
+        <DescField label="所属机构">
+          <OrgTreeSelect value={product.org} onChange={(v) => setField("org", v)} />
+        </DescField>
+        <DescField label="更新时间">
+          <span className="font-mono text-xs text-text-secondary">{product.updateTime}</span>
+        </DescField>
+      </div>
+
+      <div>
+        <div className="mb-2 text-sm text-foreground">标签</div>
         <div className="flex flex-wrap items-center gap-2">
           {(product.metadata.tags ?? []).map((t, i) => (
             <span key={i} className="inline-flex items-center gap-1 rounded border border-panel-border bg-panel/40 px-2 py-0.5 text-xs text-text-secondary">
@@ -191,7 +197,7 @@ function TabInfo({ productId }: { productId: string }) {
             <Plus className="h-3 w-3" /> 新增标签
           </button>
         </div>
-      </DescField>
+      </div>
 
       <VtDrawer
         open={!!tagDraft}
@@ -231,14 +237,15 @@ function TabInfo({ productId }: { productId: string }) {
   );
 }
 
-function DescField({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
+function DescField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className={`grid grid-cols-[88px_1fr] items-center gap-3 border-b border-panel-border/60 py-2 ${full ? "lg:col-span-2" : ""}`}>
+    <div className="grid grid-cols-[96px_1fr] items-center gap-3 border-b border-panel-border/40 py-2">
       <span className="text-xs text-text-muted">{label}</span>
-      <div>{children}</div>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
+
 
 /* =========================================================================
  * TAB 2 · 物模型 — DeviceMeta.vue

@@ -183,14 +183,28 @@ function TabInfo({ deviceId }: { deviceId: string }) {
           <span className="text-text-secondary">{device.creator}</span>
         </Row>
 
-        {/* 网关字段：子设备显示「网关设备」 */}
-        {!isGateway && (
+        {/* 网关设备：仅子设备展示（只读） */}
+        {device.productType === "children" && (
           <Row label="网关设备">
             <span className="text-text-secondary">{device.gatewayName ?? "—"}</span>
           </Row>
         )}
         <Row label="采集网关">
-          <span className="text-text-secondary">{device.collectGateway ?? "—"}</span>
+          {device.productType === "children" ? (
+            <span className="text-text-secondary">{device.collectGateway ?? "—"}</span>
+          ) : (
+            <select
+              className={vtInputCls}
+              value={device.collectGateway ?? ""}
+              onChange={(e) => setField("collectGateway", e.target.value)}
+            >
+              <option value="">请选择采集网关</option>
+              <option value="mqtt-client网关">mqtt-client网关</option>
+              <option value="modbus网关">modbus网关</option>
+              <option value="http网关">http网关</option>
+              <option value="opcua网关">opcua网关</option>
+            </select>
+          )}
         </Row>
         <Row label="采集方式">
           {device.collectMode ? (
@@ -199,6 +213,7 @@ function TabInfo({ deviceId }: { deviceId: string }) {
             </span>
           ) : <span className="text-text-muted">—</span>}
         </Row>
+
 
         <Row label="创建时间">
           <span className="text-text-secondary">{device.createTime}</span>

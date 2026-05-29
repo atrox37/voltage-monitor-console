@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
 import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
-import { OrgTreeSelect } from "@/components/org-tree-select";
 import {
   type Device,
   deviceActions,
@@ -19,11 +18,10 @@ type Draft = {
   sn: string;
   productId: string;
   gatewayId: string;
-  org: string;
 };
 
 const emptyDraft = (): Draft => ({
-  name: "", sn: "", productId: "", gatewayId: "", org: "Group Root",
+  name: "", sn: "", productId: "", gatewayId: "",
 });
 
 function DevicesPage() {
@@ -34,7 +32,6 @@ function DevicesPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
-  const [editing, setEditing] = useState<Device | null>(null);
 
   const goDetail = (id: string) => navigate({ to: "/devices/list/$id", params: { id } });
 
@@ -42,6 +39,7 @@ function DevicesPage() {
     if (!draft.name.trim() || !draft.sn.trim() || !draft.productId) return;
     const product = products.find((p) => p.id === draft.productId);
     if (!product) return;
+    if (product.type === "children" && !draft.gatewayId) return;
     const gw = gateways.find((g) => g.id === draft.gatewayId);
     deviceActions.add({
       name: draft.name.trim(),
@@ -51,24 +49,11 @@ function DevicesPage() {
       productType: product.type,
       gatewayId: gw?.id,
       gatewayName: gw?.name,
-      org: draft.org,
+      org: product.org,
       creator: "admin",
     });
     setAddOpen(false);
     setDraft(emptyDraft());
-  };
-
-  const saveEdit = () => {
-    if (!editing) return;
-    const gw = gateways.find((g) => g.id === editing.gatewayId);
-    deviceActions.update(editing.id, {
-      name: editing.name,
-      sn: editing.sn,
-      org: editing.org,
-      gatewayId: gw?.id,
-      gatewayName: gw?.name,
-    });
-    setEditing(null);
   };
 
   return (
@@ -132,7 +117,6 @@ function DevicesPage() {
         rowActions={(r) => (
           <>
             <RowBtn onClick={() => goDetail(r.id)}>详情</RowBtn>
-            <RowBtn onClick={() => setEditing({ ...r })}>编辑</RowBtn>
             {r.status === "disabled" ? (
               <RowBtn icon={undefined} onClick={() => deviceActions.setStatus(r.id, "offline")}>启用</RowBtn>
             ) : (
@@ -161,37 +145,17 @@ function DevicesPage() {
       >
         <DeviceForm value={draft} onChange={setDraft} products={products} gateways={gateways} />
       </VtDrawer>
-
-      <VtDrawer
-        open={!!editing}
-        onClose={() => setEditing(null)}
-        title="编辑设备"
-        footer={<>
-          <VtBtn variant="ghost" onClick={() => setEditing(null)}>关闭</VtBtn>
-          <VtBtn onClick={saveEdit}>保存提交</VtBtn>
-        </>}
-      >
-        {editing && (
-          <DeviceForm
-            value={{ name: editing.name, sn: editing.sn, productId: editing.productId, gatewayId: editing.gatewayId ?? "", org: editing.org }}
-            onChange={(v) => setEditing({ ...editing, name: v.name, sn: v.sn, gatewayId: v.gatewayId || undefined, org: v.org })}
-            products={products} gateways={gateways}
-            lockProduct
-          />
-        )}
-      </VtDrawer>
     </>
   );
 }
 
 function DeviceForm({
-  value, onChange, products, gateways, lockProduct,
+  value, onChange, products, gateways,
 }: {
   value: Draft;
   onChange: (v: Draft) => void;
   products: ReturnType<typeof useProducts>;
   gateways: Device[];
-  lockProduct?: boolean;
 }) {
   const selectedProduct = products.find((p) => p.id === value.productId);
   return (
@@ -205,7 +169,7 @@ function DeviceForm({
           onChange={(e) => onChange({ ...value, sn: e.target.value })} />
       </VtField>
       <VtField label="所属产品" required>
-        <select className={vtInputCls} value={value.productId} disabled={lockProduct}
+        <select className={vtInputCls} value={value.productId}
           onChange={(e) => onChange({ ...value, productId: e.target.value, gatewayId: "" })}>
           <option value="">请选择产品</option>
           {products.map((p) => (
@@ -214,17 +178,15 @@ function DeviceForm({
         </select>
       </VtField>
       {selectedProduct?.type === "children" && (
-        <VtField label="关联网关">
+        <VtField label="网关设备" required>
           <select className={vtInputCls} value={value.gatewayId}
             onChange={(e) => onChange({ ...value, gatewayId: e.target.value })}>
-            <option value="">不关联</option>
+            <option value="">请选择网关设备</option>
             {gateways.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
         </VtField>
       )}
-      <VtField label="所属机构" required>
-        <OrgTreeSelect value={value.org} onChange={(v) => onChange({ ...value, org: v })} />
-      </VtField>
     </>
   );
 }
+
