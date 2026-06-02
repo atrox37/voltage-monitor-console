@@ -2,12 +2,45 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Sun, Battery, Fuel, AlertTriangle, TrendingUp,
 } from "lucide-react";
+import type { ColumnsType } from "antd/es/table";
+import { VtDataTable } from "@/components/vt-table";
 
 export const Route = createFileRoute("/_app/")({
   component: Dashboard,
 });
 
 function Dashboard() {
+  type AlarmRow = { key: number; lvl: number; site: string; dev: string; msg: string; t: string };
+  const alarmRows: AlarmRow[] = [
+    { key: 0, lvl: 1, site: "杭州·余杭", dev: "GW-INV-08", msg: "通信中断超过 5 分钟", t: "02:14:08" },
+    { key: 1, lvl: 2, site: "深圳·南山 B2", dev: "ESS-Rack-02", msg: "电压偏低 / 380→352 V", t: "01:52:31" },
+    { key: 2, lvl: 3, site: "上海·浦东 R1", dev: "PV-String-12", msg: "组件温度偏高", t: "01:30:11" },
+    { key: 3, lvl: 2, site: "成都·天府", dev: "DG-03", msg: "启动延迟", t: "00:48:02" },
+  ];
+  const alarmColumns: ColumnsType<AlarmRow> = [
+    {
+      key: "lvl",
+      title: "级别",
+      width: 88,
+      render: (_, a) => (
+        <span className={`inline-flex items-center gap-1 alarm-level--${a.lvl}`}>
+          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+          {a.lvl === 1 ? "严重" : a.lvl === 2 ? "警告" : "提示"}
+        </span>
+      ),
+    },
+    { key: "site", title: "站点", dataIndex: "site" },
+    { key: "dev", title: "设备", dataIndex: "dev", render: (v) => <span className="text-text-secondary">{v}</span> },
+    { key: "msg", title: "描述", dataIndex: "msg", render: (v) => <span className="text-text-secondary">{v}</span> },
+    {
+      key: "t",
+      title: "时间",
+      dataIndex: "t",
+      width: 96,
+      render: (v) => <span className="font-mono text-xs text-text-muted">{v}</span>,
+    },
+  ];
+
   return (
     <main className="vt-page-content">
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -67,38 +100,13 @@ function Dashboard() {
             <Link to="/notif/configs" className="rounded bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">查看全部</Link>
           </div>
         </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wider text-text-muted">
-              <th className="px-4 py-2 font-medium">级别</th>
-              <th className="px-4 py-2 font-medium">站点</th>
-              <th className="px-4 py-2 font-medium">设备</th>
-              <th className="px-4 py-2 font-medium">描述</th>
-              <th className="px-4 py-2 font-medium">时间</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              { lvl:1, site:"杭州·余杭",   dev:"GW-INV-08",  msg:"通信中断超过 5 分钟",   t:"02:14:08" },
-              { lvl:2, site:"深圳·南山 B2", dev:"ESS-Rack-02", msg:"电压偏低 / 380→352 V", t:"01:52:31" },
-              { lvl:3, site:"上海·浦东 R1", dev:"PV-String-12", msg:"组件温度偏高",       t:"01:30:11" },
-              { lvl:2, site:"成都·天府",   dev:"DG-03",       msg:"启动延迟",            t:"00:48:02" },
-            ].map((a,i)=>(
-              <tr key={i} className="border-t border-panel-border/60 hover:bg-panel/40">
-                <td className="px-4 py-2.5">
-                  <span className={`inline-flex items-center gap-1 alarm-level--${a.lvl}`}>
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    {a.lvl===1?"严重":a.lvl===2?"警告":"提示"}
-                  </span>
-                </td>
-                <td className="px-4 py-2.5 text-foreground">{a.site}</td>
-                <td className="px-4 py-2.5 text-text-secondary">{a.dev}</td>
-                <td className="px-4 py-2.5 text-text-secondary">{a.msg}</td>
-                <td className="px-4 py-2.5 font-mono text-xs text-text-muted">{a.t}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <VtDataTable<AlarmRow>
+          rowKey="key"
+          size="small"
+          pagination={false}
+          columns={alarmColumns}
+          dataSource={alarmRows}
+        />
       </section>
     </main>
   );

@@ -4,16 +4,22 @@ import {
   ArrowLeft, Save, RefreshCw, Plus, Pencil, Trash2, X,
   ChevronRight, ChevronDown,
 } from "lucide-react";
-import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
+import { VtDrawer, VtField, VtBtn, vtInputCls, vtSelectCls } from "@/components/vt-drawer";
+import { VtDataTable, vtActionColumn } from "@/components/vt-table";
+import type { ColumnsType } from "antd/es/table";
 import { OrgTreeSelect } from "@/components/org-tree-select";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
-  PRODUCT_TYPE_LABEL,
-  productActions,
-  useProduct,
-} from "@/lib/products-store";
-import { POLL_INTERVAL_OPTIONS, cronLabel } from "@/lib/poll-interval";
-import { DATA_TYPES, DATA_UNITS, PROPERTY_RW } from "@/lib/data-types";
+  ProductEditContextProvider,
+  useProductEdit,
+  useProductEditState,
+} from "@/lib/product-edit-context";
+import { PRODUCT_TYPE_LABEL } from "@/lib/product-mappers";
+import { POLL_INTERVAL_OPTIONS, normalizeRuleCron } from "@/lib/poll-interval";
+import { DATA_UNITS, PROPERTY_RW, defaultPropertyValueType, unitLabel } from "@/lib/data-types";
+import { formatRuleCondition, jsqlToAlarmColumns, rulePollLabel, type AlarmCond } from "@/lib/rule-format";
+import { parseProductRule } from "@/api";
+import type { JSqlColumn } from "@/types";
 import type {
   SimplePropertyMetadata,
   SimpleFunctionMetadata,
@@ -36,10 +42,28 @@ type TabKey = "info" | "meta" | "tree" | "rule";
  * ========================================================================= */
 function ProductDetailPage() {
   const { id } = Route.useParams();
+  const editState = useProductEditState(id);
+  return (
+    <ProductEditContextProvider value={editState}>
+      <ProductDetailView />
+    </ProductEditContextProvider>
+  );
+}
+
+function ProductDetailView() {
   const navigate = useNavigate();
-  const product = useProduct(id);
+  const { product, loading, saving, syncing, save, syncEdge } = useProductEdit();
   const [tab, setTab] = useState<TabKey>("info");
-  const [syncing, setSyncing] = useState(false);
+
+  if (loading) {
+    return (
+      <main className="vt-page-content vt-page-fill">
+        <div className="vt-glass flex flex-1 items-center justify-center text-sm text-text-muted">
+          加载中…
+        </div>
+      </main>
+    );
+  }
 
   if (!product) {
     return (
@@ -80,17 +104,11 @@ function ProductDetailPage() {
           <span className="font-mono text-[11px] text-text-muted">#{product.id}</span>
         </div>
         <div className="flex items-center gap-2">
-          <VtBtn
-            variant="ghost"
-            onClick={() => {
-              setSyncing(true);
-              setTimeout(() => { setSyncing(false); alert("边缘同步成功"); }, 500);
-            }}
-          >
+          <VtBtn variant="ghost" disabled={syncing} onClick={() => void syncEdge()}>
             <RefreshCw className={`mr-1 inline h-3 w-3 ${syncing ? "animate-spin" : ""}`} /> 边缘同步
           </VtBtn>
-          <VtBtn onClick={() => alert("已保存")}>
-            <Save className="mr-1 inline h-3 w-3" /> 保存
+          <VtBtn disabled={saving} onClick={() => void save()}>
+            <Save className="mr-1 inline h-3 w-3" /> {saving ? "保存中…" : "保存"}
           </VtBtn>
         </div>
       </div>
@@ -115,10 +133,10 @@ function ProductDetailPage() {
       </div>
 
       <div className="vt-glass mt-3 flex-1 overflow-hidden p-5">
-        {tab === "info" && <TabInfo productId={product.id} />}
-        {tab === "meta" && <TabMeta productId={product.id} />}
-        {tab === "tree" && <TabTree productId={product.id} />}
-        {tab === "rule" && <TabRule productId={product.id} />}
+        {tab === "info" && <TabInfo />}
+        {tab === "meta" && <TabMeta />}
+        {tab === "tree" && <TabTree />}
+        {tab === "rule" && <TabRule />}
       </div>
     </main>
   );
@@ -127,21 +145,22 @@ function ProductDetailPage() {
 /* =========================================================================
  * TAB 1 · 基础信息 — TabProductDetail.vue
  * ========================================================================= */
-function TabInfo({ productId }: { productId: string }) {
-  const product = useProduct(productId)!;
+function TabInfo() {
+  const { product, orgNodes, updateProduct, updateMetadata } = useProductEdit();
   const [tagDraft, setTagDraft] = useState<{ tag: TagModel; index: number } | null>(null);
+  if (!product) return null;
 
-  const setField = <K extends "name" | "sn" | "type" | "org">(k: K, v: string) => {
-    productActions.update(productId, { [k]: v } as Partial<typeof product>);
+  const setField = <K extends "name" | "sn">(k: K, v: string) => {
+    updateProduct({ [k]: v });
   };
   const closeTag = (i: number) => {
-    productActions.updateMetadata(productId, (m) => ({
+    updateMetadata((m) => ({
       ...m, tags: (m.tags ?? []).filter((_, idx) => idx !== i),
     }));
   };
   const saveTag = () => {
     if (!tagDraft || !tagDraft.tag.tagName.trim()) return;
-    productActions.updateMetadata(productId, (m) => {
+    updateMetadata((m) => {
       const tags = [...(m.tags ?? [])];
       if (tagDraft.index < 0) tags.push(tagDraft.tag);
       else tags[tagDraft.index] = tagDraft.tag;
@@ -172,7 +191,11 @@ function TabInfo({ productId }: { productId: string }) {
           <span className="text-text-secondary">{product.creator}</span>
         </DescField>
         <DescField label="所属机构">
-          <OrgTreeSelect value={product.org} onChange={(v) => setField("org", v)} />
+          <OrgTreeSelect
+            nodes={orgNodes}
+            value={product.orgId}
+            onChange={(v) => updateProduct({ orgId: v })}
+          />
         </DescField>
         <DescField label="更新时间">
           <span className="font-mono text-xs text-text-secondary">{product.updateTime}</span>
@@ -191,7 +214,7 @@ function TabInfo({ productId }: { productId: string }) {
             </span>
           ))}
           <button
-            onClick={() => setTagDraft({ tag: { tagKey: "", tagName: "", tagValue: "", optional: false }, index: -1 })}
+            onClick={() => setTagDraft({ tag: { tagKey: "", tagName: "", optional: false }, index: -1 })}
             className="inline-flex items-center gap-1 rounded border border-dashed border-panel-border px-2 py-0.5 text-xs text-text-muted hover:border-primary/40 hover:text-primary"
           >
             <Plus className="h-3 w-3" /> 新增标签
@@ -219,15 +242,11 @@ function TabInfo({ productId }: { productId: string }) {
               <input className={vtInputCls} value={tagDraft.tag.tagName}
                 onChange={(e) => setTagDraft({ ...tagDraft, tag: { ...tagDraft.tag, tagName: e.target.value } })} />
             </VtField>
-            <VtField label="值">
-              <input className={vtInputCls} value={tagDraft.tag.tagValue ?? ""}
-                onChange={(e) => setTagDraft({ ...tagDraft, tag: { ...tagDraft.tag, tagValue: e.target.value } })} />
-            </VtField>
             <VtField label="必填">
-              <select className={vtInputCls} value={tagDraft.tag.optional ? "1" : "0"}
+              <select className={vtSelectCls} value={tagDraft.tag.optional ? "1" : "0"}
                 onChange={(e) => setTagDraft({ ...tagDraft, tag: { ...tagDraft.tag, optional: e.target.value === "1" } })}>
-                <option value="0">否</option>
-                <option value="1">是</option>
+                <option value="0">是</option>
+                <option value="1">否</option>
               </select>
             </VtField>
           </>
@@ -253,8 +272,8 @@ function DescField({ label, children }: { label: string; children: React.ReactNo
  *  - 属性编辑抽屉：标识/名称/类型/小数位/枚举值表/单位/读写
  *  - 功能表 + 编辑抽屉：参数 / 输出 (子抽屉编辑参数)
  * ========================================================================= */
-function TabMeta({ productId }: { productId: string }) {
-  const product = useProduct(productId)!;
+function TabMeta() {
+  const { product, updateMetadata, dataTypes } = useProductEdit();
   const { confirm, confirmNode } = useConfirm();
   const [sub, setSub] = useState<"prop" | "func">("prop");
 
@@ -262,16 +281,16 @@ function TabMeta({ productId }: { productId: string }) {
   const [selectedTagId, setSelectedTagId] = useState<string>("-1"); // -1 = 全部
   const [renameTag, setRenameTag] = useState<{ index: number; name: string } | null>(null);
 
-  const propertyTags: PropertyTagMetadata[] = product.metadata.propertyTags ?? [];
+  const propertyTags: PropertyTagMetadata[] = product?.metadata.propertyTags ?? [];
   const filteredProps = useMemo(() => {
-    const all = product.metadata.properties ?? [];
+    const all = product?.metadata.properties ?? [];
     if (selectedTagId === "-1") return all;
     return all.filter((p) => p.tagId === selectedTagId);
-  }, [product.metadata.properties, selectedTagId]);
+  }, [product?.metadata.properties, selectedTagId]);
 
   const addPropertyTag = () => {
     const id = `t${Date.now()}`;
-    productActions.updateMetadata(productId, (m) => ({
+    updateMetadata((m) => ({
       ...m, propertyTags: [...(m.propertyTags ?? []), { id, name: "新分组" }],
     }));
   };
@@ -283,7 +302,7 @@ function TabMeta({ productId }: { productId: string }) {
 
   const saveProp = () => {
     if (!propDraft || !propDraft.data.name.trim() || !propDraft.data.id.trim()) return;
-    productActions.updateMetadata(productId, (m) => {
+    updateMetadata((m) => {
       const props = [...(m.properties ?? [])];
       if (propDraft.index < 0) props.push(propDraft.data);
       else props[propDraft.index] = propDraft.data;
@@ -293,7 +312,7 @@ function TabMeta({ productId }: { productId: string }) {
   };
   const saveFunc = () => {
     if (!funcDraft || !funcDraft.data.name.trim() || !funcDraft.data.id.trim()) return;
-    productActions.updateMetadata(productId, (m) => {
+    updateMetadata((m) => {
       const fns = [...(m.functions ?? [])];
       if (funcDraft.index < 0) fns.push(funcDraft.data);
       else fns[funcDraft.index] = funcDraft.data;
@@ -311,7 +330,18 @@ function TabMeta({ productId }: { productId: string }) {
     setArgDraft(null);
   };
 
-  const propType = propDraft?.data.valueType?.type ?? "double";
+  const propType = propDraft?.data.valueType?.type ?? "string";
+
+  if (!product) return null;
+
+  const newPropertyDraft = (): SimplePropertyMetadata => ({
+    id: "",
+    name: "",
+    rw: "none",
+    create: true,
+    tagId: selectedTagId !== "-1" ? selectedTagId : undefined,
+    valueType: defaultPropertyValueType("string"),
+  });
 
   return (
     <div className="flex h-full flex-col">
@@ -322,8 +352,8 @@ function TabMeta({ productId }: { productId: string }) {
         </div>
         <button
           onClick={() => sub === "prop"
-            ? setPropDraft({ data: { id: "", name: "", rw: "readwrite", valueType: { type: "double", unit: "", extra: { point: 2 } }, tagId: selectedTagId !== "-1" ? selectedTagId : undefined, create: true }, index: -1 })
-            : setFuncDraft({ data: { id: "", name: "", async: false, inputs: [], outputs: [] }, index: -1 })}
+            ? setPropDraft({ data: newPropertyDraft(), index: -1 })
+            : setFuncDraft({ data: { id: "", name: "", async: false, inputs: [], outputs: [], create: true }, index: -1 })}
           className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground hover:brightness-110"
         >
           <Plus className="h-3.5 w-3.5" /> 新增{sub === "prop" ? "属性" : "功能"}
@@ -338,7 +368,7 @@ function TabMeta({ productId }: { productId: string }) {
             <span className="font-mono text-xs text-text-secondary">{p.id}</span>,
             p.name,
             p.valueType?.type ?? "—",
-            p.valueType?.unit || "—",
+            unitLabel(p.valueType?.unit),
             propertyTags.find((t) => t.id === p.tagId)?.name ?? <span className="text-text-muted">—</span>,
           ])}
           onEdit={(visualIdx) => {
@@ -350,7 +380,7 @@ function TabMeta({ productId }: { productId: string }) {
             const name = product.metadata.properties![original].name;
             confirm({
               description: <>确定删除属性 <span className="font-semibold text-foreground">「{name}」</span> 吗？</>,
-              onConfirm: () => productActions.updateMetadata(productId, (m) => ({
+              onConfirm: () => updateMetadata((m) => ({
                 ...m, properties: (m.properties ?? []).filter((_, idx) => idx !== original),
               })),
             });
@@ -370,7 +400,7 @@ function TabMeta({ productId }: { productId: string }) {
             const name = product.metadata.functions![i].name;
             confirm({
               description: <>确定删除功能 <span className="font-semibold text-foreground">「{name}」</span> 吗？</>,
-              onConfirm: () => productActions.updateMetadata(productId, (m) => ({
+              onConfirm: () => updateMetadata((m) => ({
                 ...m, functions: (m.functions ?? []).filter((_, idx) => idx !== i),
               })),
             });
@@ -423,27 +453,27 @@ function TabMeta({ productId }: { productId: string }) {
                 onChange={(e) => setPropDraft({ ...propDraft, data: { ...propDraft.data, name: e.target.value } })} />
             </VtField>
             <VtField label="数据类型">
-              <select className={vtInputCls} value={propType}
+              <select className={vtSelectCls} value={propType}
                 onChange={(e) => {
                   const t = e.target.value;
-                  const extra = t === "number" || ["int","long","float","double"].includes(t)
-                    ? { point: propDraft.data.valueType?.extra?.point ?? 2 }
-                    : t === "enum" ? { enumData: propDraft.data.valueType?.extra?.enumData ?? [] }
-                    : {};
-                  setPropDraft({ ...propDraft, data: { ...propDraft.data,
-                    valueType: { ...(propDraft.data.valueType ?? { type: t }), type: t, extra } } });
+                  setPropDraft({ ...propDraft, data: {
+                    ...propDraft.data,
+                    valueType: defaultPropertyValueType(t),
+                  } });
                 }}>
-                {DATA_TYPES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {dataTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </VtField>
-            {["int","long","float","double","number"].includes(propType) && (
+            {propType === "number" && (
               <VtField label="小数位">
                 <input type="number" min={0} max={10} className={vtInputCls}
-                  value={propDraft.data.valueType?.extra?.point ?? 2}
+                  value={propDraft.data.valueType?.extra?.point ?? 1}
                   onChange={(e) => setPropDraft({ ...propDraft, data: {
                     ...propDraft.data,
-                    valueType: { ...(propDraft.data.valueType ?? { type: propType }),
-                      extra: { ...(propDraft.data.valueType?.extra ?? {}), point: Number(e.target.value) } },
+                    valueType: {
+                      ...(propDraft.data.valueType ?? defaultPropertyValueType("number")),
+                      extra: { ...(propDraft.data.valueType?.extra ?? {}), point: Number(e.target.value) || 0 },
+                    },
                   } })} />
               </VtField>
             )}
@@ -460,13 +490,14 @@ function TabMeta({ productId }: { productId: string }) {
               </VtField>
             )}
             <VtField label="单位">
-              <select className={vtInputCls} value={propDraft.data.valueType?.unit ?? ""}
+              <select className={vtSelectCls} value={propDraft.data.valueType?.unit ?? ""}
                 onChange={(e) => setPropDraft({ ...propDraft, data: {
                   ...propDraft.data,
-                  valueType: { ...(propDraft.data.valueType ?? { type: propType }), unit: e.target.value },
+                  valueType: { ...(propDraft.data.valueType ?? defaultPropertyValueType(propType)), unit: e.target.value },
                 } })}>
-                <option value="">无</option>
-                {DATA_UNITS.map((u) => <option key={u.unit} value={u.unit}>{u.en} ({u.unit})</option>)}
+                {DATA_UNITS.map((u) => (
+                  <option key={u.unit || "none"} value={u.unit}>{u.en}{u.unit ? ` (${u.unit})` : ""}</option>
+                ))}
               </select>
             </VtField>
             <VtField label="读写">
@@ -485,7 +516,7 @@ function TabMeta({ productId }: { productId: string }) {
               </div>
             </VtField>
             <VtField label="所属分组">
-              <select className={vtInputCls} value={propDraft.data.tagId ?? ""}
+              <select className={vtSelectCls} value={propDraft.data.tagId ?? ""}
                 onChange={(e) => setPropDraft({ ...propDraft, data: { ...propDraft.data, tagId: e.target.value || undefined } })}>
                 <option value="">无</option>
                 {propertyTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -501,6 +532,7 @@ function TabMeta({ productId }: { productId: string }) {
         onClose={() => setFuncDraft(null)}
         title={funcDraft && funcDraft.index < 0 ? "新增功能" : "编辑功能"}
         width={560}
+        zIndex={50}
         hideOverlay={!!argDraft}
         footer={<>
           <VtBtn variant="ghost" onClick={() => setFuncDraft(null)}>取消</VtBtn>
@@ -518,7 +550,7 @@ function TabMeta({ productId }: { productId: string }) {
                 onChange={(e) => setFuncDraft({ ...funcDraft, data: { ...funcDraft.data, name: e.target.value } })} />
             </VtField>
             <VtField label="异步">
-              <select className={vtInputCls} value={funcDraft.data.async ? "1" : "0"}
+              <select className={vtSelectCls} value={funcDraft.data.async ? "1" : "0"}
                 onChange={(e) => setFuncDraft({ ...funcDraft, data: { ...funcDraft.data, async: e.target.value === "1" } })}>
                 <option value="0">否</option>
                 <option value="1">是</option>
@@ -527,7 +559,7 @@ function TabMeta({ productId }: { productId: string }) {
             <ArgSection
               title="输入参数"
               items={funcDraft.data.inputs ?? []}
-              onAdd={() => setArgDraft({ data: { id: "", name: "", valueType: { type: "string" } }, kind: "inputs", index: -1 })}
+              onAdd={() => setArgDraft({ data: { id: "", name: "", valueType: defaultPropertyValueType("string") }, kind: "inputs", index: -1 })}
               onEdit={(i) => setArgDraft({ data: { ...(funcDraft.data.inputs ?? [])[i] }, kind: "inputs", index: i })}
               onDelete={(i) => {
                 const list = (funcDraft.data.inputs ?? []).filter((_, idx) => idx !== i);
@@ -537,7 +569,7 @@ function TabMeta({ productId }: { productId: string }) {
             <ArgSection
               title="输出结果"
               items={funcDraft.data.outputs ?? []}
-              onAdd={() => setArgDraft({ data: { id: "", name: "", valueType: { type: "string" } }, kind: "outputs", index: -1 })}
+              onAdd={() => setArgDraft({ data: { id: "", name: "", valueType: defaultPropertyValueType("string") }, kind: "outputs", index: -1 })}
               onEdit={(i) => setArgDraft({ data: { ...(funcDraft.data.outputs ?? [])[i] }, kind: "outputs", index: i })}
               onDelete={(i) => {
                 const list = (funcDraft.data.outputs ?? []).filter((_, idx) => idx !== i);
@@ -548,13 +580,13 @@ function TabMeta({ productId }: { productId: string }) {
         )}
       </VtDrawer>
 
-      {/* ===== 参数子抽屉 (offsetRight=560 与功能抽屉并排) ===== */}
+      {/* ===== 参数子抽屉（覆盖在功能抽屉之上） ===== */}
       <VtDrawer
         open={!!argDraft}
         onClose={() => setArgDraft(null)}
         title="参数信息"
         width={420}
-        offsetRight={560}
+        zIndex={60}
         hideOverlay
         footer={<>
           <VtBtn variant="ghost" onClick={() => setArgDraft(null)}>取消</VtBtn>
@@ -572,11 +604,10 @@ function TabMeta({ productId }: { productId: string }) {
                 onChange={(e) => setArgDraft({ ...argDraft, data: { ...argDraft.data, name: e.target.value } })} />
             </VtField>
             <VtField label="类型">
-              <select className={vtInputCls} value={argDraft.data.valueType?.type ?? "string"}
+              <select className={vtSelectCls} value={argDraft.data.valueType?.type ?? "string"}
                 onChange={(e) => setArgDraft({ ...argDraft, data: { ...argDraft.data,
-                  valueType: { ...(argDraft.data.valueType ?? { type: e.target.value }), type: e.target.value,
-                    extra: e.target.value === "enum" ? { enumData: [] } : {} } } })}>
-                {DATA_TYPES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  valueType: defaultPropertyValueType(e.target.value) } })}>
+                {dataTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </VtField>
             {argDraft.data.valueType?.type === "enum" && (
@@ -592,7 +623,7 @@ function TabMeta({ productId }: { productId: string }) {
               </VtField>
             )}
             <VtField label="单位">
-              <select className={vtInputCls} value={argDraft.data.valueType?.unit ?? ""}
+              <select className={vtSelectCls} value={argDraft.data.valueType?.unit ?? ""}
                 onChange={(e) => setArgDraft({ ...argDraft, data: {
                   ...argDraft.data,
                   valueType: { ...(argDraft.data.valueType ?? { type: "string" }), unit: e.target.value },
@@ -617,7 +648,7 @@ function TabMeta({ productId }: { productId: string }) {
             confirm({
               description: <>确定删除分组 <span className="font-semibold text-foreground">「{propertyTags[renameTag.index]?.name}」</span> 吗？该分组下的属性会被设为未分组。</>,
               onConfirm: () => {
-                productActions.updateMetadata(productId, (m) => {
+                updateMetadata((m) => {
                   const tagId = (m.propertyTags ?? [])[renameTag.index]?.id;
                   return {
                     ...m,
@@ -632,7 +663,7 @@ function TabMeta({ productId }: { productId: string }) {
           }}>删除分组</VtBtn>
           <VtBtn onClick={() => {
             if (!renameTag || !renameTag.name.trim()) return;
-            productActions.updateMetadata(productId, (m) => ({
+            updateMetadata((m) => ({
               ...m, propertyTags: (m.propertyTags ?? []).map((t, i) => i === renameTag.index ? { ...t, name: renameTag.name } : t),
             }));
             setRenameTag(null);
@@ -656,40 +687,49 @@ function TabMeta({ productId }: { productId: string }) {
 function EnumEditor({ data, onChange }: { data: EnumDataItem[]; onChange: (d: EnumDataItem[]) => void }) {
   const update = (i: number, patch: Partial<EnumDataItem>) =>
     onChange(data.map((d, idx) => idx === i ? { ...d, ...patch } : d));
+  type EnumRow = { index: number; item: EnumDataItem };
+  const rows: EnumRow[] = data.map((item, index) => ({ index, item }));
+  const columns: ColumnsType<EnumRow> = [
+    {
+      key: "enumKey",
+      title: "Key (数值)",
+      render: (_, row) => (
+        <input className={vtInputCls} value={row.item.key} onChange={(e) => update(row.index, { key: e.target.value })} />
+      ),
+    },
+    {
+      key: "enumValue",
+      title: "显示文本",
+      render: (_, row) => (
+        <input className={vtInputCls} value={row.item.value} onChange={(e) => update(row.index, { value: e.target.value })} />
+      ),
+    },
+    {
+      key: "actions",
+      title: (
+        <button onClick={() => onChange([...data, { key: "", value: "" }])}
+          className="rounded p-0.5 text-text-muted hover:text-primary"><Plus className="h-3.5 w-3.5" /></button>
+      ),
+      width: 64,
+      align: "right",
+      render: (_, row) => (
+        <button onClick={() => onChange(data.filter((_, idx) => idx !== row.index))}
+          className="rounded p-1 text-text-muted hover:bg-status-critical/10 hover:text-status-critical">
+          <Trash2 className="h-3 w-3" />
+        </button>
+      ),
+    },
+  ];
   return (
     <div className="overflow-hidden rounded border border-panel-border">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-panel/60 text-text-muted">
-            <th className="px-2 py-1.5 text-left font-medium">Key (数值)</th>
-            <th className="px-2 py-1.5 text-left font-medium">显示文本</th>
-            <th className="w-16 px-2 py-1.5 text-right font-medium">
-              <button onClick={() => onChange([...data, { key: "", value: "" }])}
-                className="rounded p-0.5 text-text-muted hover:text-primary"><Plus className="h-3.5 w-3.5" /></button>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.length === 0 ? (
-            <tr><td colSpan={3} className="px-2 py-3 text-center text-text-muted">暂无枚举值</td></tr>
-          ) : data.map((d, i) => (
-            <tr key={i} className="border-t border-panel-border/60">
-              <td className="px-2 py-1">
-                <input className={vtInputCls} value={d.key} onChange={(e) => update(i, { key: e.target.value })} />
-              </td>
-              <td className="px-2 py-1">
-                <input className={vtInputCls} value={d.value} onChange={(e) => update(i, { value: e.target.value })} />
-              </td>
-              <td className="px-2 py-1 text-right">
-                <button onClick={() => onChange(data.filter((_, idx) => idx !== i))}
-                  className="rounded p-1 text-text-muted hover:bg-status-critical/10 hover:text-status-critical">
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <VtDataTable<EnumRow>
+        rowKey="index"
+        size="small"
+        pagination={false}
+        columns={columns}
+        dataSource={rows}
+        locale={{ emptyText: "暂无枚举值" }}
+      />
     </div>
   );
 }
@@ -702,6 +742,19 @@ function ArgSection({ title, items, onAdd, onEdit, onDelete }: {
   onEdit: (i: number) => void;
   onDelete: (i: number) => void;
 }) {
+  type ArgRow = SimpleFunctionParam & { index: number };
+  const rows: ArgRow[] = items.map((item, index) => ({ ...item, index }));
+  const columns: ColumnsType<ArgRow> = [
+    { key: "id", title: "标识", dataIndex: "id", render: (v) => <span className="font-mono text-[11px] text-text-secondary">{v}</span> },
+    { key: "name", title: "名称", dataIndex: "name" },
+    { key: "type", title: "类型", render: (_, row) => <span className="text-text-muted">{row.valueType?.type ?? "—"}</span> },
+    vtActionColumn<ArgRow>("操作", (row) => (
+      <>
+        <button onClick={() => onEdit(row.index)} className="mx-0.5 rounded p-1 text-text-muted hover:text-primary"><Pencil className="h-3 w-3" /></button>
+        <button onClick={() => onDelete(row.index)} className="mx-0.5 rounded p-1 text-text-muted hover:text-status-critical"><Trash2 className="h-3 w-3" /></button>
+      </>
+    ), 100),
+  ];
   return (
     <div className="mt-4">
       <div className="mb-1.5 flex items-center justify-between">
@@ -712,31 +765,14 @@ function ArgSection({ title, items, onAdd, onEdit, onDelete }: {
         </button>
       </div>
       <div className="overflow-hidden rounded border border-panel-border">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="bg-panel/60 text-text-muted">
-              <th className="px-2 py-1.5 text-left font-medium">标识</th>
-              <th className="px-2 py-1.5 text-left font-medium">名称</th>
-              <th className="px-2 py-1.5 text-left font-medium">类型</th>
-              <th className="w-20 px-2 py-1.5 text-right font-medium">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.length === 0 ? (
-              <tr><td colSpan={4} className="px-2 py-3 text-center text-text-muted">暂无参数</td></tr>
-            ) : items.map((it, i) => (
-              <tr key={i} className="border-t border-panel-border/60">
-                <td className="px-2 py-1 font-mono text-[11px] text-text-secondary">{it.id}</td>
-                <td className="px-2 py-1">{it.name}</td>
-                <td className="px-2 py-1 text-text-muted">{it.valueType?.type ?? "—"}</td>
-                <td className="px-2 py-1 text-right">
-                  <button onClick={() => onEdit(i)} className="mx-0.5 rounded p-1 text-text-muted hover:text-primary"><Pencil className="h-3 w-3" /></button>
-                  <button onClick={() => onDelete(i)} className="mx-0.5 rounded p-1 text-text-muted hover:text-status-critical"><Trash2 className="h-3 w-3" /></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <VtDataTable<ArgRow>
+          rowKey="index"
+          size="small"
+          pagination={false}
+          columns={columns}
+          dataSource={rows}
+          locale={{ emptyText: "暂无参数" }}
+        />
       </div>
     </div>
   );
@@ -757,35 +793,38 @@ function MetaTable({ headers, rows, onEdit, onDelete }: {
   onEdit: (i: number) => void;
   onDelete: (i: number) => void;
 }) {
+  type MetaRow = { key: number; cells: React.ReactNode[] };
+  const data: MetaRow[] = rows.map((cells, key) => ({ key, cells }));
+  const columns: ColumnsType<MetaRow> = [
+    ...headers.map((title, i) => ({
+      key: `col-${i}`,
+      title,
+      render: (_: unknown, row: MetaRow) => row.cells[i],
+    })),
+    vtActionColumn<MetaRow>("操作", (row) => (
+      <>
+        <button onClick={() => onEdit(row.key)}
+          className="mx-0.5 inline-flex cursor-pointer items-center gap-1 rounded border border-panel-border px-2 py-1 text-xs text-text-secondary transition hover:border-primary/40 hover:text-primary">
+          <Pencil className="h-3 w-3" /> 编辑
+        </button>
+        <button onClick={() => onDelete(row.key)}
+          className="mx-0.5 inline-flex cursor-pointer items-center gap-1 rounded border border-status-critical/40 px-2 py-1 text-xs text-status-critical transition hover:bg-status-critical/10">
+          <Trash2 className="h-3 w-3" /> 删除
+        </button>
+      </>
+    ), 180),
+  ];
   return (
     <div className="overflow-hidden rounded border border-panel-border">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-panel/60 text-xs text-text-muted">
-            {headers.map((h) => <th key={h} className="px-3 py-2 text-left font-medium">{h}</th>)}
-            <th className="px-3 py-2 text-right font-medium">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr><td colSpan={headers.length + 1} className="px-3 py-10 text-center text-xs text-text-muted">暂无数据</td></tr>
-          ) : rows.map((cells, i) => (
-            <tr key={i} className="border-t border-panel-border/60 hover:bg-panel/30">
-              {cells.map((c, j) => <td key={j} className="px-3 py-2">{c}</td>)}
-              <td className="px-3 py-2 text-right">
-                <button onClick={() => onEdit(i)}
-                  className="mx-0.5 inline-flex items-center gap-1 rounded border border-panel-border px-2 py-1 text-xs text-text-secondary transition hover:border-primary/40 hover:text-primary">
-                  <Pencil className="h-3 w-3" /> 编辑
-                </button>
-                <button onClick={() => onDelete(i)}
-                  className="mx-0.5 inline-flex items-center gap-1 rounded border border-status-critical/40 px-2 py-1 text-xs text-status-critical transition hover:bg-status-critical/10">
-                  <Trash2 className="h-3 w-3" /> 删除
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <VtDataTable<MetaRow>
+        rowKey="key"
+        size="small"
+        pagination={false}
+        columns={columns}
+        dataSource={data}
+        scrollX="max-content"
+        locale={{ emptyText: "暂无数据" }}
+      />
     </div>
   );
 }
@@ -793,15 +832,15 @@ function MetaTable({ headers, rows, onEdit, onDelete }: {
 /* =========================================================================
  * TAB 3 · 网关路由 — TabProductTree.vue
  * ========================================================================= */
-function TabTree({ productId }: { productId: string }) {
-  const product = useProduct(productId)!;
+function TabTree() {
+  const { product, updateMetadata } = useProductEdit();
   const { confirm, confirmNode } = useConfirm();
   const [renameOf, setRenameOf] = useState<{ id: string; name: string } | null>(null);
 
   const newId = () => `n${Math.floor(Math.random() * 1e6)}`;
 
   const append = (parentId: string | null) => {
-    productActions.updateMetadata(productId, (m) => {
+    updateMetadata((m) => {
       const trees = JSON.parse(JSON.stringify(m.trees ?? [])) as SimpleTreeMetadata[];
       const node = { id: newId(), name: "节点", children: [] };
       if (parentId === null) { trees.push(node); return { ...m, trees }; }
@@ -817,7 +856,7 @@ function TabTree({ productId }: { productId: string }) {
     });
   };
   const remove = (id: string) => {
-    productActions.updateMetadata(productId, (m) => {
+    updateMetadata((m) => {
       const filter = (ns: SimpleTreeMetadata[]): SimpleTreeMetadata[] =>
         ns.filter((n) => n.id !== id).map((n) => ({ ...n, children: n.children ? filter(n.children) : [] }));
       return { ...m, trees: filter(m.trees ?? []) };
@@ -825,13 +864,15 @@ function TabTree({ productId }: { productId: string }) {
   };
   const rename = () => {
     if (!renameOf) return;
-    productActions.updateMetadata(productId, (m) => {
+    updateMetadata((m) => {
       const walk = (ns: SimpleTreeMetadata[]): SimpleTreeMetadata[] =>
         ns.map((n) => n.id === renameOf.id ? { ...n, name: renameOf.name } : { ...n, children: n.children ? walk(n.children) : [] });
       return { ...m, trees: walk(m.trees ?? []) };
     });
     setRenameOf(null);
   };
+
+  if (!product) return null;
 
   return (
     <div>
@@ -931,12 +972,6 @@ function IconAction({ icon: Icon, label, onClick, danger }: {
 /* =========================================================================
  * TAB 4 · 告警规则 — TabProductRule.vue + DialogAlarmRule.vue + ProductAlarmItem.vue
  * ========================================================================= */
-type AlarmCond = {
-  column: string;      // property id
-  operation: string;   // > < = etc
-  value: string | number | boolean;
-  valueType?: string;  // mirrored from property valueType.type
-};
 // 草稿规则带 columns (多组 AND 条件 — 组间 OR)
 type RuleDraft = RuleModel & { columns?: AlarmCond[][] };
 
@@ -960,39 +995,116 @@ function operationsFor(type: string | undefined) {
   return OPERATIONS_STR;
 }
 
-function TabRule({ productId }: { productId: string }) {
-  const product = useProduct(productId)!;
+function TabRule() {
+  const { product, updateMetadata, serializeRule } = useProductEdit();
   const { confirm, confirmNode } = useConfirm();
   const [draft, setDraft] = useState<{ rule: RuleDraft; index: number } | null>(null);
+  const [ruleSaving, setRuleSaving] = useState(false);
+  const [ruleLoading, setRuleLoading] = useState(false);
 
-  const properties = product.metadata.properties ?? [];
-  const propMap = useMemo(
-    () => Object.fromEntries(properties.map((p) => [p.id, p])),
-    [properties],
-  );
+  const properties = product?.metadata.properties ?? [];
 
-  const formatColumns = (rule: RuleDraft) => {
-    if (!rule.columns?.length) return "—";
-    return rule.columns.map((grp) =>
-      grp.map((c) => {
-        const p = propMap[c.column];
-        const name = p?.name ?? c.column;
-        if (c.operation === "IS NOT NULL") return `${name} 不为空`;
-        return `${name} ${c.operation} ${c.value}`;
-      }).join(" 且 "),
-    ).join(" 或 ");
+  const toJsqlColumns = (groups: AlarmCond[][]): JSqlColumn[][] =>
+    groups.map((grp) =>
+      grp.map((c) => ({
+        column: c.column,
+        operation: c.operation,
+        value: c.value,
+        valueType: c.valueType,
+      })),
+    );
+
+  const openRuleEdit = async (row: RuleModel, index: number) => {
+    setRuleLoading(true);
+    try {
+      const base: RuleDraft = JSON.parse(JSON.stringify(row));
+      base.ruleData = {
+        type: "time",
+        count: base.ruleData?.count ?? 1,
+        cron: normalizeRuleCron(base.ruleData),
+      };
+      if (base.ruleMeta?.sql) {
+        const parsed = await parseProductRule(base.ruleMeta);
+        base.columns = jsqlToAlarmColumns(parsed);
+      } else {
+        base.columns = base.columns ?? [[]];
+      }
+      setDraft({ rule: base, index });
+    } catch {
+      setDraft({
+        rule: {
+          ...JSON.parse(JSON.stringify(row)),
+          columns: [[]],
+          ruleData: { type: "time", count: row.ruleData?.count ?? 1, cron: normalizeRuleCron(row.ruleData) },
+        },
+        index,
+      });
+    } finally {
+      setRuleLoading(false);
+    }
   };
 
-  const saveRule = () => {
+  const saveRule = async () => {
     if (!draft || !draft.rule.name.trim()) return;
-    productActions.updateMetadata(productId, (m) => {
-      const rules = [...((m.rules ?? []) as RuleDraft[])];
-      if (draft.index < 0) rules.push(draft.rule);
-      else rules[draft.index] = draft.rule;
-      return { ...m, rules };
-    });
-    setDraft(null);
+    setRuleSaving(true);
+    try {
+      const { columns, ...rulePo } = draft.rule;
+      const cron = normalizeRuleCron(draft.rule.ruleData);
+      await serializeRule(draft.index, {
+        ...rulePo,
+        ruleData: { ...rulePo.ruleData, type: "time", cron, count: rulePo.ruleData?.count ?? 1 },
+      }, toJsqlColumns(columns ?? [[]]));
+      setDraft(null);
+    } catch {
+      // toast handled in context
+    } finally {
+      setRuleSaving(false);
+    }
   };
+
+  if (!product) return null;
+
+  type RuleRow = RuleDraft & { index: number };
+  const ruleRows: RuleRow[] = (product.metadata.rules as RuleDraft[] ?? []).map((r, index) => ({ ...r, index }));
+  const ruleColumns: ColumnsType<RuleRow> = [
+    { key: "name", title: "规则名称", dataIndex: "name" },
+    { key: "poll", title: "轮询周期", render: (_, r) => <span className="text-xs text-text-secondary">{rulePollLabel(r)}</span> },
+    { key: "count", title: "触发阈值", render: (_, r) => <span className="text-xs text-text-secondary">连续 {r.ruleData?.count ?? 1} 次</span> },
+    {
+      key: "condition",
+      title: "触发条件",
+      render: (_, r) => <span className="max-w-md text-xs text-text-secondary">{formatRuleCondition(r, properties)}</span>,
+    },
+    {
+      key: "state",
+      title: "状态",
+      render: (_, r) => (
+        <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] ${
+          r.state === 1 ? "bg-status-online/15 text-status-online" : "bg-panel-heavy text-text-muted"
+        }`}>
+          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+          {r.state === 1 ? "已启用" : "已禁用"}
+        </span>
+      ),
+    },
+    vtActionColumn<RuleRow>("操作", (r) => (
+      <>
+        <button disabled={ruleLoading} onClick={() => void openRuleEdit(r, r.index)}
+          className="mx-0.5 inline-flex cursor-pointer items-center gap-1 rounded border border-panel-border px-2 py-1 text-xs text-text-secondary hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50">
+          <Pencil className="h-3 w-3" /> 编辑
+        </button>
+        <button onClick={() => confirm({
+          description: <>确定删除规则 <span className="font-semibold text-foreground">「{r.name}」</span> 吗？</>,
+          onConfirm: () => updateMetadata((m) => ({
+            ...m, rules: (m.rules ?? []).filter((_, idx) => idx !== r.index),
+          })),
+        })}
+          className="mx-0.5 inline-flex items-center gap-1 rounded border border-status-critical/40 px-2 py-1 text-xs text-status-critical hover:bg-status-critical/10">
+          <Trash2 className="h-3 w-3" /> 删除
+        </button>
+      </>
+    ), 180),
+  ];
 
   return (
     <div>
@@ -1001,7 +1113,7 @@ function TabRule({ productId }: { productId: string }) {
           onClick={() => setDraft({
             rule: {
               id: `r${Date.now()}`, name: "", state: 1,
-              ruleData: { type: "time", cron: POLL_INTERVAL_OPTIONS[3].value, count: 1 },
+              ruleData: { type: "time", cron: POLL_INTERVAL_OPTIONS[0].value, count: 1 },
               ruleMeta: { sql: "", param: {} },
               columns: [[]],
             },
@@ -1014,53 +1126,15 @@ function TabRule({ productId }: { productId: string }) {
       </div>
 
       <div className="overflow-hidden rounded border border-panel-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-panel/60 text-xs text-text-muted">
-              <th className="px-3 py-2 text-left font-medium">规则名称</th>
-              <th className="px-3 py-2 text-left font-medium">轮询周期</th>
-              <th className="px-3 py-2 text-left font-medium">触发阈值</th>
-              <th className="px-3 py-2 text-left font-medium">触发条件</th>
-              <th className="px-3 py-2 text-left font-medium">状态</th>
-              <th className="px-3 py-2 text-right font-medium">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(product.metadata.rules ?? []).length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-10 text-center text-xs text-text-muted">暂无规则</td></tr>
-            ) : (product.metadata.rules as RuleDraft[] ?? []).map((r, i) => (
-              <tr key={r.id} className="border-t border-panel-border/60 hover:bg-panel/30">
-                <td className="px-3 py-2">{r.name}</td>
-                <td className="px-3 py-2 text-xs text-text-secondary">{cronLabel(r.ruleData?.cron)}</td>
-                <td className="px-3 py-2 text-xs text-text-secondary">连续 {r.ruleData?.count ?? 1} 次</td>
-                <td className="max-w-md px-3 py-2 text-xs text-text-secondary">{formatColumns(r)}</td>
-                <td className="px-3 py-2">
-                  <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] ${
-                    r.state === 1 ? "bg-status-online/15 text-status-online" : "bg-panel-heavy text-text-muted"
-                  }`}>
-                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    {r.state === 1 ? "已启用" : "已禁用"}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-right">
-                  <button onClick={() => setDraft({ rule: JSON.parse(JSON.stringify(r)), index: i })}
-                    className="mx-0.5 inline-flex items-center gap-1 rounded border border-panel-border px-2 py-1 text-xs text-text-secondary hover:border-primary/40 hover:text-primary">
-                    <Pencil className="h-3 w-3" /> 编辑
-                  </button>
-                  <button onClick={() => confirm({
-                    description: <>确定删除规则 <span className="font-semibold text-foreground">「{r.name}」</span> 吗？</>,
-                    onConfirm: () => productActions.updateMetadata(productId, (m) => ({
-                      ...m, rules: (m.rules ?? []).filter((_, idx) => idx !== i),
-                    })),
-                  })}
-                    className="mx-0.5 inline-flex items-center gap-1 rounded border border-status-critical/40 px-2 py-1 text-xs text-status-critical hover:bg-status-critical/10">
-                    <Trash2 className="h-3 w-3" /> 删除
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <VtDataTable<RuleRow>
+          rowKey="id"
+          size="small"
+          pagination={false}
+          columns={ruleColumns}
+          dataSource={ruleRows}
+          scrollX="max-content"
+          locale={{ emptyText: "暂无规则" }}
+        />
       </div>
 
       <VtDrawer
@@ -1070,7 +1144,9 @@ function TabRule({ productId }: { productId: string }) {
         width={720}
         footer={<>
           <VtBtn variant="ghost" onClick={() => setDraft(null)}>取消</VtBtn>
-          <VtBtn onClick={saveRule}>保存</VtBtn>
+          <VtBtn disabled={ruleSaving} onClick={() => void saveRule()}>
+            {ruleSaving ? "保存中…" : "保存"}
+          </VtBtn>
         </>}
       >
         {draft && (
@@ -1097,7 +1173,7 @@ function TabRule({ productId }: { productId: string }) {
               <span className="inline-flex items-center rounded bg-primary/10 px-2 py-1 text-xs text-primary">定时轮询</span>
             </VtField>
             <VtField label="轮询周期">
-              <select className={vtInputCls} value={draft.rule.ruleData?.cron ?? POLL_INTERVAL_OPTIONS[3].value}
+              <select className={vtSelectCls} value={normalizeRuleCron(draft.rule.ruleData)}
                 onChange={(e) => setDraft({ ...draft, rule: {
                   ...draft.rule,
                   ruleData: { ...(draft.rule.ruleData ?? { type: "time" }), cron: e.target.value },
@@ -1175,6 +1251,74 @@ function AlarmConditionBuilder({
     });
   };
 
+  type CondRow = { ri: number; cond: AlarmCond };
+  const condColumns = (gi: number): ColumnsType<CondRow> => [
+    {
+      key: "column",
+      title: "属性",
+      render: (_, { ri, cond: r }) => (
+        <select className={vtSelectCls} value={r.column}
+          onChange={(e) => onColumnChange(gi, ri, e.target.value)}>
+          {properties.map((pp) => <option key={pp.id} value={pp.id}>{pp.name}</option>)}
+        </select>
+      ),
+    },
+    {
+      key: "operation",
+      title: "比较",
+      render: (_, { ri, cond: r }) => {
+        const p = properties.find((x) => x.id === r.column);
+        const ops = operationsFor(p?.valueType?.type);
+        return (
+          <select className={vtSelectCls} value={r.operation}
+            onChange={(e) => setRow(gi, ri, { operation: e.target.value })}>
+            {ops.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        );
+      },
+    },
+    {
+      key: "value",
+      title: "值",
+      render: (_, { ri, cond: r }) => {
+        const p = properties.find((x) => x.id === r.column);
+        const isNumber = ["int", "long", "float", "double", "number"].includes(p?.valueType?.type ?? "");
+        const isEnum = p?.valueType?.type === "enum";
+        const enumData = (p?.valueType?.extra?.enumData as EnumDataItem[]) ?? [];
+        if (r.operation === "IS NOT NULL") return <span className="text-text-muted">—</span>;
+        if (isEnum) {
+          return (
+            <select className={vtSelectCls} value={String(r.value)}
+              onChange={(e) => setRow(gi, ri, { value: e.target.value })}>
+              {enumData.map((d) => <option key={d.key} value={d.key}>{d.value}</option>)}
+            </select>
+          );
+        }
+        if (isNumber) {
+          return (
+            <input type="number" className={vtInputCls} value={Number(r.value) || 0}
+              onChange={(e) => setRow(gi, ri, { value: Number(e.target.value) })} />
+          );
+        }
+        return (
+          <input className={vtInputCls} value={String(r.value ?? "")}
+            onChange={(e) => setRow(gi, ri, { value: e.target.value })} />
+        );
+      },
+    },
+    {
+      key: "actions",
+      width: 48,
+      align: "right",
+      render: (_, { ri }) => (
+        <button onClick={() => delRow(gi, ri)}
+          className="rounded p-1 text-text-muted hover:bg-status-critical/10 hover:text-status-critical">
+          <Trash2 className="h-3 w-3" />
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-3">
       {groups.map((rows, gi) => (
@@ -1194,65 +1338,14 @@ function AlarmConditionBuilder({
               )}
             </div>
           </div>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-text-muted">
-                <th className="px-2 py-1 text-left font-medium">属性</th>
-                <th className="px-2 py-1 text-left font-medium">比较</th>
-                <th className="px-2 py-1 text-left font-medium">值</th>
-                <th className="w-10" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr><td colSpan={4} className="px-2 py-2 text-center text-text-muted">尚未添加条件</td></tr>
-              ) : rows.map((r, ri) => {
-                const p = properties.find((x) => x.id === r.column);
-                const ops = operationsFor(p?.valueType?.type);
-                const isNumber = ["int","long","float","double","number"].includes(p?.valueType?.type ?? "");
-                const isEnum = p?.valueType?.type === "enum";
-                const enumData = (p?.valueType?.extra?.enumData as EnumDataItem[]) ?? [];
-                return (
-                  <tr key={ri}>
-                    <td className="px-2 py-1">
-                      <select className={vtInputCls} value={r.column}
-                        onChange={(e) => onColumnChange(gi, ri, e.target.value)}>
-                        {properties.map((pp) => <option key={pp.id} value={pp.id}>{pp.name}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-2 py-1">
-                      <select className={vtInputCls} value={r.operation}
-                        onChange={(e) => setRow(gi, ri, { operation: e.target.value })}>
-                        {ops.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-2 py-1">
-                      {r.operation === "IS NOT NULL" ? (
-                        <span className="text-text-muted">—</span>
-                      ) : isEnum ? (
-                        <select className={vtInputCls} value={String(r.value)}
-                          onChange={(e) => setRow(gi, ri, { value: e.target.value })}>
-                          {enumData.map((d) => <option key={d.key} value={d.key}>{d.value}</option>)}
-                        </select>
-                      ) : isNumber ? (
-                        <input type="number" className={vtInputCls} value={Number(r.value) || 0}
-                          onChange={(e) => setRow(gi, ri, { value: Number(e.target.value) })} />
-                      ) : (
-                        <input className={vtInputCls} value={String(r.value ?? "")}
-                          onChange={(e) => setRow(gi, ri, { value: e.target.value })} />
-                      )}
-                    </td>
-                    <td className="px-2 py-1 text-right">
-                      <button onClick={() => delRow(gi, ri)}
-                        className="rounded p-1 text-text-muted hover:bg-status-critical/10 hover:text-status-critical">
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <VtDataTable<CondRow>
+            rowKey="ri"
+            size="small"
+            pagination={false}
+            columns={condColumns(gi)}
+            dataSource={rows.map((cond, ri) => ({ ri, cond }))}
+            locale={{ emptyText: "尚未添加条件" }}
+          />
         </div>
       ))}
       <button onClick={addGroup}

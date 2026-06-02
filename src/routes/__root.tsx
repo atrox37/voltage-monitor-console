@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useEffect } from "react";
 import {
   Outlet,
   Link,
@@ -9,25 +10,21 @@ import {
 } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
+import { Button, Result } from "antd";
+import { Toaster } from "@/components/ui/sonner";
+import { AntdAppProvider } from "@/providers/antd-app-provider";
+import { hydrateAuthSession } from "@/lib/auth-session";
+import { hydrateLocale } from "@/i18n";
 
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="vt-glass max-w-md p-8 text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">页面未找到</h2>
-        <p className="mt-2 text-sm text-text-secondary">
-          你访问的页面不存在或已被移除。
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            返回首页
-          </Link>
-        </div>
-      </div>
+      <Result
+        status="404"
+        title="404"
+        subTitle="你访问的页面不存在或已被移除。"
+        extra={<Link to="/"><Button type="primary">返回首页</Button></Link>}
+      />
     </div>
   );
 }
@@ -37,21 +34,17 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="vt-glass max-w-md p-8 text-center">
-        <h1 className="text-xl font-semibold text-foreground">页面加载失败</h1>
-        <p className="mt-2 text-sm text-text-secondary">出现了一些异常，请重试。</p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => { router.invalidate(); reset(); }}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            重试
-          </button>
-          <a href="/" className="rounded-md border border-panel-border bg-panel px-4 py-2 text-sm text-foreground hover:bg-panel-strong">
-            返回首页
-          </a>
-        </div>
-      </div>
+      <Result
+        status="error"
+        title="页面加载失败"
+        subTitle="出现了一些异常，请重试。"
+        extra={(
+          <>
+            <Button type="primary" onClick={() => { router.invalidate(); reset(); }}>重试</Button>
+            <Button href="/">返回首页</Button>
+          </>
+        )}
+      />
     </div>
   );
 }
@@ -66,6 +59,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -91,9 +85,18 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    hydrateAuthSession();
+    hydrateLocale();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AntdAppProvider>
+        <Outlet />
+        <Toaster position="top-center" richColors closeButton />
+      </AntdAppProvider>
     </QueryClientProvider>
   );
 }

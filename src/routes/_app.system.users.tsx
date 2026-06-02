@@ -1,153 +1,406 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import CryptoJS from "crypto-js";
 import { Lock } from "lucide-react";
+import { toast } from "sonner";
+import { deleteUser, getDimensionTree, pageRoles, pageUsers, saveUser } from "@/api/sys";
 import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
-import { VtDrawer, VtField, VtBtn, VtSegmented, vtInputCls } from "@/components/vt-drawer";
-import { OrgTreeSelect } from "@/components/org-tree-select";
+import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
+import { VtBtn, VtDrawer, VtField, VtSegmented, vtInputCls } from "@/components/vt-drawer";
+import { dimensionToOrgNodes } from "@/lib/dimension-tree";
+import { termEq, termLike, toDbId } from "@/lib/query-terms";
+import { isRequestCanceled } from "@/lib/request";
+import { useTranslation } from "@/i18n";
+import type { PageQuery, SysRolePo, SysUserPageDto, SysUserPo } from "@/types";
 
 export const Route = createFileRoute("/_app/system/users")({
   component: UsersPage,
 });
 
-type User = {
+type UserRow = {
   id: string;
   username: string;
   role: string;
+  roleId: string;
   org: string;
+  orgId: string;
   email: string;
   phone?: string;
   status: "online" | "disabled";
   updatedAt: string;
+  raw: SysUserPageDto;
 };
 
-const initial: User[] = [
-  { id: "1", username: "root",         role: "root",     org: "Group Root",      email: "root@voltageenergy.com",         status: "online",   updatedAt: "2026-05-11 02:51:13" },
-  { id: "2", username: "test222",      role: "Engineer", org: "Group Root",      email: "test222@voltageenergy.com",      status: "online",   updatedAt: "2026-04-16 10:49:06" },
-  { id: "3", username: "shengkai.pan", role: "Viewer",   org: "Group Root",      email: "shengkai.pan@voltageenergy.com", status: "online",   updatedAt: "2026-01-04 03:30:31" },
-  { id: "4", username: "admin",        role: "Admin",    org: "Group Root",      email: "admin@voltageenergy.com",        status: "online",   updatedAt: "2025-09-28 02:36:25" },
-  { id: "5", username: "zhiyuan.wang", role: "Viewer",   org: "Group Children1", email: "zhiyuan.wang@voltageenergy.com", phone: "11111111111", status: "disabled", updatedAt: "2025-09-23 03:40:08" },
-];
+const DEFAULT_SORTS: PageQuery["sorts"] = [{ column: "t.update_time", order: "desc" }];
 
-const ROLES = ["root", "Admin", "Engineer", "Viewer"];
+function mapUserRow(dto: SysUserPageDto): UserRow {
+  const po = dto.sysUserPo;
+  return {
+    id: String(po.id ?? ""),
+    username: po.username,
+    role: dto.sysRolePo?.roleName ?? "—",
+    roleId: String(po.roleId ?? ""),
+    org: dto.dimensionPo?.name ?? "—",
+    orgId: String(po.orgId ?? ""),
+    email: po.email ?? "",
+    phone: po.phone,
+    status: po.state === 0 ? "disabled" : "online",
+    updatedAt: po.updateTime ?? "—",
+    raw: dto,
+  };
+}
 
-function emptyUser(): User {
-  return { id: "", username: "", role: "Viewer", org: "Group Root", email: "", phone: "", status: "online", updatedAt: "" };
+type UserForm = {
+  id: string;
+  username: string;
+  roleId: string;
+  orgId: string;
+  email: string;
+  phone: string;
+  password: string;
+  status: "online" | "disabled";
+};
+
+function emptyForm(): UserForm {
+  return {
+    id: "",
+    username: "",
+    roleId: "",
+    orgId: "",
+    email: "",
+    phone: "",
+    password: "",
+    status: "online",
+  };
 }
 
 function UsersPage() {
-  const [rows, setRows] = useState<User[]>(initial);
-  const [editing, setEditing] = useState<User | null>(null);
+  const { t } = useTranslation();
+  const [rows, setRows] = useState<UserRow[]>([]);
+  const [roles, setRoles] = useState<SysRolePo[]>([]);
+  const [orgNodes, setOrgNodes] = useState<OrgNode[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = 10;
+
+  const [filterDraft, setFilterDraft] = useState({ username: "", orgId: "" });
+  const [filterApplied, setFilterApplied] = useState({ username: "", orgId: "" });
+
+  const [editing, setEditing] = useState<UserForm | null>(null);
   const [isAdd, setIsAdd] = useState(false);
-  const [passUser, setPassUser] = useState<User | null>(null);
+  const [passUser, setPassUser] = useState<SysUserPo | null>(null);
   const [newPass, setNewPass] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const openAdd  = () => { setEditing(emptyUser()); setIsAdd(true); };
-  const openEdit = (u: User) => { setEditing({ ...u }); setIsAdd(false); };
-  const close    = () => setEditing(null);
-
-  const save = () => {
-    if (!editing) return;
-    const now = new Date().toISOString().slice(0, 19).replace("T", " ");
-    if (editing.id) {
-      setRows((rs) => rs.map((r) => (r.id === editing.id ? { ...editing, updatedAt: now } : r)));
-    } else {
-      setRows((rs) => [...rs, { ...editing, id: String(Date.now()), updatedAt: now }]);
+  const loadMeta = useCallback(async () => {
+    try {
+      const [roleRes, root] = await Promise.all([
+        pageRoles({ current: 1, size: -1 }),
+        getDimensionTree(),
+      ]);
+      const roleRows = roleRes.records ?? roleRes.data ?? [];
+      setRoles(roleRows.map((r) => r.sysRolePo).filter(Boolean) as SysRolePo[]);
+      setOrgNodes(dimensionToOrgNodes(root));
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      toast.error(err instanceof Error ? err.message : t("users.loadMetaFailed"));
     }
-    close();
+  }, []);
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const terms = [];
+      const username = filterApplied.username.trim();
+      if (username) terms.push(termLike("t.username", username));
+      if (filterApplied.orgId) {
+        terms.push(termEq("t.org_id", toDbId(filterApplied.orgId)));
+      }
+      const result = await pageUsers({
+        current: page,
+        size: pageSize,
+        terms,
+        sorts: DEFAULT_SORTS,
+      });
+      const list = result.records ?? result.data ?? [];
+      setRows(list.map(mapUserRow));
+      setTotal(result.total ?? list.length);
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      setRows([]);
+      setTotal(0);
+      toast.error(err instanceof Error ? err.message : t("users.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }, [filterApplied.orgId, filterApplied.username, page]);
+
+  useEffect(() => {
+    void loadMeta();
+  }, [loadMeta]);
+
+  useEffect(() => {
+    void fetchUsers();
+  }, [fetchUsers]);
+
+  const openAdd = () => {
+    setEditing(emptyForm());
+    setIsAdd(true);
   };
 
-  const savePass = () => {
-    if (!passUser || !newPass.trim()) return;
-    const now = new Date().toISOString().slice(0, 19).replace("T", " ");
-    setRows((rs) => rs.map((r) => (r.id === passUser.id ? { ...r, updatedAt: now } : r)));
-    setPassUser(null);
-    setNewPass("");
+  const openEdit = (row: UserRow) => {
+    const po = row.raw.sysUserPo;
+    setEditing({
+      id: String(po.id ?? ""),
+      username: po.username,
+      roleId: String(po.roleId ?? ""),
+      orgId: String(po.orgId ?? ""),
+      email: po.email ?? "",
+      phone: po.phone ?? "",
+      password: "",
+      status: po.state === 0 ? "disabled" : "online",
+    });
+    setIsAdd(false);
+  };
+
+  const save = async () => {
+    if (!editing) return;
+    if (!editing.username.trim() || !editing.roleId || !editing.orgId || !editing.email.trim()) {
+      toast.error(t("common.requiredHint"));
+      return;
+    }
+    if (isAdd && !editing.password.trim()) {
+      toast.error(t("users.passwordPlaceholder"));
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload: Partial<SysUserPo> = {
+        id: editing.id || undefined,
+        username: editing.username.trim(),
+        roleId: toDbId(editing.roleId),
+        orgId: toDbId(editing.orgId),
+        email: editing.email.trim(),
+        phone: editing.phone.trim() || undefined,
+        state: editing.status === "disabled" ? 0 : 1,
+      };
+      if (isAdd) {
+        payload.password = CryptoJS.MD5(editing.password).toString();
+      }
+      await saveUser(payload);
+      toast.success(t("common.saveSuccess"));
+      setEditing(null);
+      setPage(1);
+      await fetchUsers();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const savePass = async () => {
+    if (!passUser?.id || !newPass.trim()) return;
+    setSaving(true);
+    try {
+      await saveUser({
+        id: passUser.id,
+        username: passUser.username,
+        roleId: passUser.roleId,
+        orgId: passUser.orgId,
+        email: passUser.email,
+        phone: passUser.phone,
+        state: passUser.state,
+        password: CryptoJS.MD5(newPass).toString(),
+      });
+      toast.success(t("users.passwordUpdated"));
+      setPassUser(null);
+      setNewPass("");
+      await fetchUsers();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (row: UserRow) => {
+    await deleteUser(row.id);
+    toast.success(t("common.deleteSuccess"));
+    await fetchUsers();
   };
 
   return (
     <>
-      <ListPageTemplate<User>
-        title="用户管理"
+      <ListPageTemplate<UserRow>
+        actionColumnWidth={280}
+        title={t("users.title")}
+        loading={loading}
+        serverSide
+        rows={rows}
+        totalCount={total}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onSearch={() => {
+          setFilterApplied({ ...filterDraft });
+          setPage(1);
+        }}
+        onReset={() => {
+          setFilterDraft({ username: "", orgId: "" });
+          setFilterApplied({ username: "", orgId: "" });
+          setPage(1);
+        }}
+        filterValues={filterDraft}
+        onFilterValuesChange={(draft) =>
+          setFilterDraft({ username: draft.username ?? "", orgId: draft.orgId ?? "" })
+        }
         filters={[
-          { type: "text", key: "username", label: "用户名", placeholder: "请输入用户名" },
-          { type: "select", key: "org", label: "机构",
-            options: [
-              { label: "Group Root", value: "Group Root" },
-              { label: "Group Children1", value: "Group Children1" },
-            ],
+          {
+            type: "text",
+            key: "username",
+            label: t("users.username"),
+            placeholder: t("users.usernamePlaceholder"),
+          },
+          {
+            type: "orgTree",
+            key: "orgId",
+            label: t("users.org"),
+            nodes: orgNodes,
+            allowAll: true,
+            placeholder: t("users.orgPlaceholder"),
           },
         ]}
         columns={[
-          { key: "username", title: "用户名" },
-          { key: "role",     title: "角色" },
-          { key: "org",      title: "机构" },
-          { key: "email",    title: "邮箱", render: (r) => <span className="text-text-secondary">{r.email}</span> },
-          { key: "status",   title: "状态", render: (r) => <StatusBadge status={r.status} /> },
-          { key: "updatedAt", title: "更新时间", render: (r) => <span className="font-mono text-xs text-text-secondary">{r.updatedAt}</span> },
+          { key: "username", title: t("users.username") },
+          { key: "role", title: t("users.role") },
+          { key: "org", title: t("users.org") },
+          {
+            key: "email",
+            title: t("users.email"),
+            render: (r) => <span className="text-text-secondary">{r.email}</span>,
+          },
+          {
+            key: "status",
+            title: t("common.status"),
+            render: (r) => <StatusBadge status={r.status} />,
+          },
+          {
+            key: "updatedAt",
+            title: t("users.updatedAt"),
+            render: (r) => (
+              <span className="font-mono text-xs text-text-secondary">{r.updatedAt}</span>
+            ),
+          },
         ]}
-        rows={rows}
         onAdd={openAdd}
         rowActions={(r) => (
           <>
-            <RowBtn onClick={() => openEdit(r)}>编辑</RowBtn>
-            <RowBtn icon={Lock} onClick={() => { setPassUser(r); setNewPass(""); }}>修改密码</RowBtn>
+            <RowBtn onClick={() => openEdit(r)}>{t("common.edit")}</RowBtn>
+            <RowBtn
+              icon={Lock}
+              onClick={() => {
+                setPassUser({ ...r.raw.sysUserPo });
+                setNewPass("");
+              }}
+            >
+              {t("users.changePassword")}
+            </RowBtn>
             <RowBtn
               danger
-              confirm={{ description: <>确定要删除用户 <span className="font-semibold text-foreground">「{r.username}」</span> 吗？该操作不可恢复。</> }}
-              onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}
-            >删除</RowBtn>
+              confirm={{
+                description: (
+                  <>
+                    {t("common.confirmDeleteDesc", { target: t("users.deleteTarget"), name: r.username })}
+                  </>
+                ),
+              }}
+              onClick={() => void handleDelete(r)}
+            >
+              {t("common.delete")}
+            </RowBtn>
           </>
         )}
       />
 
-      {/* Edit / Add Drawer */}
       <VtDrawer
         open={!!editing}
-        onClose={close}
-        title={isAdd ? "新建用户" : "编辑用户"}
+        onClose={() => setEditing(null)}
+        title={isAdd ? t("users.create") : t("users.edit")}
         footer={
           <>
-            <VtBtn variant="ghost" onClick={close}>关闭</VtBtn>
-            <VtBtn onClick={save}>保存提交</VtBtn>
+            <VtBtn variant="ghost" onClick={() => setEditing(null)}>{t("common.close")}</VtBtn>
+            <VtBtn onClick={() => void save()} disabled={saving}>
+              {saving ? t("common.saving") : t("common.saveSubmit")}
+            </VtBtn>
           </>
         }
       >
         {editing && (
           <div>
-            <VtField label="用户名" required>
-              <input className={vtInputCls} value={editing.username} placeholder="请输入用户名"
-                onChange={(e) => setEditing({ ...editing, username: e.target.value })} />
+            <VtField label={t("users.username")} required>
+              <input
+                className={vtInputCls}
+                value={editing.username}
+                placeholder={t("users.usernamePlaceholder")}
+                onChange={(e) => setEditing({ ...editing, username: e.target.value })}
+              />
             </VtField>
-            <VtField label="角色" required>
-              <select className={vtInputCls} value={editing.role}
-                onChange={(e) => setEditing({ ...editing, role: e.target.value })}>
-                {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            <VtField label={t("users.role")} required>
+              <select
+                className={vtInputCls}
+                value={editing.roleId}
+                onChange={(e) => setEditing({ ...editing, roleId: e.target.value })}
+              >
+                <option value="">{t("users.selectRole")}</option>
+                {roles.map((r) => (
+                  <option key={String(r.id)} value={String(r.id)}>
+                    {r.roleName}
+                  </option>
+                ))}
               </select>
             </VtField>
-            <VtField label="机构" required>
-              <OrgTreeSelect value={editing.org} onChange={(v) => setEditing({ ...editing, org: v })} />
+            <VtField label={t("users.org")} required>
+              <OrgTreeSelect
+                nodes={orgNodes}
+                value={editing.orgId}
+                onChange={(v) => setEditing({ ...editing, orgId: v })}
+              />
             </VtField>
-            <VtField label="邮箱" required>
-              <input className={vtInputCls} type="email" value={editing.email} placeholder="user@example.com"
-                onChange={(e) => setEditing({ ...editing, email: e.target.value })} />
+            <VtField label={t("users.email")} required>
+              <input
+                className={vtInputCls}
+                type="email"
+                value={editing.email}
+                placeholder="user@example.com"
+                onChange={(e) => setEditing({ ...editing, email: e.target.value })}
+              />
             </VtField>
-            <VtField label="电话">
-              <input className={vtInputCls} value={editing.phone ?? ""} placeholder="请输入电话"
-                onChange={(e) => setEditing({ ...editing, phone: e.target.value })} />
+            <VtField label={t("users.phone")}>
+              <input
+                className={vtInputCls}
+                value={editing.phone}
+                placeholder={t("users.phonePlaceholder")}
+                onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
+              />
             </VtField>
             {isAdd && (
-              <VtField label="密码" required>
-                <input className={vtInputCls} type="password" autoComplete="new-password"
-                  placeholder="请输入密码" />
+              <VtField label={t("users.password")} required>
+                <input
+                  className={vtInputCls}
+                  type="password"
+                  autoComplete="new-password"
+                  value={editing.password}
+                  placeholder={t("users.passwordPlaceholder")}
+                  onChange={(e) => setEditing({ ...editing, password: e.target.value })}
+                />
               </VtField>
             )}
-            <VtField label="状态">
-              <VtSegmented<User["status"]>
+            <VtField label={t("common.status")}>
+              <VtSegmented<UserForm["status"]>
                 value={editing.status}
                 onChange={(v) => setEditing({ ...editing, status: v })}
                 options={[
-                  { label: "禁用", value: "disabled", tone: "critical" },
-                  { label: "正常", value: "online", tone: "online" },
+                  { label: t("common.disabled"), value: "disabled", tone: "critical" },
+                  { label: t("common.normal"), value: "online", tone: "online" },
                 ]}
               />
             </VtField>
@@ -155,31 +408,43 @@ function UsersPage() {
         )}
       </VtDrawer>
 
-      {/* Change password dialog (drawer) */}
       <VtDrawer
         open={!!passUser}
-        onClose={() => { setPassUser(null); setNewPass(""); }}
-        title={`修改密码 — ${passUser?.username ?? ""}`}
+        onClose={() => {
+          setPassUser(null);
+          setNewPass("");
+        }}
+        title={t("users.changePasswordTitle", { name: passUser?.username ?? "" })}
         width={400}
+        zIndex={60}
         footer={
           <>
-            <VtBtn variant="ghost" onClick={() => { setPassUser(null); setNewPass(""); }}>取消</VtBtn>
-            <VtBtn onClick={savePass}>修改</VtBtn>
+            <VtBtn
+              variant="ghost"
+              onClick={() => {
+                setPassUser(null);
+                setNewPass("");
+              }}
+            >
+              {t("common.cancel")}
+            </VtBtn>
+            <VtBtn onClick={() => void savePass()} disabled={saving}>
+              {t("common.modify")}
+            </VtBtn>
           </>
         }
       >
-        <VtField label="密码" required>
+        <VtField label={t("users.password")} required>
           <input
             className={vtInputCls}
             type="password"
             autoComplete="new-password"
-            placeholder="请输入新密码"
+            placeholder={t("users.newPasswordPlaceholder")}
             value={newPass}
             onChange={(e) => setNewPass(e.target.value)}
             autoFocus
           />
         </VtField>
-        <p className="ml-[84px] mt-1 text-xs text-text-muted">提交后该用户将使用新密码登录。</p>
       </VtDrawer>
     </>
   );

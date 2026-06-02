@@ -1,6 +1,6 @@
-import { type ReactNode, useEffect, useState, useCallback, type ComponentType } from "react";
-import { AlertTriangle, X } from "lucide-react";
-import { VtBtn } from "@/components/vt-drawer";
+import { type ReactNode, useCallback, useState } from "react";
+import { Modal } from "antd";
+import { ExclamationCircleOutlined } from "@ant-design/icons";
 
 export function ConfirmDialog({
   open,
@@ -9,7 +9,6 @@ export function ConfirmDialog({
   confirmText = "删除",
   cancelText = "取消",
   danger = true,
-  icon: Icon,
   onConfirm,
   onClose,
 }: {
@@ -19,53 +18,33 @@ export function ConfirmDialog({
   confirmText?: string;
   cancelText?: string;
   danger?: boolean;
-  icon?: ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }>;
   onConfirm: () => void;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-  const IconComp = Icon ?? AlertTriangle;
-  const iconColor = Icon
-    ? "text-primary"
-    : danger
-      ? "text-status-critical"
-      : "text-status-warn";
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-[400px] overflow-hidden rounded-lg border border-panel-border bg-background shadow-2xl">
-        <header className="flex items-center justify-between border-b border-panel-border px-5 py-3">
-          <div className="flex items-center gap-2">
-            <IconComp className={`h-4 w-4 ${iconColor}`} />
-            <h3 className="font-heading text-sm font-semibold tracking-wider text-foreground">{title}</h3>
-          </div>
-          <button onClick={onClose} className="rounded p-1 text-text-muted transition hover:bg-panel hover:text-foreground">
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-        <div className="px-5 py-5 text-sm text-text-secondary">{description}</div>
-        <footer className="flex justify-end gap-2 border-t border-panel-border px-5 py-3">
-          <VtBtn variant="ghost" onClick={onClose}>{cancelText}</VtBtn>
-          <VtBtn
-            onClick={() => { onConfirm(); onClose(); }}
-            className={danger ? "bg-status-critical hover:brightness-110" : ""}
-          >
-            {confirmText}
-          </VtBtn>
-        </footer>
+    <Modal
+      title={title}
+      open={open}
+      onCancel={onClose}
+      onOk={() => {
+        onConfirm();
+        onClose();
+      }}
+      okText={confirmText}
+      cancelText={cancelText}
+      okButtonProps={{ danger }}
+      centered
+      destroyOnClose
+    >
+      <div className="flex gap-3 py-2">
+        <ExclamationCircleOutlined className={`text-lg ${danger ? "text-[#da2d2c]" : "text-[#ff6900]"}`} />
+        <div className="text-sm text-[var(--text-secondary)]">{description}</div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-/** Imperative confirm hook — render {confirmNode} once, call confirm({...}) to trigger */
 export function useConfirm() {
   const [state, setState] = useState<{
     description: ReactNode;

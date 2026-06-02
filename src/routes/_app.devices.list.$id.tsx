@@ -5,19 +5,25 @@ import {
   AlertTriangle, Save, FileText, Bell, RotateCw, Inbox, Eye,
   ChevronRight, ChevronDown,
 } from "lucide-react";
-import { VtBtn, VtDrawer, VtField, vtInputCls } from "@/components/vt-drawer";
+import { VtBtn, VtDrawer, VtField, vtInputCls, vtSelectCls } from "@/components/vt-drawer";
+import { VtDataTable, vtActionColumn } from "@/components/vt-table";
+import type { ColumnsType } from "antd/es/table";
 import { OrgTreeSelect } from "@/components/org-tree-select";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
-  deviceActions, useDevice, useDevices, mockReadings, mockAlarms, mockEvents,
-  type AlarmLog, type EventLog,
-} from "@/lib/devices-store";
-import { useProduct, productActions, PRODUCT_TYPE_LABEL } from "@/lib/products-store";
+  DeviceEditContextProvider,
+  useDeviceEdit,
+  useDeviceEditState,
+} from "@/lib/device-edit-context";
+import { pageDevices } from "@/api";
+import { mapDeviceDtoToRow, type DeviceListRow } from "@/lib/device-mappers";
+import { mockReadings, mockAlarms, mockEvents, type AlarmLog, type EventLog } from "@/lib/devices-store";
+import { PRODUCT_TYPE_LABEL } from "@/lib/product-mappers";
 import type {
   PropertyTagMetadata, SimplePropertyMetadata, SimpleFunctionMetadata,
-  SimpleTreeMetadata, RuleModel,
+  SimpleTreeMetadata, RuleModel, TagModel,
 } from "@/types/api/metadata";
-import { DATA_TYPES, DATA_UNITS } from "@/lib/data-types";
+import { DATA_UNITS } from "@/lib/data-types";
 
 export const Route = createFileRoute("/_app/devices/list/$id")({
   component: DeviceDetailPage,
@@ -25,19 +31,30 @@ export const Route = createFileRoute("/_app/devices/list/$id")({
 
 type TabKey = "info" | "meta" | "runtime" | "func" | "events" | "rules" | "alarm" | "children";
 
-/* 默认的设备标签字段集（对照原项目截图） */
-const DEFAULT_TAG_FIELDS = [
-  "Installatonate", "Location", "Next Maintenance",
-  "Assigned Technician", "System Capacity", "Warranty Status",
-  "Longitude", "Latitude", "State",
-];
-
 function DeviceDetailPage() {
   const { id } = Route.useParams();
+  const editState = useDeviceEditState(id);
+  return (
+    <DeviceEditContextProvider value={editState}>
+      <DeviceDetailView />
+    </DeviceEditContextProvider>
+  );
+}
+
+function DeviceDetailView() {
   const navigate = useNavigate();
-  const device = useDevice(id);
-  const product = useProduct(device?.productId);
+  const { device, loading, saving, syncing, save, syncModel } = useDeviceEdit();
   const [tab, setTab] = useState<TabKey>("info");
+
+  if (loading) {
+    return (
+      <main className="vt-page-content vt-page-fill">
+        <div className="vt-glass flex flex-1 items-center justify-center text-sm text-text-muted">
+          加载中…
+        </div>
+      </main>
+    );
+  }
 
   if (!device) {
     return (
@@ -89,11 +106,19 @@ function DeviceDetailPage() {
           <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs ${statusCls}`}>
             <span className="h-1.5 w-1.5 rounded-full bg-current" />{statusLabel}
           </span>
-          <button className="inline-flex items-center gap-1 rounded border border-panel-border px-2.5 py-1 text-xs text-text-secondary hover:border-primary/40 hover:text-primary">
-            <RotateCw className="h-3.5 w-3.5" /> 模型同步
+          <button
+            disabled={syncing}
+            onClick={() => void syncModel()}
+            className="inline-flex items-center gap-1 rounded border border-panel-border px-2.5 py-1 text-xs text-text-secondary hover:border-primary/40 hover:text-primary disabled:opacity-50"
+          >
+            <RotateCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} /> 模型同步
           </button>
-          <button className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1 text-xs text-primary-foreground hover:opacity-90">
-            <Save className="h-3.5 w-3.5" /> 保存
+          <button
+            disabled={saving}
+            onClick={() => void save()}
+            className="inline-flex items-center gap-1 rounded bg-primary px-3 py-1 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            <Save className="h-3.5 w-3.5" /> {saving ? "保存中…" : "保存"}
           </button>
         </div>
       </div>
@@ -114,43 +139,31 @@ function DeviceDetailPage() {
       </div>
 
       <div className="vt-glass mt-3 flex-1 overflow-hidden p-5">
-        {tab === "info"     && <TabInfo deviceId={device.id} />}
-        {tab === "meta"     && <TabMeta deviceId={device.id} />}
-        {tab === "runtime"  && <TabRuntime deviceId={device.id} />}
-        {tab === "func"     && <TabFunc deviceId={device.id} />}
-        {tab === "events"   && <TabEvents deviceId={device.id} />}
-        {tab === "rules"    && <TabRules deviceId={device.id} />}
-        {tab === "alarm"    && <TabAlarm deviceId={device.id} />}
-        {tab === "children" && <TabChildren deviceId={device.id} />}
+        {tab === "info"     && <TabInfo />}
+        {tab === "meta"     && <TabMeta />}
+        {tab === "runtime"  && <TabRuntime />}
+        {tab === "func"     && <TabFunc />}
+        {tab === "events"   && <TabEvents />}
+        {tab === "rules"    && <TabRules />}
+        {tab === "alarm"    && <TabAlarm />}
+        {tab === "children" && <TabChildren />}
       </div>
-
-      {!product && tab !== "info" && (
-        <div className="mt-2 rounded border border-status-warning/40 bg-status-warning/10 px-3 py-2 text-xs text-status-warning">
-          关联产品不存在，部分功能不可用。
-        </div>
-      )}
     </main>
   );
 }
 
 /* ========== 基本信息 ========== */
-function TabInfo({ deviceId }: { deviceId: string }) {
-  const device = useDevice(deviceId)!;
-  const isGateway = device.productType === "gateway";
+function TabInfo() {
+  const { device, orgNodes, gateways, updateDevice, updateMetadata } = useDeviceEdit();
+  if (!device) return null;
+  const isChildren = device.productType === "children";
 
-  const setField = <K extends keyof typeof device>(k: K, v: (typeof device)[K]) =>
-    deviceActions.update(deviceId, { [k]: v } as Partial<typeof device>);
-
-  /* 把 tags 转成 name->value 字典做表单 */
-  const tagMap = useMemo(() => {
-    const m: Record<string, string> = {};
-    device.tags.forEach((t) => { m[t.tagName] = t.tagValue ?? ""; });
-    return m;
-  }, [device.tags]);
-
-  const setTag = (name: string, value: string) => {
-    const others = device.tags.filter((t) => t.tagName !== name);
-    deviceActions.setTags(deviceId, [...others, { tagKey: name, tagName: name, tagValue: value }]);
+  const setTag = (index: number, patch: Partial<TagModel>) => {
+    updateMetadata((m) => {
+      const tags = [...(m.tags ?? [])];
+      tags[index] = { ...tags[index], ...patch };
+      return { ...m, tags };
+    });
   };
 
   return (
@@ -160,13 +173,13 @@ function TabInfo({ deviceId }: { deviceId: string }) {
       {/* 基本字段区 */}
       <div className="grid grid-cols-1 gap-x-6 gap-y-1 md:grid-cols-2 xl:grid-cols-3">
         <Row label="设备名称">
-          <input className={vtInputCls} value={device.name} onChange={(e) => setField("name", e.target.value)} />
+          <input className={vtInputCls} value={device.name} onChange={(e) => updateDevice({ name: e.target.value })} />
         </Row>
         <Row label="设备SN">
-          <input className={vtInputCls} value={device.sn} onChange={(e) => setField("sn", e.target.value)} />
+          <input className={vtInputCls} value={device.sn} onChange={(e) => updateDevice({ sn: e.target.value })} />
         </Row>
         <Row label="所属机构">
-          <OrgTreeSelect value={device.org} onChange={(v) => setField("org", v)} />
+          <OrgTreeSelect nodes={orgNodes} value={device.orgId} onChange={(v) => updateDevice({ orgId: v })} />
         </Row>
 
         <Row label="产品名称">
@@ -183,33 +196,38 @@ function TabInfo({ deviceId }: { deviceId: string }) {
           <span className="text-text-secondary">{device.creator}</span>
         </Row>
 
-        {/* 网关设备：仅子设备展示（只读） */}
-        {device.productType === "children" && (
+        {/* 子设备：展示关联网关（只读） */}
+        {isChildren && (
           <Row label="网关设备">
             <span className="text-text-secondary">{device.gatewayName ?? "—"}</span>
           </Row>
         )}
         <Row label="采集网关">
-          {device.productType === "children" ? (
-            <span className="text-text-secondary">{device.collectGateway ?? "—"}</span>
+          {isChildren ? (
+            <span className="text-text-secondary">{device.gatewayName ?? "—"}</span>
           ) : (
             <select
-              className={vtInputCls}
-              value={device.collectGateway ?? ""}
-              onChange={(e) => setField("collectGateway", e.target.value)}
+              className={vtSelectCls}
+              value={device.gatewayId ?? ""}
+              onChange={(e) => {
+                const id = e.target.value;
+                const gw = gateways.find((g) => String(g.gatewayPo?.id ?? "") === id);
+                updateDevice({ gatewayId: id || undefined, gatewayName: gw?.gatewayPo?.name });
+              }}
             >
               <option value="">请选择采集网关</option>
-              <option value="mqtt-client网关">mqtt-client网关</option>
-              <option value="modbus网关">modbus网关</option>
-              <option value="http网关">http网关</option>
-              <option value="opcua网关">opcua网关</option>
+              {gateways.map((g) => (
+                <option key={g.gatewayPo?.id} value={String(g.gatewayPo?.id ?? "")}>
+                  {g.gatewayPo?.name ?? "—"}
+                </option>
+              ))}
             </select>
           )}
         </Row>
         <Row label="采集方式">
-          {device.collectMode ? (
+          {device.networkType ? (
             <span className="inline-block rounded bg-status-info/15 px-2 py-0.5 text-xs text-status-info">
-              {device.collectMode}
+              {device.networkType}
             </span>
           ) : <span className="text-text-muted">—</span>}
         </Row>
@@ -223,22 +241,24 @@ function TabInfo({ deviceId }: { deviceId: string }) {
         </Row>
       </div>
 
-      {/* 设备标签（网关 / 子设备 都展示） */}
-      <div>
-        <div className="mb-2 text-sm text-foreground">设备标签</div>
-        <div className="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2 xl:grid-cols-3">
-          {DEFAULT_TAG_FIELDS.map((name) => (
-            <div key={name} className="grid grid-cols-[140px_1fr] items-center gap-3">
-              <span className="text-xs font-medium text-foreground">{name}</span>
-              <input
-                className={vtInputCls}
-                value={tagMap[name] ?? ""}
-                onChange={(e) => setTag(name, e.target.value)}
-              />
-            </div>
-          ))}
+      {/* 设备标签 */}
+      {(device.metadata.tags ?? []).length > 0 && (
+        <div>
+          <div className="mb-2 text-sm text-foreground">设备标签</div>
+          <div className="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2 xl:grid-cols-3">
+            {(device.metadata.tags ?? []).map((tag, index) => (
+              <div key={`${tag.tagKey}-${index}`} className="grid grid-cols-[140px_1fr] items-center gap-3">
+                <span className="text-xs font-medium text-foreground">{tag.tagName}</span>
+                <input
+                  className={vtInputCls}
+                  value={tag.tagValue ?? ""}
+                  onChange={(e) => setTag(index, { tagValue: e.target.value })}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -253,17 +273,13 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 /* ========== 模型属性 ========== */
-function TabMeta({ deviceId }: { deviceId: string }) {
-  const device = useDevice(deviceId)!;
-  const product = useProduct(device.productId);
+function TabMeta() {
+  const { device, updateMetadata, dataTypes } = useDeviceEdit();
   const { confirm, confirmNode } = useConfirm();
-  const props = product?.metadata.properties ?? [];
-  const fns   = product?.metadata.functions ?? [];
-  const propertyTags: PropertyTagMetadata[] = product?.metadata.propertyTags ?? [
-    { id: "properties", name: "Properties" },
-    { id: "measurement", name: "Measurement" },
-    { id: "action", name: "Action" },
-  ];
+  if (!device) return null;
+  const props = device.metadata.properties ?? [];
+  const fns = device.metadata.functions ?? [];
+  const propertyTags: PropertyTagMetadata[] = device.metadata.propertyTags ?? [];
 
   const [sub, setSub] = useState<"prop" | "fn">("prop");
   const [filterTag, setFilterTag] = useState<string>("all");
@@ -277,8 +293,7 @@ function TabMeta({ deviceId }: { deviceId: string }) {
   );
 
   const saveProp = (p: SimplePropertyMetadata) => {
-    if (!product) return;
-    productActions.updateMetadata(product.id, (m) => {
+    updateMetadata((m) => {
       const list = m.properties ?? [];
       const exists = list.some((x) => x.id === p.id);
       return {
@@ -289,18 +304,16 @@ function TabMeta({ deviceId }: { deviceId: string }) {
     setEditingProp(null);
   };
   const delProp = (p: SimplePropertyMetadata) => {
-    if (!product) return;
     confirm({
       description: <>确定删除属性 <span className="font-semibold text-foreground">「{p.name}」</span> 吗？</>,
-      onConfirm: () => productActions.updateMetadata(product.id, (m) => ({
+      onConfirm: () => updateMetadata((m) => ({
         ...m, properties: (m.properties ?? []).filter((x) => x.id !== p.id),
       })),
     });
   };
 
   const saveFn = (f: SimpleFunctionMetadata) => {
-    if (!product) return;
-    productActions.updateMetadata(product.id, (m) => {
+    updateMetadata((m) => {
       const list = m.functions ?? [];
       const exists = list.some((x) => x.id === f.id);
       return {
@@ -311,14 +324,56 @@ function TabMeta({ deviceId }: { deviceId: string }) {
     setEditingFn(null);
   };
   const delFn = (f: SimpleFunctionMetadata) => {
-    if (!product) return;
     confirm({
       description: <>确定删除功能 <span className="font-semibold text-foreground">「{f.name}」</span> 吗？</>,
-      onConfirm: () => productActions.updateMetadata(product.id, (m) => ({
+      onConfirm: () => updateMetadata((m) => ({
         ...m, functions: (m.functions ?? []).filter((x) => x.id !== f.id),
       })),
     });
   };
+
+  const propColumns: ColumnsType<SimplePropertyMetadata> = [
+    { key: "name", title: "名称", dataIndex: "name" },
+    { key: "id", title: "标识", dataIndex: "id", width: 160, render: (v) => <span className="text-text-secondary">{v}</span> },
+    { key: "type", title: "类型", width: 128, render: (_, p) => <span className="text-text-secondary">{p.valueType?.type ?? "—"}</span> },
+    { key: "unit", title: "单位", width: 96, render: (_, p) => <span className="text-text-secondary">{p.valueType?.unit || "—"}</span> },
+    {
+      key: "tag",
+      title: "标签",
+      width: 128,
+      render: (_, p) => (
+        <span className="text-text-secondary">{propertyTags.find((t) => t.id === p.tagId)?.name ?? "Properties"}</span>
+      ),
+    },
+    vtActionColumn<SimplePropertyMetadata>("操作", (p) => (
+      <>
+        <button onClick={() => setEditingProp(p)}
+          className="mr-1 rounded p-1 text-text-muted hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
+        <button onClick={() => delProp(p)}
+          className="rounded p-1 text-text-muted hover:text-status-critical"><Trash2 className="h-3.5 w-3.5" /></button>
+      </>
+    ), 100),
+  ];
+
+  const fnColumns: ColumnsType<SimpleFunctionMetadata> = [
+    { key: "name", title: "名称", dataIndex: "name" },
+    { key: "id", title: "标识", dataIndex: "id", width: 160, render: (v) => <span className="text-text-secondary">{v}</span> },
+    { key: "async", title: "异步", width: 96, render: (_, f) => <span className="text-text-secondary">{f.async ? "是" : "否"}</span> },
+    {
+      key: "io",
+      title: "入/出参",
+      width: 128,
+      render: (_, f) => <span className="text-text-secondary">{(f.inputs?.length ?? 0)} / {(f.outputs?.length ?? 0)}</span>,
+    },
+    vtActionColumn<SimpleFunctionMetadata>("操作", (f) => (
+      <>
+        <button onClick={() => setEditingFn(f)}
+          className="mr-1 rounded p-1 text-text-muted hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
+        <button onClick={() => delFn(f)}
+          className="rounded p-1 text-text-muted hover:text-status-critical"><Trash2 className="h-3.5 w-3.5" /></button>
+      </>
+    ), 100),
+  ];
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -344,73 +399,27 @@ function TabMeta({ deviceId }: { deviceId: string }) {
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto rounded border border-panel-border">
+      <div className="flex-1 overflow-hidden rounded border border-panel-border">
         {sub === "prop" ? (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-panel/60 text-xs text-text-muted">
-                <th className="px-3 py-2 text-left font-medium">名称</th>
-                <th className="px-3 py-2 text-left font-medium w-40">标识</th>
-                <th className="px-3 py-2 text-left font-medium w-32">类型</th>
-                <th className="px-3 py-2 text-left font-medium w-24">单位</th>
-                <th className="px-3 py-2 text-left font-medium w-32">标签</th>
-                <th className="px-3 py-2 text-right font-medium w-32">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProps.length === 0 ? (
-                <tr><td colSpan={6} className="px-3 py-12 text-center text-xs text-text-muted">暂无数据</td></tr>
-              ) : filteredProps.map((p) => (
-                <tr key={p.id} className="border-t border-panel-border/60">
-                  <td className="px-3 py-2">{p.name}</td>
-                  <td className="px-3 py-2 text-text-secondary">{p.id}</td>
-                  <td className="px-3 py-2 text-text-secondary">{p.valueType?.type ?? "—"}</td>
-                  <td className="px-3 py-2 text-text-secondary">{p.valueType?.unit || "—"}</td>
-                  <td className="px-3 py-2 text-text-secondary">
-                    {propertyTags.find((t) => t.id === p.tagId)?.name ?? "Properties"}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button onClick={() => setEditingProp(p)}
-                      className="mr-1 rounded p-1 text-text-muted hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => delProp(p)}
-                      className="rounded p-1 text-text-muted hover:text-status-critical"><Trash2 className="h-3.5 w-3.5" /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <VtDataTable<SimplePropertyMetadata>
+            rowKey="id"
+            size="small"
+            pagination={false}
+            columns={propColumns}
+            dataSource={filteredProps}
+            scrollX="max-content"
+            locale={{ emptyText: "暂无数据" }}
+          />
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-panel/60 text-xs text-text-muted">
-                <th className="px-3 py-2 text-left font-medium">名称</th>
-                <th className="px-3 py-2 text-left font-medium w-40">标识</th>
-                <th className="px-3 py-2 text-left font-medium w-24">异步</th>
-                <th className="px-3 py-2 text-left font-medium w-32">入/出参</th>
-                <th className="px-3 py-2 text-right font-medium w-32">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fns.length === 0 ? (
-                <tr><td colSpan={5} className="px-3 py-12 text-center text-xs text-text-muted">暂无数据</td></tr>
-              ) : fns.map((f) => (
-                <tr key={f.id} className="border-t border-panel-border/60">
-                  <td className="px-3 py-2">{f.name}</td>
-                  <td className="px-3 py-2 text-text-secondary">{f.id}</td>
-                  <td className="px-3 py-2 text-text-secondary">{f.async ? "是" : "否"}</td>
-                  <td className="px-3 py-2 text-text-secondary">
-                    {(f.inputs?.length ?? 0)} / {(f.outputs?.length ?? 0)}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button onClick={() => setEditingFn(f)}
-                      className="mr-1 rounded p-1 text-text-muted hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => delFn(f)}
-                      className="rounded p-1 text-text-muted hover:text-status-critical"><Trash2 className="h-3.5 w-3.5" /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <VtDataTable<SimpleFunctionMetadata>
+            rowKey="id"
+            size="small"
+            pagination={false}
+            columns={fnColumns}
+            dataSource={fns}
+            scrollX="max-content"
+            locale={{ emptyText: "暂无数据" }}
+          />
         )}
       </div>
 
@@ -452,6 +461,7 @@ function PropertyDrawer({ open, value, onClose, onSave, tags }: {
   open: boolean; value: SimplePropertyMetadata | null; onClose: () => void;
   onSave: (p: SimplePropertyMetadata) => void; tags: PropertyTagMetadata[];
 }) {
+  const { dataTypes } = useDeviceEdit();
   const [draft, setDraft] = useState<SimplePropertyMetadata>({ id: "", name: "" });
   useEffect(() => { if (value) setDraft({ ...value, valueType: value.valueType ?? { type: "double" } }); }, [value]);
   return (
@@ -469,7 +479,7 @@ function PropertyDrawer({ open, value, onClose, onSave, tags }: {
       <VtField label="类型">
         <select className={vtInputCls} value={draft.valueType?.type ?? "double"}
           onChange={(e) => setDraft({ ...draft, valueType: { ...draft.valueType, type: e.target.value } })}>
-          {DATA_TYPES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          {dataTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
       </VtField>
       <VtField label="单位">
@@ -521,15 +531,11 @@ function FunctionDrawer({ open, value, onClose, onSave }: {
 
 
 /* ========== 运行状态 ========== */
-function TabRuntime({ deviceId }: { deviceId: string }) {
-  const device = useDevice(deviceId)!;
-  const product = useProduct(device.productId);
-  const props = product?.metadata.properties ?? [];
-  const propertyTags: PropertyTagMetadata[] = product?.metadata.propertyTags ?? [
-    { id: "properties", name: "Properties" },
-    { id: "measurement", name: "Measurement" },
-    { id: "action", name: "Action" },
-  ];
+function TabRuntime() {
+  const { device } = useDeviceEdit();
+  if (!device) return null;
+  const props = device.metadata.properties ?? [];
+  const propertyTags: PropertyTagMetadata[] = device.metadata.propertyTags ?? [];
 
   const [seed, setSeed] = useState(1);
   const [auto, setAuto] = useState(true);
@@ -607,10 +613,10 @@ function TabRuntime({ deviceId }: { deviceId: string }) {
 }
 
 /* ========== 设备功能 ========== */
-function TabFunc({ deviceId }: { deviceId: string }) {
-  const device = useDevice(deviceId)!;
-  const product = useProduct(device.productId);
-  const fns = product?.metadata.functions ?? [];
+function TabFunc() {
+  const { device } = useDeviceEdit();
+  if (!device) return null;
+  const fns = device.metadata.functions ?? [];
   const [activeId, setActiveId] = useState<string>("");
   const active = fns.find((f) => f.id === activeId);
   const [inputs, setInputs] = useState<Record<string, string>>({});
@@ -642,6 +648,27 @@ function TabFunc({ deviceId }: { deviceId: string }) {
       ...l,
     ]);
   };
+
+  type FnLogRow = { id: string; fn: string; time: string; status: "成功" | "失败"; sendData: string; resultFile: string };
+  const fnLogColumns: ColumnsType<FnLogRow> = [
+    { key: "fn", title: "功能", dataIndex: "fn" },
+    {
+      key: "status",
+      title: "请求状态",
+      width: 96,
+      render: (_, l) => (
+        <span className="rounded bg-status-online/15 px-1.5 py-0.5 text-[11px] text-status-online">{l.status}</span>
+      ),
+    },
+    { key: "sendData", title: "发送数据", dataIndex: "sendData", render: (v) => <span className="text-xs text-text-secondary">{v}</span> },
+    {
+      key: "resultFile",
+      title: "请求结果源文件",
+      width: 176,
+      dataIndex: "resultFile",
+      render: (v) => <span className="cursor-pointer text-xs text-primary hover:underline">{v}</span>,
+    },
+  ];
 
   return (
     <div className="grid h-full grid-cols-1 gap-4 overflow-hidden lg:grid-cols-[420px_1fr]">
@@ -696,33 +723,16 @@ function TabFunc({ deviceId }: { deviceId: string }) {
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
             className="rounded border border-panel-border bg-transparent px-2 py-0.5 text-xs" />
         </div>
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-panel/60 text-xs text-text-muted">
-                <th className="px-3 py-2 text-left font-medium">功能</th>
-                <th className="px-3 py-2 text-left font-medium w-24">请求状态</th>
-                <th className="px-3 py-2 text-left font-medium">发送数据</th>
-                <th className="px-3 py-2 text-left font-medium w-44">请求结果源文件</th>
-              </tr>
-            </thead>
-            <tbody>
-              {log.length === 0 ? (
-                <tr><td colSpan={4} className="px-3 py-12 text-center text-xs text-text-muted">
-                  <Inbox className="mx-auto mb-1 h-6 w-6 opacity-50" /> 暂无数据
-                </td></tr>
-              ) : log.map((l) => (
-                <tr key={l.id} className="border-t border-panel-border/60">
-                  <td className="px-3 py-2">{l.fn}</td>
-                  <td className="px-3 py-2">
-                    <span className="rounded bg-status-online/15 px-1.5 py-0.5 text-[11px] text-status-online">{l.status}</span>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-text-secondary">{l.sendData}</td>
-                  <td className="px-3 py-2 text-xs text-primary hover:underline cursor-pointer">{l.resultFile}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex-1 overflow-hidden">
+          <VtDataTable<FnLogRow>
+            rowKey="id"
+            size="small"
+            pagination={false}
+            columns={fnLogColumns}
+            dataSource={log}
+            scrollX="max-content"
+            locale={{ emptyText: "暂无数据" }}
+          />
         </div>
         <Pager total={log.length} />
       </div>
@@ -740,7 +750,9 @@ function FRow({ label, children, alignTop }: { label: string; children: React.Re
 }
 
 /* ========== 日志信息 ========== */
-function TabEvents({ deviceId }: { deviceId: string }) {
+function TabEvents() {
+  const { device } = useDeviceEdit();
+  const deviceId = device?.id ?? "";
   const [list, setList] = useState<EventLog[]>(() => mockEvents(deviceId));
   const [from, setFrom] = useState("2026-05-22");
   const [to, setTo] = useState("2026-05-29");
@@ -749,41 +761,39 @@ function TabEvents({ deviceId }: { deviceId: string }) {
     property: "属性", function: "功能", online: "上线", offline: "下线", error: "错误",
   };
 
+  const eventColumns: ColumnsType<EventLog> = [
+    {
+      key: "time",
+      title: (
+        <div className="flex items-center gap-2">
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+            className="rounded border border-panel-border bg-transparent px-2 py-0.5 text-xs" />
+          <span>至</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
+            className="rounded border border-panel-border bg-transparent px-2 py-0.5 text-xs" />
+        </div>
+      ),
+      dataIndex: "time",
+      width: 256,
+      render: (v) => <span className="text-xs text-text-secondary">{v}</span>,
+    },
+    { key: "type", title: "类型", width: 96, render: (_, e) => <span className="text-xs text-text-secondary">{typeMap[e.type]}</span> },
+    { key: "id", title: "消息ID", width: 160, dataIndex: "id", render: (v) => <span className="text-xs text-text-secondary">{v}</span> },
+    { key: "payload", title: "日志", dataIndex: "payload", render: (v) => <span className="text-xs text-text-secondary">{v}</span> },
+  ];
+
   return (
     <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-auto rounded border border-panel-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-panel/60 text-xs text-text-muted">
-              <th className="px-3 py-2 text-left font-medium w-64">
-                <div className="flex items-center gap-2">
-                  <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-                    className="rounded border border-panel-border bg-transparent px-2 py-0.5 text-xs" />
-                  <span>至</span>
-                  <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-                    className="rounded border border-panel-border bg-transparent px-2 py-0.5 text-xs" />
-                </div>
-              </th>
-              <th className="px-3 py-2 text-left font-medium w-24">类型</th>
-              <th className="px-3 py-2 text-left font-medium w-40">消息ID</th>
-              <th className="px-3 py-2 text-left font-medium">日志</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.length === 0 ? (
-              <tr><td colSpan={4} className="px-3 py-12 text-center text-xs text-text-muted">
-                <FileText className="mx-auto mb-1 h-6 w-6 opacity-50" /> 暂无数据
-              </td></tr>
-            ) : list.map((e) => (
-              <tr key={e.id} className="border-t border-panel-border/60">
-                <td className="px-3 py-2 text-xs text-text-secondary">{e.time}</td>
-                <td className="px-3 py-2 text-xs text-text-secondary">{typeMap[e.type]}</td>
-                <td className="px-3 py-2 text-xs text-text-secondary">{e.id}</td>
-                <td className="px-3 py-2 text-xs text-text-secondary">{e.payload}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="flex-1 overflow-hidden rounded border border-panel-border">
+        <VtDataTable<EventLog>
+          rowKey="id"
+          size="small"
+          pagination={false}
+          columns={eventColumns}
+          dataSource={list}
+          scrollX="max-content"
+          locale={{ emptyText: "暂无数据" }}
+        />
       </div>
       <div className="mt-2 flex justify-end">
         <button onClick={() => setList(mockEvents(deviceId))}
@@ -797,16 +807,15 @@ function TabEvents({ deviceId }: { deviceId: string }) {
 }
 
 /* ========== 告警规则 ========== */
-function TabRules({ deviceId }: { deviceId: string }) {
-  const device = useDevice(deviceId)!;
-  const product = useProduct(device.productId);
+function TabRules() {
+  const { device, updateMetadata } = useDeviceEdit();
   const { confirm, confirmNode } = useConfirm();
-  const rules = product?.metadata.rules ?? [];
+  if (!device) return null;
+  const rules = device.metadata.rules ?? [];
   const [editing, setEditing] = useState<RuleModel | null>(null);
 
   const save = (r: RuleModel) => {
-    if (!product) return;
-    productActions.updateMetadata(product.id, (m) => {
+    updateMetadata((m) => {
       const list = m.rules ?? [];
       const exists = list.some((x) => x.id === r.id);
       return { ...m, rules: exists ? list.map((x) => (x.id === r.id ? r : x)) : [...list, r] };
@@ -814,15 +823,47 @@ function TabRules({ deviceId }: { deviceId: string }) {
     setEditing(null);
   };
   const del = (r: RuleModel) => {
-    if (!product) return;
     confirm({
       description: <>确定删除规则 <span className="font-semibold text-foreground">「{r.name}」</span> 吗？</>,
-      onConfirm: () => productActions.updateMetadata(product.id, (m) => ({
+      onConfirm: () => updateMetadata((m) => ({
         ...m, rules: (m.rules ?? []).filter((x) => x.id !== r.id),
       })),
     });
   };
   const toggle = (r: RuleModel) => save({ ...r, state: (r.state ?? 1) === 1 ? 0 : 1 });
+
+  const ruleColumns: ColumnsType<RuleModel> = [
+    { key: "name", title: "规则名称", dataIndex: "name" },
+    { key: "type", title: "触发方式", width: 128, render: (_, r) => <span className="text-xs text-text-secondary">{r.ruleData?.type ?? "time"}</span> },
+    { key: "cron", title: "轮询周期", width: 160, render: (_, r) => <span className="text-xs text-text-secondary">{r.ruleData?.cron ?? "—"}</span> },
+    { key: "count", title: "阈值次数", width: 112, render: (_, r) => <span className="text-xs text-text-secondary">{r.ruleData?.count ?? 1}</span> },
+    {
+      key: "state",
+      title: "状态",
+      width: 96,
+      render: (_, r) => {
+        const on = (r.state ?? 1) === 1;
+        return on
+          ? <span className="rounded bg-status-online/15 px-1.5 py-0.5 text-[11px] text-status-online">启用</span>
+          : <span className="rounded bg-panel-heavy px-1.5 py-0.5 text-[11px] text-text-muted">禁用</span>;
+      },
+    },
+    vtActionColumn<RuleModel>("操作", (r) => {
+      const on = (r.state ?? 1) === 1;
+      return (
+        <>
+          <button onClick={() => toggle(r)}
+            className="mr-1 rounded border border-panel-border px-2 py-0.5 text-xs text-text-secondary hover:border-primary/40 hover:text-primary">
+            {on ? "禁用" : "启用"}
+          </button>
+          <button onClick={() => setEditing(r)}
+            className="mr-1 rounded p-1 text-text-muted hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
+          <button onClick={() => del(r)}
+            className="rounded p-1 text-text-muted hover:text-status-critical"><Trash2 className="h-3.5 w-3.5" /></button>
+        </>
+      );
+    }, 200),
+  ];
 
   return (
     <div className="flex h-full flex-col">
@@ -836,51 +877,16 @@ function TabRules({ deviceId }: { deviceId: string }) {
           <Plus className="h-3 w-3" /> 添加规则
         </button>
       </div>
-      <div className="flex-1 overflow-auto rounded border border-panel-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-panel/60 text-xs text-text-muted">
-              <th className="px-3 py-2 text-left font-medium">规则名称</th>
-              <th className="px-3 py-2 text-left font-medium w-32">触发方式</th>
-              <th className="px-3 py-2 text-left font-medium w-40">轮询周期</th>
-              <th className="px-3 py-2 text-left font-medium w-28">阈值次数</th>
-              <th className="px-3 py-2 text-left font-medium w-24">状态</th>
-              <th className="px-3 py-2 text-right font-medium w-44">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rules.length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-24 text-center text-xs text-text-muted">
-                <Bell className="mx-auto mb-1 h-6 w-6 opacity-50" /> 暂无数据
-              </td></tr>
-            ) : rules.map((r) => {
-              const on = (r.state ?? 1) === 1;
-              return (
-                <tr key={r.id} className="border-t border-panel-border/60">
-                  <td className="px-3 py-2">{r.name}</td>
-                  <td className="px-3 py-2 text-xs text-text-secondary">{r.ruleData?.type ?? "time"}</td>
-                  <td className="px-3 py-2 text-xs text-text-secondary">{r.ruleData?.cron ?? "—"}</td>
-                  <td className="px-3 py-2 text-xs text-text-secondary">{r.ruleData?.count ?? 1}</td>
-                  <td className="px-3 py-2">
-                    {on
-                      ? <span className="rounded bg-status-online/15 px-1.5 py-0.5 text-[11px] text-status-online">启用</span>
-                      : <span className="rounded bg-panel-heavy px-1.5 py-0.5 text-[11px] text-text-muted">禁用</span>}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button onClick={() => toggle(r)}
-                      className="mr-1 rounded border border-panel-border px-2 py-0.5 text-xs text-text-secondary hover:border-primary/40 hover:text-primary">
-                      {on ? "禁用" : "启用"}
-                    </button>
-                    <button onClick={() => setEditing(r)}
-                      className="mr-1 rounded p-1 text-text-muted hover:text-primary"><Pencil className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => del(r)}
-                      className="rounded p-1 text-text-muted hover:text-status-critical"><Trash2 className="h-3.5 w-3.5" /></button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="flex-1 overflow-hidden rounded border border-panel-border">
+        <VtDataTable<RuleModel>
+          rowKey="id"
+          size="small"
+          pagination={false}
+          columns={ruleColumns}
+          dataSource={rules}
+          scrollX="max-content"
+          locale={{ emptyText: "暂无数据" }}
+        />
       </div>
       <RuleDrawer open={!!editing} value={editing} onClose={() => setEditing(null)} onSave={save} />
       {confirmNode}
@@ -923,63 +929,65 @@ function RuleDrawer({ open, value, onClose, onSave }: {
 }
 
 /* ========== 告警记录 ========== */
-function TabAlarm({ deviceId }: { deviceId: string }) {
-  const [list] = useState<AlarmLog[]>(() => mockAlarms(deviceId));
+function TabAlarm() {
+  const { device } = useDeviceEdit();
+  const [list] = useState<AlarmLog[]>(() => mockAlarms(device?.id ?? ""));
   const [from, setFrom] = useState("2026-05-22");
   const [to, setTo] = useState("2026-05-29");
   const [detail, setDetail] = useState<AlarmLog | null>(null);
 
+  const alarmColumns: ColumnsType<AlarmLog> = [
+    {
+      key: "time",
+      title: (
+        <div className="flex items-center gap-2">
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+            className="rounded border border-panel-border bg-transparent px-2 py-0.5 text-xs" />
+          <span>至</span>
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
+            className="rounded border border-panel-border bg-transparent px-2 py-0.5 text-xs" />
+        </div>
+      ),
+      dataIndex: "time",
+      width: 256,
+      render: (v) => <span className="text-xs text-text-secondary">{v}</span>,
+    },
+    { key: "ruleName", title: "告警名称", dataIndex: "ruleName" },
+    { key: "count", title: "触发次数", width: 112, render: () => <span className="text-xs text-text-secondary">1</span> },
+    { key: "message", title: "数据", dataIndex: "message", render: (v) => <span className="text-xs text-text-secondary">{v}</span> },
+    {
+      key: "level",
+      title: "通知",
+      width: 128,
+      render: (_, a) => (
+        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] ${
+          a.level === "critical" ? "bg-status-critical/15 text-status-critical" : "bg-status-warning/15 text-status-warning"
+        }`}>
+          <AlertTriangle className="h-3 w-3" />
+          {a.level === "critical" ? "严重" : "警告"}
+        </span>
+      ),
+    },
+    vtActionColumn<AlarmLog>("操作", (a) => (
+      <button onClick={() => setDetail(a)}
+        className="inline-flex items-center gap-1 rounded border border-panel-border px-2 py-0.5 text-xs text-text-secondary hover:border-primary/40 hover:text-primary">
+        <Eye className="h-3 w-3" /> 详情
+      </button>
+    ), 100),
+  ];
+
   return (
     <div className="flex h-full flex-col">
       <div className="overflow-hidden rounded border border-panel-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-panel/60 text-xs text-text-muted">
-              <th className="px-3 py-2 text-left font-medium w-64">
-                <div className="flex items-center gap-2">
-                  <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-                    className="rounded border border-panel-border bg-transparent px-2 py-0.5 text-xs" />
-                  <span>至</span>
-                  <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-                    className="rounded border border-panel-border bg-transparent px-2 py-0.5 text-xs" />
-                </div>
-              </th>
-              <th className="px-3 py-2 text-left font-medium">告警名称</th>
-              <th className="px-3 py-2 text-left font-medium w-28">触发次数</th>
-              <th className="px-3 py-2 text-left font-medium">数据</th>
-              <th className="px-3 py-2 text-left font-medium w-32">通知</th>
-              <th className="px-3 py-2 text-right font-medium w-28">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-16 text-center text-xs text-text-muted">
-                <Inbox className="mx-auto mb-1 h-6 w-6 opacity-50" /> 暂无数据
-              </td></tr>
-            ) : list.map((a) => (
-              <tr key={a.id} className="border-t border-panel-border/60">
-                <td className="px-3 py-2 text-xs text-text-secondary">{a.time}</td>
-                <td className="px-3 py-2">{a.ruleName}</td>
-                <td className="px-3 py-2 text-xs text-text-secondary">1</td>
-                <td className="px-3 py-2 text-xs text-text-secondary">{a.message}</td>
-                <td className="px-3 py-2">
-                  <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] ${
-                    a.level === "critical" ? "bg-status-critical/15 text-status-critical" : "bg-status-warning/15 text-status-warning"
-                  }`}>
-                    <AlertTriangle className="h-3 w-3" />
-                    {a.level === "critical" ? "严重" : "警告"}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-right">
-                  <button onClick={() => setDetail(a)}
-                    className="inline-flex items-center gap-1 rounded border border-panel-border px-2 py-0.5 text-xs text-text-secondary hover:border-primary/40 hover:text-primary">
-                    <Eye className="h-3 w-3" /> 详情
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <VtDataTable<AlarmLog>
+          rowKey="id"
+          size="small"
+          pagination={false}
+          columns={alarmColumns}
+          dataSource={list}
+          scrollX="max-content"
+          locale={{ emptyText: "暂无数据" }}
+        />
       </div>
       <Pager total={list.length} />
 
@@ -1001,17 +1009,28 @@ function TabAlarm({ deviceId }: { deviceId: string }) {
 }
 
 /* ========== 子设备（网关） ========== */
-function TabChildren({ deviceId }: { deviceId: string }) {
-  const device = useDevice(deviceId)!;
-  const product = useProduct(device.productId);
-  const allDevices = useDevices();
+function TabChildren() {
+  const { device, updateMetadata } = useDeviceEdit();
   const { confirm, confirmNode } = useConfirm();
-  const trees = product?.metadata.trees ?? [];
-  const children = allDevices.filter((d) => d.gatewayId === device.id);
+  if (!device) return null;
+  const trees = device.metadata.trees ?? [];
+  const [children, setChildren] = useState<DeviceListRow[]>([]);
+
+  useEffect(() => {
+    void pageDevices({
+      current: 1,
+      size: -1,
+      terms: [{ column: "t.parent_id", value: Number(device.id) || device.id }],
+    })
+      .then((res) => {
+        const list = res.records ?? res.data ?? [];
+        setChildren(list.map(mapDeviceDtoToRow));
+      })
+      .catch(() => setChildren([]));
+  }, [device.id]);
 
   const updateTrees = (next: SimpleTreeMetadata[]) => {
-    if (!product) return;
-    productActions.updateMetadata(product.id, (m) => ({ ...m, trees: next }));
+    updateMetadata((m) => ({ ...m, trees: next }));
   };
 
   const addChildNode = (parentId: string | null) => {
@@ -1039,6 +1058,35 @@ function TabChildren({ deviceId }: { deviceId: string }) {
       list.filter((n) => n.id !== id).map((n) => ({ ...n, children: walk(n.children ?? []) }));
     updateTrees(walk(trees));
   };
+
+  const childColumns: ColumnsType<DeviceListRow> = [
+    {
+      key: "name",
+      title: "设备名称",
+      render: (_, c) => (
+        <Link to="/devices/list/$id" params={{ id: c.id }} className="text-primary hover:underline">{c.name}</Link>
+      ),
+    },
+    { key: "productName", title: "产品名称", dataIndex: "productName", render: (v) => <span className="text-text-secondary">{v}</span> },
+    { key: "gatewayName", title: "关联网关", width: 160, render: (_, c) => <span className="text-text-secondary">{c.gatewayName ?? "—"}</span> },
+    { key: "org", title: "所属机构", width: 128, dataIndex: "org", render: (v) => <span className="text-text-secondary">{v}</span> },
+    { key: "creator", title: "创建人", width: 96, dataIndex: "creator", render: (v) => <span className="text-text-secondary">{v}</span> },
+    { key: "createTime", title: "创建时间", width: 176, dataIndex: "createTime", render: (v) => <span className="text-text-secondary">{v}</span> },
+    {
+      key: "status",
+      title: "状态",
+      width: 80,
+      render: (_, c) => (
+        <span className={`rounded px-1.5 py-0.5 text-[11px] ${
+          c.status === "online" ? "bg-status-online/15 text-status-online" :
+          c.status === "disabled" ? "bg-panel-heavy text-text-muted" :
+          "bg-status-critical/15 text-status-critical"
+        }`}>
+          {c.status === "online" ? "在线" : c.status === "disabled" ? "禁用" : "离线"}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <div className="grid h-full grid-cols-[300px_1fr] gap-4 overflow-hidden">
@@ -1070,55 +1118,16 @@ function TabChildren({ deviceId }: { deviceId: string }) {
             <Plus className="h-3 w-3" /> 添加
           </button>
         </div>
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-panel/60 text-xs text-text-muted">
-                <th className="px-3 py-2 text-left font-medium">设备名称</th>
-                <th className="px-3 py-2 text-left font-medium">产品名称</th>
-                <th className="px-3 py-2 text-left font-medium w-40">关联网关</th>
-                <th className="px-3 py-2 text-left font-medium w-32">所属机构</th>
-                <th className="px-3 py-2 text-left font-medium w-24">创建人</th>
-                <th className="px-3 py-2 text-left font-medium w-44">创建时间</th>
-                <th className="px-3 py-2 text-left font-medium w-20">状态</th>
-                <th className="px-3 py-2 text-right font-medium w-16"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {children.length === 0 ? (
-                <tr><td colSpan={8} className="px-3 py-16 text-center text-xs text-text-muted">
-                  <Inbox className="mx-auto mb-1 h-6 w-6 opacity-50" /> 暂无数据
-                </td></tr>
-              ) : children.map((c) => (
-                <tr key={c.id} className="border-t border-panel-border/60">
-                  <td className="px-3 py-2">{c.name}</td>
-                  <td className="px-3 py-2 text-text-secondary">{c.productName}</td>
-                  <td className="px-3 py-2 text-text-secondary">{c.collectGateway ?? "—"}</td>
-                  <td className="px-3 py-2 text-text-secondary">{c.org}</td>
-                  <td className="px-3 py-2 text-text-secondary">{c.creator}</td>
-                  <td className="px-3 py-2 text-text-secondary">{c.createTime}</td>
-                  <td className="px-3 py-2">
-                    <span className={`rounded px-1.5 py-0.5 text-[11px] ${
-                      c.status === "online" ? "bg-status-online/15 text-status-online" :
-                      c.status === "disabled" ? "bg-panel-heavy text-text-muted" :
-                      "bg-status-critical/15 text-status-critical"
-                    }`}>
-                      {c.status === "online" ? "在线" : c.status === "disabled" ? "禁用" : "离线"}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button onClick={() => confirm({
-                      description: <>确定移除子设备 <span className="font-semibold text-foreground">「{c.name}」</span> 吗？</>,
-                      onConfirm: () => deviceActions.update(c.id, { gatewayId: undefined, gatewayName: undefined }),
-                    })}
-                      className="rounded p-1 text-text-muted hover:text-status-critical">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex-1 overflow-hidden">
+          <VtDataTable<DeviceListRow>
+            rowKey="id"
+            size="small"
+            pagination={false}
+            columns={childColumns}
+            dataSource={children}
+            scrollX="max-content"
+            locale={{ emptyText: "暂无数据" }}
+          />
         </div>
         <Pager total={children.length} />
       </div>

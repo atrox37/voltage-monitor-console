@@ -1,108 +1,251 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Radio, X, CalendarDays } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Radio, X, CalendarDays, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  deleteGateway,
+  getDimensionTree,
+  pageBoardLogs,
+  pageGateways,
+  pageNetworks,
+  pageProtocols,
+  saveGateway,
+} from "@/api";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
+import { VtDataTable } from "@/components/vt-table";
+import type { ColumnsType } from "antd/es/table";
+import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
 import { VtDrawer, VtField, vtInputCls, VtBtn } from "@/components/vt-drawer";
+import { dimensionToOrgNodes } from "@/lib/dimension-tree";
+import { mapGatewayDtoToRow, type GatewayListRow, type MqttClientConfiguration } from "@/lib/ingest-mappers";
+import { ALL_PAGE_QUERY, termEq, termLike, toDbId } from "@/lib/query-terms";
+import { isRequestCanceled } from "@/lib/request";
+import stompManager from "@/lib/stomp";
+import { useTranslation } from "@/i18n";
+import type { DeviceProtocolPageDto, NetworkConfigPo, PageQuery } from "@/types";
 
 export const Route = createFileRoute("/_app/ingest/gateways")({
   component: GatewaysPage,
 });
 
-type Gateway = {
+const DEFAULT_SORTS: PageQuery["sorts"] = [{ column: "t.update_time", order: "desc" }];
+const BOARD_SORTS: PageQuery["sorts"] = [{ column: "ts", order: "desc" }];
+const TYPE_OPTIONS = [{ label: "MQTT CLIENT", value: "MQTT_CLIENT" }];
+
+type GatewayForm = {
   id: string;
   name: string;
-  networkComponent: string;       // e.g. "mqtt-client"
-  networkComponentType: string;   // e.g. "MQTT_CLIENT"
-  protocol: string;               // e.g. "voltage-v1"
-  org: string;
+  networkId: string;
+  protocolId: string;
   enabled: boolean;
-  updateTime: string;
 };
 
-const NETWORK_OPTIONS = [
-  { name: "mqtt-client", type: "MQTT_CLIENT" },
-  { name: "mqtt-aws",    type: "MQTT_CLIENT" },
-];
-const PROTOCOL_OPTIONS = ["mqtt-client", "voltage-v1", "kafka-v1"];
-
-const seed: Gateway[] = [
-  { id: "1", name: "mqtt-client网关",      networkComponent: "mqtt-client", networkComponentType: "MQTT_CLIENT", protocol: "mqtt-client", org: "Group Root", enabled: false, updateTime: "2025-01-16 06:38:05" },
-  { id: "2", name: "mqtt-client-aws网关",  networkComponent: "mqtt-aws",    networkComponentType: "MQTT_CLIENT", protocol: "voltage-v1",  org: "Group Root", enabled: false, updateTime: "2025-01-16 06:38:05" },
-];
-
 function GatewaysPage() {
-  const [rows, setRows] = useState<Gateway[]>(seed);
-  const [editing, setEditing] = useState<Gateway | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [zhaoTarget, setZhaoTarget] = useState<Gateway | null>(null);
+  const { t } = useTranslation();
+  const [rows, setRows] = useState<GatewayListRow[]>([]);
+  const [orgNodes, setOrgNodes] = useState<OrgNode[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = 10;
 
-  const handleSave = (g: Gateway) => {
-    setRows((rs) => {
-      const exists = rs.some((r) => r.id === g.id);
-      return exists ? rs.map((r) => (r.id === g.id ? g : r)) : [...rs, g];
+  const [filterDraft, setFilterDraft] = useState({ name: "", orgId: "", networkComponentType: "" });
+  const [filterApplied, setFilterApplied] = useState({ name: "", orgId: "", networkComponentType: "" });
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<"add" | "edit">("add");
+  const [form, setForm] = useState<GatewayForm>({ id: "", name: "", networkId: "", protocolId: "", enabled: false });
+  const [saving, setSaving] = useState(false);
+  const [zhaoTarget, setZhaoTarget] = useState<GatewayListRow | null>(null);
+
+  const fetchRows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const terms = [];
+      const name = filterApplied.name.trim();
+      if (name) terms.push(termLike("t.name", name));
+      if (filterApplied.orgId) terms.push(termEq("t.org_id", toDbId(filterApplied.orgId)));
+      if (filterApplied.networkComponentType) terms.push(termEq("t1.type", filterApplied.networkComponentType));
+
+      const result = await pageGateways({
+        current: page,
+        size: pageSize,
+        terms,
+        sorts: DEFAULT_SORTS,
+      });
+      const list = result.records ?? result.data ?? [];
+      setRows(list.map(mapGatewayDtoToRow));
+      setTotal(result.total ?? list.length);
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      setRows([]);
+      setTotal(0);
+      toast.error(err instanceof Error ? err.message : t("ingest.gateways.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }, [filterApplied.name, filterApplied.orgId, filterApplied.networkComponentType, page, t]);
+
+  useEffect(() => {
+    void getDimensionTree()
+      .then((root) => setOrgNodes(dimensionToOrgNodes(root)))
+      .catch((err) => {
+        if (isRequestCanceled(err)) return;
+      });
+  }, []);
+
+  useEffect(() => {
+    void fetchRows();
+  }, [fetchRows]);
+
+  const openAdd = () => {
+    setDrawerMode("add");
+    setForm({ id: "", name: "", networkId: "", protocolId: "", enabled: false });
+    setDrawerOpen(true);
+  };
+
+  const openEdit = (row: GatewayListRow) => {
+    setDrawerMode("edit");
+    setForm({
+      id: row.id,
+      name: row.name,
+      networkId: row.networkId,
+      protocolId: row.protocolId,
+      enabled: row.enabled,
     });
-    setEditing(null);
-    setAdding(false);
+    setDrawerOpen(true);
+  };
+
+  const handleSave = async (data: GatewayForm) => {
+    setSaving(true);
+    try {
+      await saveGateway({
+        id: data.id ? toDbId(data.id) : undefined,
+        name: data.name,
+        state: data.enabled ? 1 : 0,
+        networkId: toDbId(data.networkId),
+        protocolId: toDbId(data.protocolId),
+      });
+      toast.success(t("common.saveSuccess"));
+      setDrawerOpen(false);
+      await fetchRows();
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      toast.error(err instanceof Error ? err.message : t("common.loadFailed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (row: GatewayListRow) => {
+    try {
+      await deleteGateway(row.id);
+      toast.success(t("common.deleteSuccess"));
+      await fetchRows();
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      toast.error(err instanceof Error ? err.message : t("common.loadFailed"));
+    }
   };
 
   return (
     <>
-      <ListPageTemplate<Gateway>
-        title="网关列表"
+      <ListPageTemplate<GatewayListRow>
+        actionColumnWidth={260}
+        title={t("ingest.gateways.title")}
+        loading={loading}
+        serverSide
+        rows={rows}
+        totalCount={total}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onSearch={() => {
+          setFilterApplied({ ...filterDraft });
+          setPage(1);
+        }}
+        onReset={() => {
+          const empty = { name: "", orgId: "", networkComponentType: "" };
+          setFilterDraft(empty);
+          setFilterApplied(empty);
+          setPage(1);
+        }}
+        filterValues={filterDraft}
+        onFilterValuesChange={(draft) =>
+          setFilterDraft({
+            name: draft.name ?? "",
+            orgId: draft.orgId ?? "",
+            networkComponentType: draft.networkComponentType ?? "",
+          })
+        }
         filters={[
-          { type: "text", key: "name", label: "名称" },
-          { type: "select", key: "org", label: "机构", options: [
-            { label: "Group Root", value: "Group Root" },
-          ] },
-          { type: "select", key: "networkComponentType", label: "网络组件类型", options: [
-            { label: "MQTT CLIENT", value: "MQTT_CLIENT" },
-          ] },
+          { type: "text", key: "name", label: t("common.nameLabel"), placeholder: t("common.inputPlaceholder") },
+          {
+            type: "orgTree",
+            key: "orgId",
+            label: t("common.orgLabel"),
+            nodes: orgNodes,
+            allowAll: true,
+            placeholder: t("common.select"),
+          },
+          {
+            type: "select",
+            key: "networkComponentType",
+            label: t("common.networkCompType"),
+            options: TYPE_OPTIONS,
+          },
         ]}
         columns={[
-          { key: "name", title: "名称" },
-          { key: "networkComponent", title: "网络组件（类型）", render: (r) => (
-            <span className="inline-flex items-center gap-2">
-              <span className="text-foreground">{r.networkComponent}</span>
-              <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] text-primary">{r.networkComponentType}</span>
-            </span>
-          ) },
-          { key: "protocol", title: "协议库" },
-          { key: "org", title: "机构" },
-          { key: "enabled", title: "状态", render: (r) => (
-            <button
-              onClick={() => setRows((rs) => rs.map((x) => x.id === r.id ? { ...x, enabled: !x.enabled } : x))}
-              className={`rounded px-2 py-0.5 text-[11px] ${
-                r.enabled
-                  ? "bg-status-online/15 text-status-online"
-                  : "bg-status-warning/15 text-status-warning"
-              }`}
-            >
-              {r.enabled ? "是" : "否"}
-            </button>
-          ) },
-          { key: "updateTime", title: "更新日期", render: (r) => <span className="text-text-secondary">{r.updateTime}</span> },
+          { key: "name", title: t("common.nameLabel") },
+          {
+            key: "networkComponent",
+            title: t("ingest.gateways.networkCompCol"),
+            render: (r) => (
+              <span className="inline-flex items-center gap-2">
+                <span className="text-foreground">{r.networkComponent}</span>
+                <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] text-primary">{r.networkComponentType}</span>
+              </span>
+            ),
+          },
+          { key: "protocol", title: t("ingest.gateways.protocol") },
+          { key: "org", title: t("common.orgLabel") },
+          {
+            key: "enabled",
+            title: t("common.status"),
+            render: (r) => (
+              <span className={`rounded px-2 py-0.5 text-[11px] ${r.enabled ? "bg-status-online/15 text-status-online" : "bg-status-warning/15 text-status-warning"}`}>
+                {r.enabled ? t("common.yes") : t("common.no")}
+              </span>
+            ),
+          },
+          { key: "updateTime", title: t("common.updatedAt"), render: (r) => <span className="text-text-secondary">{r.updateTime}</span> },
         ]}
-        rows={rows}
-        onAdd={() => setAdding(true)}
+        onAdd={openAdd}
         rowActions={(r) => (
           <>
-            <RowBtn onClick={() => setEditing(r)}>编辑</RowBtn>
-            <RowBtn icon={Radio} onClick={() => setZhaoTarget(r)}>总招</RowBtn>
-            <RowBtn danger onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}>删除</RowBtn>
+            <RowBtn onClick={() => openEdit(r)}>{t("common.edit")}</RowBtn>
+            <RowBtn icon={Radio} onClick={() => setZhaoTarget(r)}>{t("ingest.gateways.recruit")}</RowBtn>
+            <RowBtn
+              danger
+              confirm={{
+                title: t("common.confirmDelete"),
+                description: t("common.confirmDeleteDesc", { target: t("ingest.gateways.title"), name: r.name }),
+                confirmText: t("common.delete"),
+              }}
+              onClick={() => void handleDelete(r)}
+            >
+              {t("common.delete")}
+            </RowBtn>
           </>
         )}
       />
 
-      {(editing || adding) && (
+      {drawerOpen && (
         <GatewayDrawer
-          mode={adding ? "add" : "edit"}
-          value={editing ?? {
-            id: String(Date.now()),
-            name: "", networkComponent: "", networkComponentType: "",
-            protocol: "", org: "Group Root", enabled: false,
-            updateTime: new Date().toISOString().slice(0, 19).replace("T", " "),
-          }}
-          onClose={() => { setEditing(null); setAdding(false); }}
+          mode={drawerMode}
+          value={form}
+          saving={saving}
+          onClose={() => setDrawerOpen(false)}
           onSave={handleSave}
         />
       )}
@@ -114,254 +257,309 @@ function GatewaysPage() {
   );
 }
 
-/* ------------------------------------------------------------------ */
 function GatewayDrawer({
-  mode, value, onClose, onSave,
+  mode, value, saving, onClose, onSave,
 }: {
   mode: "add" | "edit";
-  value: Gateway;
+  value: GatewayForm;
+  saving: boolean;
   onClose: () => void;
-  onSave: (g: Gateway) => void;
+  onSave: (g: GatewayForm) => void;
 }) {
-  const [d, setD] = useState<Gateway>(value);
-  const set = <K extends keyof Gateway>(k: K, v: Gateway[K]) =>
+  const { t } = useTranslation();
+  const [d, setD] = useState<GatewayForm>(value);
+  const [networks, setNetworks] = useState<NetworkConfigPo[]>([]);
+  const [protocols, setProtocols] = useState<DeviceProtocolPageDto[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+
+  useEffect(() => {
+    setD(value);
+  }, [value]);
+
+  useEffect(() => {
+    let canceled = false;
+    setOptionsLoading(true);
+    void Promise.all([
+      pageNetworks({ ...ALL_PAGE_QUERY, terms: [{ column: "t2.id", termType: "isnull" }] }),
+      pageProtocols(ALL_PAGE_QUERY),
+    ])
+      .then(([netRes, protoRes]) => {
+        if (canceled) return;
+        const netList = (netRes.records ?? netRes.data ?? []).map((row) => row.t1.networkConfigPo);
+        const protoList = protoRes.records ?? protoRes.data ?? [];
+        setNetworks(netList);
+        setProtocols(protoList);
+      })
+      .catch((err) => {
+        if (isRequestCanceled(err) || canceled) return;
+        toast.error(err instanceof Error ? err.message : t("ingest.gateways.loadOptionsFailed"));
+      })
+      .finally(() => {
+        if (!canceled) setOptionsLoading(false);
+      });
+    return () => { canceled = true; };
+  }, [t]);
+
+  const selectedNetwork = networks.find((n) => String(n.id) === d.networkId);
+  const protocolOptions = useMemo(() => {
+    if (!selectedNetwork?.type) return protocols;
+    return protocols.filter((p) => p.support?.includes(selectedNetwork.type!));
+  }, [protocols, selectedNetwork?.type]);
+
+  const set = <K extends keyof GatewayForm>(k: K, v: GatewayForm[K]) =>
     setD((x) => ({ ...x, [k]: v }));
 
   return (
     <VtDrawer
       open
       onClose={onClose}
-      title={mode === "add" ? "添加" : "编辑"}
+      title={mode === "add" ? t("common.addTitle") : t("common.editTitle")}
       width={520}
       footer={
         <>
-          <VtBtn variant="ghost" onClick={onClose}>取消</VtBtn>
-          <VtBtn onClick={() => onSave({
-            ...d,
-            updateTime: new Date().toISOString().slice(0, 19).replace("T", " "),
-          })}>保存</VtBtn>
+          <VtBtn variant="ghost" onClick={onClose}>{t("common.cancel")}</VtBtn>
+          <VtBtn disabled={saving || optionsLoading} onClick={() => onSave(d)}>
+            {saving ? t("common.saving") : t("common.save")}
+          </VtBtn>
         </>
       }
     >
-      <VtField label="名称" required>
-        <input className={vtInputCls} placeholder="请输入名称"
-          value={d.name} onChange={(e) => set("name", e.target.value)} />
+      {optionsLoading && (
+        <div className="mb-3 flex items-center gap-2 text-xs text-text-secondary">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {t("common.loading")}
+        </div>
+      )}
+      <VtField label={t("common.nameLabel")} required>
+        <input className={vtInputCls} placeholder={t("common.inputPlaceholder")} value={d.name} onChange={(e) => set("name", e.target.value)} />
       </VtField>
 
-      <VtField label="网络组件" required>
+      <VtField label={t("ingest.gateways.networkComp")} required>
         <select
           className={vtInputCls}
-          value={d.networkComponent}
+          value={d.networkId}
           onChange={(e) => {
-            const opt = NETWORK_OPTIONS.find((o) => o.name === e.target.value);
-            set("networkComponent", e.target.value);
-            if (opt) set("networkComponentType", opt.type);
+            set("networkId", e.target.value);
+            set("protocolId", "");
           }}
         >
-          <option value="">请选择</option>
-          {NETWORK_OPTIONS.map((o) => (
-            <option key={o.name} value={o.name}>{o.name} ({o.type})</option>
+          <option value="">{t("common.select")}</option>
+          {networks.map((n) => (
+            <option key={String(n.id)} value={String(n.id)}>{n.name} ({n.type})</option>
           ))}
         </select>
       </VtField>
 
-      <VtField label="协议库" required>
-        <select
-          className={vtInputCls}
-          value={d.protocol}
-          onChange={(e) => set("protocol", e.target.value)}
-        >
-          <option value="">请选择</option>
-          {PROTOCOL_OPTIONS.map((p) => (
-            <option key={p} value={p}>{p}</option>
+      <VtField label={t("ingest.gateways.protocol")} required>
+        <select className={vtInputCls} value={d.protocolId} onChange={(e) => set("protocolId", e.target.value)}>
+          <option value="">{t("common.select")}</option>
+          {protocolOptions.map((p) => (
+            <option key={String(p.id)} value={String(p.id)}>{p.name}</option>
           ))}
         </select>
       </VtField>
 
-      <VtField label="状态">
+      <VtField label={t("common.status")}>
         <button
           type="button"
           onClick={() => set("enabled", !d.enabled)}
-          className={`inline-flex h-6 w-12 items-center rounded-full px-0.5 transition ${
-            d.enabled ? "bg-primary justify-end" : "bg-panel-heavy justify-start"
-          }`}
+          className={`inline-flex h-6 w-12 items-center rounded-full px-0.5 transition ${d.enabled ? "bg-primary justify-end" : "bg-panel-heavy justify-start"}`}
         >
           <span className="h-5 w-5 rounded-full bg-white shadow" />
         </button>
-        <span className="ml-2 text-xs text-text-secondary">{d.enabled ? "开启" : "关闭"}</span>
+        <span className="ml-2 text-xs text-text-secondary">{d.enabled ? t("common.on") : t("common.off")}</span>
       </VtField>
     </VtDrawer>
   );
 }
 
-/* ------------------------------------------------------------------ */
-type ZhaoRecord = {
-  time: string;
-  name: string;
-  device: string;
-  sn: string;
-  status: "成功" | "超时";
-};
+type BoardItem = { id: string; name: string };
 
-function generateRecords(): ZhaoRecord[] {
-  const names = ["告警数据总招", "设备数据总招"];
-  const out: ZhaoRecord[] = [];
-  const baseTimes = [
-    "2026-05-28 01:03:34", "2026-05-28 01:03:15",
-    "2026-05-27 23:42:34", "2026-05-27 23:42:15",
-    "2026-05-27 23:32:36", "2026-05-27 23:22:11",
-    "2026-05-26 18:11:02", "2026-05-25 09:30:44",
-  ];
-  baseTimes.forEach((t, i) => {
-    names.forEach((n, j) => {
-      const hasDevice = (i + j) % 2 === 1;
-      out.push({
-        time: t,
-        name: n,
-        device: hasDevice ? "18b204606258a197_Station" : "",
-        sn: hasDevice ? "18b204606258a197" : "",
-        status: hasDevice ? "成功" : "超时",
-      });
-    });
+function ZhaoDialog({ gateway, onClose }: { gateway: GatewayListRow; onClose: () => void }) {
+  const { t } = useTranslation();
+  const netId = gateway.raw.networkConfigPo?.id;
+  const cfg = (gateway.raw.networkConfigPo?.configuration ?? {}) as MqttClientConfiguration;
+  const boards: BoardItem[] = (cfg.boards ?? []).map((b) => ({ id: String(b.id ?? ""), name: b.name ?? "" }));
+
+  const [checked, setChecked] = useState<string[]>([]);
+  const [from, setFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().slice(0, 10);
   });
-  return out;
-}
-
-function ZhaoDialog({ gateway, onClose }: { gateway: Gateway; onClose: () => void }) {
-  const [deviceData, setDeviceData] = useState(false);
-  const [alarmData, setAlarmData] = useState(false);
-  const [from, setFrom] = useState("2026-05-22");
-  const [to, setTo] = useState("2026-05-29");
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [records, setRecords] = useState<Array<{ time: string; name: string; device: string; sn: string; status: string }>>([]);
+  const [loading, setLoading] = useState(false);
   const pageSize = 10;
 
-  const allRecords = useMemo(() => generateRecords(), []);
-  const totalPages = Math.max(1, Math.ceil(allRecords.length / pageSize));
-  const pageRows = allRecords.slice((page - 1) * pageSize, page * pageSize);
+  const boardNameMap = useMemo(() => Object.fromEntries(boards.map((b) => [b.id, b.name])), [boards]);
+
+  const fetchRecords = useCallback(async () => {
+    if (!netId) return;
+    setLoading(true);
+    try {
+      const terms = [
+        termEq("net_id", toDbId(netId)),
+        { column: "ts", termType: "gt" as const, value: `${from} 00:00:00` },
+        { column: "ts", termType: "lte" as const, value: `${to} 23:59:59` },
+      ];
+      const result = await pageBoardLogs({
+        current: page,
+        size: pageSize,
+        terms,
+        sorts: BOARD_SORTS,
+      });
+      const list = result.records ?? result.data ?? [];
+      setRecords(
+        list.map((r) => ({
+          time: r.ts ?? "",
+          name: boardNameMap[String(r.boardId ?? "")] ?? String(r.boardId ?? ""),
+          device: r.deviceName ?? "",
+          sn: r.deviceSn ?? "",
+          status: r.state ?? "",
+        })),
+      );
+      setTotal(result.total ?? list.length);
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      setRecords([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [boardNameMap, from, netId, page, to]);
+
+  useEffect(() => {
+    void fetchRecords();
+  }, [fetchRecords]);
+
+  useEffect(() => {
+    if (!netId) return;
+    stompManager.connect();
+    const subId = stompManager.subscribe(
+      { destination: `/topic/board_network_${netId}` },
+      () => { /* topic heartbeat */ },
+    );
+    return () => {
+      stompManager.unsubscribe(subId);
+    };
+  }, [netId]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  type RecruitRecord = { key: number; time: string; name: string; device: string; sn: string; status: string };
+  const recordRows: RecruitRecord[] = records.map((r, i) => ({ key: i, ...r }));
+  const recordColumns: ColumnsType<RecruitRecord> = [
+    { key: "time", title: t("ingest.gateways.time"), dataIndex: "time", render: (v) => <span className="text-text-secondary">{v}</span> },
+    { key: "name", title: t("ingest.gateways.recruitName"), dataIndex: "name" },
+    { key: "device", title: t("ingest.gateways.deviceName"), dataIndex: "device", render: (v) => <span className="text-text-secondary">{v}</span> },
+    { key: "sn", title: t("ingest.gateways.deviceSn"), dataIndex: "sn", render: (v) => <span className="text-text-secondary">{v}</span> },
+    {
+      key: "status",
+      title: t("common.status"),
+      dataIndex: "status",
+      render: (status: string) => (
+        <span className={`rounded px-2 py-0.5 ${
+          status === "success"
+            ? "bg-status-online/15 text-status-online"
+            : status === "timeout"
+              ? "bg-status-warning/15 text-status-warning"
+              : "bg-panel text-text-secondary"
+        }`}>
+          {status === "success" ? t("common.success") : status === "timeout" ? t("common.timeout") : status}
+        </span>
+      ),
+    },
+  ];
+
+  const toggleBoard = (id: string) => {
+    setChecked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const handleSend = () => {
+    if (!netId || checked.length === 0) {
+      toast.error(t("ingest.gateways.recruitPickHint"));
+      return;
+    }
+    if (!stompManager.isConnected) {
+      toast.error(t("common.loadFailed"));
+      return;
+    }
+    const payload = checked.map((id) => ({ netId: toDbId(netId), data: { id } }));
+    stompManager.send("/queue/queue_stomp_board", payload, { "reply-to": "/temp-queue/foo" });
+    toast.success(t("ingest.gateways.recruitSent", { items: checked.map((id) => boardNameMap[id] ?? id).join(", ") }));
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex w-[760px] max-h-[85vh] flex-col overflow-hidden rounded-lg border border-panel-border bg-background shadow-2xl">
+      <div className="relative flex max-h-[85vh] w-[760px] flex-col overflow-hidden rounded-lg border border-panel-border bg-background shadow-2xl">
         <header className="flex items-center justify-between border-b border-panel-border px-5 py-3">
-          <h3 className="font-heading text-sm font-semibold tracking-wider text-foreground">总招 · {gateway.name}</h3>
-          <button onClick={onClose} className="rounded p-1 text-text-muted hover:bg-panel hover:text-foreground">
+          <h3 className="font-heading text-sm font-semibold tracking-wider text-foreground">
+            {t("ingest.gateways.recruitTitle", { name: gateway.name })}
+          </h3>
+          <button type="button" onClick={onClose} className="rounded p-1 text-text-muted hover:bg-panel hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
-          <div className="mb-4 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => setDeviceData((v) => !v)}
-              className={`flex items-center gap-2 rounded border px-3 py-1.5 text-xs ${
-                deviceData ? "border-primary/60 bg-primary/10 text-primary" : "border-panel-border text-text-secondary"
-              }`}
-            >
-              <span className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${
-                deviceData ? "border-primary bg-primary text-primary-foreground" : "border-panel-border"
-              }`}>{deviceData ? "✓" : ""}</span>
-              设备数据总招
-            </button>
-            <button
-              type="button"
-              onClick={() => setAlarmData((v) => !v)}
-              className={`flex items-center gap-2 rounded border px-3 py-1.5 text-xs ${
-                alarmData ? "border-primary/60 bg-primary/10 text-primary" : "border-panel-border text-text-secondary"
-              }`}
-            >
-              <span className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${
-                alarmData ? "border-primary bg-primary text-primary-foreground" : "border-panel-border"
-              }`}>{alarmData ? "✓" : ""}</span>
-              告警数据总招
-            </button>
-          </div>
+          {boards.length === 0 ? (
+            <div className="mb-4 text-xs text-text-muted">{t("common.noData")}</div>
+          ) : (
+            <div className="mb-4 flex flex-wrap gap-3">
+              {boards.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => toggleBoard(b.id)}
+                  className={`flex items-center gap-2 rounded border px-3 py-1.5 text-xs ${
+                    checked.includes(b.id) ? "border-primary/60 bg-primary/10 text-primary" : "border-panel-border text-text-secondary"
+                  }`}
+                >
+                  <span className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                    checked.includes(b.id) ? "border-primary bg-primary text-primary-foreground" : "border-panel-border"
+                  }`}>{checked.includes(b.id) ? "✓" : ""}</span>
+                  {b.name}
+                </button>
+              ))}
+            </div>
+          )}
 
-          <div className="mb-2 text-xs font-semibold text-foreground">记录</div>
+          <div className="mb-2 text-xs font-semibold text-foreground">{t("common.record")}</div>
 
-          <div className="mb-3 flex items-center gap-2 rounded-md border border-panel-border bg-background/40 px-2 py-1.5 text-xs text-text-secondary w-fit">
+          <div className="mb-3 flex w-fit items-center gap-2 rounded-md border border-panel-border bg-background/40 px-2 py-1.5 text-xs text-text-secondary">
             <CalendarDays className="h-3.5 w-3.5 text-text-muted" />
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="bg-transparent text-foreground outline-none"
-            />
-            <span>至</span>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="bg-transparent text-foreground outline-none"
-            />
+            <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} className="bg-transparent text-foreground outline-none" />
+            <span>{t("common.dateTo")}</span>
+            <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} className="bg-transparent text-foreground outline-none" />
           </div>
 
           <div className="overflow-hidden rounded-md border border-panel-border">
-            <table className="w-full text-xs">
-              <thead className="bg-panel/40 text-text-secondary">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium">时间</th>
-                  <th className="px-3 py-2 text-left font-medium">总招名称</th>
-                  <th className="px-3 py-2 text-left font-medium">设备名称</th>
-                  <th className="px-3 py-2 text-left font-medium">设备Sn</th>
-                  <th className="px-3 py-2 text-left font-medium">状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((r, i) => (
-                  <tr key={i} className="border-t border-panel-border/60">
-                    <td className="px-3 py-2 text-text-secondary">{r.time}</td>
-                    <td className="px-3 py-2 text-foreground">{r.name}</td>
-                    <td className="px-3 py-2 text-text-secondary">{r.device}</td>
-                    <td className="px-3 py-2 text-text-secondary">{r.sn}</td>
-                    <td className="px-3 py-2">
-                      <span className={`rounded px-2 py-0.5 ${
-                        r.status === "成功"
-                          ? "bg-status-online/15 text-status-online"
-                          : "bg-status-warning/15 text-status-warning"
-                      }`}>{r.status}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <VtDataTable<RecruitRecord>
+              rowKey="key"
+              size="small"
+              loading={loading}
+              pagination={false}
+              columns={recordColumns}
+              dataSource={recordRows}
+              locale={{ emptyText: t("common.noData") }}
+            />
           </div>
 
           <div className="mt-3 flex items-center justify-center gap-1">
-            <button
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="flex h-7 w-7 items-center justify-center rounded border border-panel-border bg-panel text-text-secondary disabled:opacity-40"
-            >‹</button>
+            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="flex h-7 w-7 items-center justify-center rounded border border-panel-border bg-panel text-text-secondary disabled:opacity-40">‹</button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPage(p)}
-                className={`h-7 min-w-[28px] rounded px-2 text-xs ${
-                  page === p
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-panel-border bg-panel text-text-secondary"
-                }`}
-              >{p}</button>
+              <button key={p} type="button" onClick={() => setPage(p)} className={`h-7 min-w-[28px] rounded px-2 text-xs ${page === p ? "bg-primary text-primary-foreground" : "border border-panel-border bg-panel text-text-secondary"}`}>{p}</button>
             ))}
-            <button
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="flex h-7 w-7 items-center justify-center rounded border border-panel-border bg-panel text-text-secondary disabled:opacity-40"
-            >›</button>
+            <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="flex h-7 w-7 items-center justify-center rounded border border-panel-border bg-panel text-text-secondary disabled:opacity-40">›</button>
           </div>
         </div>
 
         <footer className="flex justify-end gap-2 border-t border-panel-border px-5 py-3">
-          <VtBtn
-            onClick={() => {
-              const picks = [deviceData && "设备数据总招", alarmData && "告警数据总招"].filter(Boolean);
-              alert(picks.length ? `已发送：${picks.join("、")}` : "请先选择需要发送的总招类型");
-            }}
-          >
-            发送
-          </VtBtn>
+          <VtBtn onClick={handleSend}>{t("ingest.gateways.recruitSend")}</VtBtn>
         </footer>
       </div>
     </div>

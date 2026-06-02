@@ -1,276 +1,467 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshCw, PlayCircle } from "lucide-react";
+import { toast } from "sonner";
+import {
+  deleteProtocol,
+  getDimensionTree,
+  pageProtocols,
+  reloadProtocol,
+  saveProtocol,
+  testProtocol,
+  uploadProtocol,
+} from "@/api";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
-import { VtDrawer, VtField, vtInputCls, VtBtn, VtSegmented } from "@/components/vt-drawer";
+import { VtDrawer, VtField, vtInputCls, VtBtn, VtSegmented, VtFilePickButton } from "@/components/vt-drawer";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { dimensionToOrgNodes } from "@/lib/dimension-tree";
+import {
+  mapProtocolDtoToForm,
+  mapProtocolDtoToRow,
+  mapProtocolFormToPo,
+  protocolTestType,
+} from "@/lib/ingest-mappers";
+import { termEq, termLike, toDbId } from "@/lib/query-terms";
+import { isRequestCanceled } from "@/lib/request";
+import { useTranslation } from "@/i18n";
+import type { DeviceProtocolPageDto, PageQuery } from "@/types";
+import type { OrgNode } from "@/components/org-tree-select";
 
 export const Route = createFileRoute("/_app/ingest/protocols")({
   component: ProtocolsPage,
 });
 
-type Protocol = {
+const DEFAULT_SORTS: PageQuery["sorts"] = [{ column: "t.update_time", order: "desc" }];
+
+type ProtocolForm = {
   id: string;
   name: string;
-  type: "MQTT客户端" | "kafka客户端";
-  gatewayCount: number;
-  org: string;
-  storage: "S3" | "Minio";
-  pkg: string;
-  uploadUrl: string;
   description: string;
-  updateTime: string;
+  provider: string;
+  location: string;
+  storage: "S3" | "Minio";
+  support: string[];
 };
 
-const seed: Protocol[] = [
-  { id: "1", name: "mqtt-client", type: "MQTT客户端", gatewayCount: 1, org: "Group Root", storage: "Minio", pkg: "com.protocol.mqtt.MqttProtocolSupport", uploadUrl: "http://192.168.30.10:39000/protocol/protocol/mqtt.jar", description: "默认 MQTT 客户端协议", updateTime: "2025-08-29 02:29:55" },
-  { id: "2", name: "voltage-v1", type: "MQTT客户端", gatewayCount: 1, org: "Group Root", storage: "Minio", pkg: "com.protocol.voltage.VoltageProtocolSupport", uploadUrl: "http://192.168.30.10:39000/protocol/protocol/voltage.jar", description: "11", updateTime: "2025-08-29 02:29:55" },
-  { id: "3", name: "kafka-v1",   type: "kafka客户端", gatewayCount: 0, org: "Group Root", storage: "S3",    pkg: "com.protocol.kafka.KafkaProtocolSupport", uploadUrl: "http://192.168.30.10:39000/protocol/protocol/kafka.jar", description: "", updateTime: "2025-01-14 08:39:24" },
-];
+function blankProtocolForm(): ProtocolForm {
+  return {
+    id: "",
+    name: "",
+    description: "",
+    provider: "",
+    location: "",
+    storage: "Minio",
+    support: [],
+  };
+}
+
+function supportLabel(type: string, t: (key: string) => string) {
+  if (type === "KAFKA") return t("ingest.protocols.kafkaClient");
+  if (type === "MQTT_CLIENT" || type === "MQTT_SERVER") return t("ingest.protocols.mqttClient");
+  return type;
+}
 
 function ProtocolsPage() {
-  const [rows, setRows] = useState<Protocol[]>(seed);
-  const [editing, setEditing] = useState<Protocol | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [testing, setTesting] = useState<Protocol | null>(null);
-  const [syncTarget, setSyncTarget] = useState<Protocol | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const { t } = useTranslation();
+  const [rows, setRows] = useState<ReturnType<typeof mapProtocolDtoToRow>[]>([]);
+  const [orgNodes, setOrgNodes] = useState<OrgNode[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = 10;
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 1800);
+  const [filterDraft, setFilterDraft] = useState({ name: "", orgId: "" });
+  const [filterApplied, setFilterApplied] = useState({ name: "", orgId: "" });
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState<"add" | "edit">("add");
+  const [form, setForm] = useState<ProtocolForm>(blankProtocolForm());
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState<DeviceProtocolPageDto | null>(null);
+  const [syncTarget, setSyncTarget] = useState<DeviceProtocolPageDto | null>(null);
+
+  const fetchRows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const terms = [];
+      const name = filterApplied.name.trim();
+      if (name) terms.push(termLike("t.name", name));
+      if (filterApplied.orgId) terms.push(termEq("t.org_id", toDbId(filterApplied.orgId)));
+
+      const result = await pageProtocols({
+        current: page,
+        size: pageSize,
+        terms,
+        sorts: DEFAULT_SORTS,
+      });
+      const list = result.records ?? result.data ?? [];
+      setRows(list.map(mapProtocolDtoToRow));
+      setTotal(result.total ?? list.length);
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      setRows([]);
+      setTotal(0);
+      toast.error(err instanceof Error ? err.message : t("ingest.protocols.loadFailed"));
+    } finally {
+      setLoading(false);
+    }
+  }, [filterApplied.name, filterApplied.orgId, page, t]);
+
+  useEffect(() => {
+    void getDimensionTree()
+      .then((root) => setOrgNodes(dimensionToOrgNodes(root)))
+      .catch((err) => {
+        if (isRequestCanceled(err)) return;
+      });
+  }, []);
+
+  useEffect(() => {
+    void fetchRows();
+  }, [fetchRows]);
+
+  const openAdd = () => {
+    setDrawerMode("add");
+    setForm(blankProtocolForm());
+    setDrawerOpen(true);
   };
 
-  const handleSync = (p: Protocol) => {
-    setRows((rs) =>
-      rs.map((r) =>
-        r.id === p.id
-          ? { ...r, updateTime: new Date().toISOString().slice(0, 19).replace("T", " ") }
-          : r,
-      ),
-    );
-    showToast(`已同步协议 ${p.name}`);
-    setSyncTarget(null);
+  const openEdit = (row: ReturnType<typeof mapProtocolDtoToRow>) => {
+    setDrawerMode("edit");
+    setForm(mapProtocolDtoToForm(row.raw));
+    setDrawerOpen(true);
   };
 
-  const handleDelete = (id: string) => setRows((rs) => rs.filter((r) => r.id !== id));
+  const handleSave = async (data: ProtocolForm) => {
+    setSaving(true);
+    try {
+      await saveProtocol(mapProtocolFormToPo(data));
+      toast.success(t("common.saveSuccess"));
+      setDrawerOpen(false);
+      await fetchRows();
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      toast.error(err instanceof Error ? err.message : t("common.loadFailed"));
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  const handleSave = (p: Protocol) => {
-    setRows((rs) => {
-      const exists = rs.some((r) => r.id === p.id);
-      return exists ? rs.map((r) => (r.id === p.id ? p : r)) : [...rs, p];
-    });
-    setEditing(null);
-    setAdding(false);
-    showToast("已保存");
+  const handleSync = async (p: DeviceProtocolPageDto) => {
+    if (!p.id) return;
+    try {
+      await reloadProtocol(p.id);
+      toast.success(t("ingest.protocols.syncDone", { name: p.name ?? "" }));
+      setSyncTarget(null);
+      await fetchRows();
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      toast.error(err instanceof Error ? err.message : t("common.loadFailed"));
+    }
+  };
+
+  const handleDelete = async (row: ReturnType<typeof mapProtocolDtoToRow>) => {
+    try {
+      await deleteProtocol(row.id);
+      toast.success(t("common.deleteSuccess"));
+      await fetchRows();
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      toast.error(err instanceof Error ? err.message : t("common.loadFailed"));
+    }
   };
 
   return (
     <>
-      <ListPageTemplate<Protocol>
-        title="协议库"
+      <ListPageTemplate
+        actionColumnWidth={320}
+        title={t("ingest.protocols.title")}
+        loading={loading}
+        serverSide
+        rows={rows}
+        totalCount={total}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onSearch={() => {
+          setFilterApplied({ ...filterDraft });
+          setPage(1);
+        }}
+        onReset={() => {
+          const empty = { name: "", orgId: "" };
+          setFilterDraft(empty);
+          setFilterApplied(empty);
+          setPage(1);
+        }}
+        filterValues={filterDraft}
+        onFilterValuesChange={(draft) =>
+          setFilterDraft({ name: draft.name ?? "", orgId: draft.orgId ?? "" })
+        }
         filters={[
-          { type: "text", key: "name", label: "名称" },
-          { type: "select", key: "org", label: "机构", options: [
-            { label: "Group Root", value: "Group Root" },
-            { label: "Group Children1", value: "Group Children1" },
-          ] },
+          { type: "text", key: "name", label: t("common.nameLabel"), placeholder: t("common.inputPlaceholder") },
+          {
+            type: "orgTree",
+            key: "orgId",
+            label: t("common.orgLabel"),
+            nodes: orgNodes,
+            allowAll: true,
+            placeholder: t("common.select"),
+          },
         ]}
         columns={[
-          { key: "name", title: "协议名称" },
-          { key: "type", title: "支持类型", render: (r) => (
-            <span className={`rounded px-2 py-0.5 text-[11px] ${
-              r.type === "kafka客户端"
-                ? "bg-status-warning/15 text-status-warning"
-                : "bg-status-online/15 text-status-online"
-            }`}>{r.type}</span>
-          ) },
-          { key: "gatewayCount", title: "是否关联网关", render: (r) => (
-            r.gatewayCount > 0
-              ? <span className="inline-flex items-center gap-1.5">
-                  <span className="rounded bg-status-online/15 px-1.5 py-0.5 text-[11px] text-status-online">是</span>
-                  <span className="rounded bg-status-online/15 px-1.5 py-0.5 text-[11px] text-status-online">已绑定 {r.gatewayCount} 个网关</span>
-                </span>
-              : <span className="rounded bg-status-warning/15 px-1.5 py-0.5 text-[11px] text-status-warning">否</span>
-          ) },
-          { key: "org", title: "所属机构" },
-          { key: "updateTime", title: "更新时间", render: (r) => <span className="text-text-secondary">{r.updateTime}</span> },
+          { key: "name", title: t("ingest.protocols.protocolName") },
+          {
+            key: "support",
+            title: t("ingest.protocols.supportType"),
+            render: (r) => (
+              <span className="inline-flex flex-wrap gap-1">
+                {r.support.map((s) => (
+                  <span
+                    key={s}
+                    className={`rounded px-2 py-0.5 text-[11px] ${
+                      s === "KAFKA" ? "bg-status-warning/15 text-status-warning" : "bg-status-online/15 text-status-online"
+                    }`}
+                  >
+                    {supportLabel(s, t)}
+                  </span>
+                ))}
+              </span>
+            ),
+          },
+          {
+            key: "gatewayCount",
+            title: t("ingest.protocols.gatewayLinked"),
+            render: (r) => (
+              r.gatewayCount > 0
+                ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="rounded bg-status-online/15 px-1.5 py-0.5 text-[11px] text-status-online">{t("ingest.protocols.linkedYes")}</span>
+                    <span className="rounded bg-status-online/15 px-1.5 py-0.5 text-[11px] text-status-online">{t("ingest.protocols.linkedCount", { count: r.gatewayCount })}</span>
+                  </span>
+                )
+                : <span className="rounded bg-status-warning/15 px-1.5 py-0.5 text-[11px] text-status-warning">{t("ingest.protocols.linkedNo")}</span>
+            ),
+          },
+          { key: "org", title: t("common.orgBelong") },
+          { key: "updateTime", title: t("common.updatedAt"), render: (r) => <span className="text-text-secondary">{r.updateTime}</span> },
         ]}
-        rows={rows}
-        onAdd={() => setAdding(true)}
+        onAdd={openAdd}
         rowActions={(r) => (
           <>
-            <RowBtn onClick={() => setEditing(r)}>编辑</RowBtn>
-            <RowBtn icon={RefreshCw} onClick={() => setSyncTarget(r)}>同步</RowBtn>
-            <RowBtn icon={PlayCircle} onClick={() => setTesting(r)}>测试</RowBtn>
+            <RowBtn onClick={() => openEdit(r)}>{t("common.edit")}</RowBtn>
+            <RowBtn icon={RefreshCw} onClick={() => setSyncTarget(r.raw)}>{t("common.sync")}</RowBtn>
+            <RowBtn icon={PlayCircle} onClick={() => setTesting(r.raw)}>{t("common.test")}</RowBtn>
             <RowBtn
               danger
               disabled={r.gatewayCount > 0}
-              onClick={() => handleDelete(r.id)}
+              confirm={{
+                title: t("common.confirmDelete"),
+                description: t("common.confirmDeleteDesc", { target: t("ingest.protocols.title"), name: r.name }),
+                confirmText: t("common.delete"),
+              }}
+              onClick={() => void handleDelete(r)}
             >
-              删除
+              {t("common.delete")}
             </RowBtn>
           </>
         )}
       />
 
-      {(editing || adding) && (
+      {drawerOpen && (
         <ProtocolDrawer
-          mode={adding ? "add" : "edit"}
-          value={editing ?? {
-            id: String(Date.now()),
-            name: "", type: "MQTT客户端", gatewayCount: 0,
-            org: "Group Root", storage: "Minio",
-            pkg: "", uploadUrl: "", description: "",
-            updateTime: new Date().toISOString().slice(0, 19).replace("T", " "),
-          }}
-          onClose={() => { setEditing(null); setAdding(false); }}
+          mode={drawerMode}
+          value={form}
+          saving={saving}
+          onClose={() => setDrawerOpen(false)}
           onSave={handleSave}
         />
       )}
 
-      {testing && <KafkaTestDrawer protocol={testing} onClose={() => setTesting(null)} />}
+      {testing && <ProtocolTestDrawer protocol={testing} onClose={() => setTesting(null)} />}
 
       <ConfirmDialog
         open={!!syncTarget}
-        title="同步协议"
+        title={t("ingest.protocols.syncTitle")}
         icon={RefreshCw}
         danger={false}
-        description={<>确定要同步协议 <span className="font-semibold text-foreground">{syncTarget?.name}</span> 到所有已绑定的网关吗？</>}
-        confirmText="同步"
-        onConfirm={() => syncTarget && handleSync(syncTarget)}
+        description={t("ingest.protocols.syncDesc", { name: syncTarget?.name ?? "" })}
+        confirmText={t("common.sync")}
+        onConfirm={() => syncTarget && void handleSync(syncTarget)}
         onClose={() => setSyncTarget(null)}
       />
-
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-md bg-status-online/90 px-4 py-2 text-xs font-semibold text-white shadow-lg">
-          {toast}
-        </div>
-      )}
     </>
   );
 }
 
-function fileNameFromUrl(url: string) {
-  if (!url) return "";
-  const m = url.split("/").pop() ?? "";
-  return m;
-}
-
 function ProtocolDrawer({
-  mode, value, onClose, onSave,
+  mode, value, saving, onClose, onSave,
 }: {
   mode: "add" | "edit";
-  value: Protocol;
+  value: ProtocolForm;
+  saving: boolean;
   onClose: () => void;
-  onSave: (p: Protocol) => void;
+  onSave: (p: ProtocolForm) => void;
 }) {
-  const [draft, setDraft] = useState<Protocol>(value);
-  const set = <K extends keyof Protocol>(k: K, v: Protocol[K]) =>
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<ProtocolForm>(value);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  const set = <K extends keyof ProtocolForm>(k: K, v: ProtocolForm[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
 
+  const onUpload = async (file: File | undefined) => {
+    if (!file) return;
+    if (!draft.provider.trim()) {
+      toast.error(t("common.requiredHint"));
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("provider", draft.provider);
+      fd.append("bucketType", draft.storage.toLowerCase());
+      if (draft.id) fd.append("id", draft.id);
+      const res = await uploadProtocol(fd);
+      set("location", res.url ?? "");
+      set("support", res.support ?? []);
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      toast.error(err instanceof Error ? err.message : t("ingest.protocols.uploadFailed"));
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
   return (
-    <VtDrawer
-      open
-      onClose={onClose}
-      title={mode === "add" ? "添加" : "编辑"}
-      width={520}
-      footer={
-        <>
-          <VtBtn variant="ghost" onClick={onClose}>取消</VtBtn>
-          <VtBtn onClick={() => onSave(draft)}>保存</VtBtn>
-        </>
-      }
-    >
-      <VtField label="名称" required>
-        <input className={vtInputCls} placeholder="请输入名称"
-          value={draft.name} onChange={(e) => set("name", e.target.value)} />
-      </VtField>
-
-      {mode === "edit" && (
-        <VtField label="支持协议">
-          <span className="rounded bg-status-online/15 px-2 py-1 text-xs text-status-online">{draft.type}</span>
+    <>
+      <input ref={fileRef} type="file" className="hidden" accept=".jar" onChange={(e) => void onUpload(e.target.files?.[0])} />
+      <VtDrawer
+        open
+        onClose={onClose}
+        title={mode === "add" ? t("common.addTitle") : t("common.editTitle")}
+        width={520}
+        footer={
+          <>
+            <VtBtn variant="ghost" onClick={onClose}>{t("common.cancel")}</VtBtn>
+            <VtBtn disabled={saving || uploading} onClick={() => onSave(draft)}>
+              {saving ? t("common.saving") : t("common.save")}
+            </VtBtn>
+          </>
+        }
+      >
+        <VtField label={t("common.nameLabel")} required>
+          <input className={vtInputCls} placeholder={t("common.inputPlaceholder")} value={draft.name} onChange={(e) => set("name", e.target.value)} />
         </VtField>
-      )}
 
-      <VtField label="存储目标" required>
-        <VtSegmented
-          value={draft.storage}
-          onChange={(v) => set("storage", v)}
-          options={[{ label: "S3", value: "S3" }, { label: "Minio", value: "Minio" }]}
-        />
-      </VtField>
+        {mode === "edit" && draft.support.length > 0 && (
+          <VtField label={t("ingest.protocols.supportProtocol")}>
+            <span className="inline-flex flex-wrap gap-1">
+              {draft.support.map((s) => (
+                <span key={s} className="rounded bg-status-online/15 px-2 py-1 text-xs text-status-online">{supportLabel(s, t)}</span>
+              ))}
+            </span>
+          </VtField>
+        )}
 
-      <VtField label="包名" required>
-        <input className={vtInputCls} placeholder="请输入包名"
-          value={draft.pkg} onChange={(e) => set("pkg", e.target.value)} />
-      </VtField>
-
-      <VtField label="上传" required>
-        <div className="flex gap-2">
-          <input
-            className={`${vtInputCls} cursor-default`}
-            readOnly
-            placeholder="请选择文件"
-            value={fileNameFromUrl(draft.uploadUrl)}
+        <VtField label={t("ingest.protocols.storage")} required>
+          <VtSegmented
+            value={draft.storage}
+            onChange={(v) => set("storage", v as "S3" | "Minio")}
+            options={[{ label: "S3", value: "S3" }, { label: "Minio", value: "Minio" }]}
           />
-          <button
-            type="button"
-            onClick={() =>
-              set(
-                "uploadUrl",
-                `http://192.168.30.10:39000/protocol/protocol/${draft.name || "upload"}.jar`,
-              )
-            }
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-panel-border bg-panel text-text-secondary hover:text-foreground"
-            title="选择文件"
-          >
-            ↑
-          </button>
-        </div>
-      </VtField>
+        </VtField>
 
-      <VtField label="描述">
-        <input className={vtInputCls} placeholder="请输入描述消息"
-          value={draft.description} onChange={(e) => set("description", e.target.value)} />
-      </VtField>
-    </VtDrawer>
+        <VtField label={t("ingest.protocols.pkg")} required>
+          <input className={vtInputCls} placeholder={t("common.inputPlaceholder")} value={draft.provider} onChange={(e) => set("provider", e.target.value)} />
+        </VtField>
+
+        <VtField label={t("ingest.protocols.upload")} required>
+          <div className="flex gap-2">
+            <input
+              className={`${vtInputCls} cursor-default`}
+              readOnly
+              placeholder={t("common.selectFile")}
+              value={draft.location ? draft.location.split("/").pop() ?? "" : ""}
+            />
+            <VtFilePickButton
+              loading={uploading}
+              onClick={() => fileRef.current?.click()}
+              title={t("common.selectFile")}
+            />
+          </div>
+        </VtField>
+
+        <VtField label={t("ingest.protocols.description")}>
+          <input className={vtInputCls} placeholder={t("ingest.protocols.descPlaceholder")} value={draft.description} onChange={(e) => set("description", e.target.value)} />
+        </VtField>
+      </VtDrawer>
+    </>
   );
 }
 
-function KafkaTestDrawer({ protocol, onClose }: { protocol: Protocol; onClose: () => void }) {
+function ProtocolTestDrawer({ protocol, onClose }: { protocol: DeviceProtocolPageDto; onClose: () => void }) {
+  const { t } = useTranslation();
   const [topic, setTopic] = useState("");
+  const [clientId, setClientId] = useState("");
   const [payload, setPayload] = useState("");
   const [result, setResult] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  const testType = protocolTestType(protocol.support);
+  const typeLabel = testType === "kafka" ? "Kafka" : "MQTT";
+
+  const runTest = async () => {
+    if (!protocol.id) return;
+    setTesting(true);
+    try {
+      const body: Record<string, unknown> = {
+        id: toDbId(protocol.id),
+        type: testType,
+        topic,
+        data: payload,
+      };
+      if (testType === "mqtt") body.clientId = clientId;
+      const data = await testProtocol(body);
+      setResult(typeof data === "string" ? data : JSON.stringify(data, null, 2));
+    } catch (err) {
+      if (isRequestCanceled(err)) return;
+      toast.error(err instanceof Error ? err.message : t("common.loadFailed"));
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
     <VtDrawer
       open
       onClose={onClose}
-      title={`${protocol.type === "kafka客户端" ? "Kafka" : protocol.type}协议测试`}
+      title={t("ingest.protocols.testTitle", { type: typeLabel })}
       width={520}
       footer={
-        <VtBtn
-          onClick={() =>
-            setResult(`✓ 已向 topic "${topic || "(empty)"}" 发送 ${payload.length} 字节`)
-          }
-        >
-          测试
+        <VtBtn disabled={testing} onClick={() => void runTest()}>
+          {testing ? t("common.loading") : t("ingest.protocols.testSend")}
         </VtBtn>
       }
     >
-      <VtField label="主题">
+      <VtField label={t("common.topic")}>
         <input className={vtInputCls} value={topic} onChange={(e) => setTopic(e.target.value)} />
       </VtField>
-      <VtField label="发送报文" full>
-        <textarea
-          className={`${vtInputCls} h-28 py-2`}
-          value={payload}
-          onChange={(e) => setPayload(e.target.value)}
-        />
+      {testType === "mqtt" && (
+        <VtField label="clientId">
+          <input className={vtInputCls} value={clientId} onChange={(e) => setClientId(e.target.value)} />
+        </VtField>
+      )}
+      <VtField label={t("ingest.protocols.sendPayload")} full>
+        <textarea className={`${vtInputCls} h-28 py-2`} value={payload} onChange={(e) => setPayload(e.target.value)} />
       </VtField>
       {result && (
-        <div className="rounded-md border border-status-online/40 bg-status-online/10 px-3 py-2 text-xs text-status-online">
+        <div className="rounded-md border border-status-online/40 bg-status-online/10 px-3 py-2 text-xs text-status-online whitespace-pre-wrap break-all">
           {result}
         </div>
       )}

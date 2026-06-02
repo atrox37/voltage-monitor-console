@@ -1,5 +1,6 @@
-import { type ReactNode, useEffect } from "react";
-import { X } from "lucide-react";
+import { type ReactNode } from "react";
+import { Button, Drawer, Form, Input, InputNumber, Segmented, Select, Upload } from "antd";
+import { LoadingOutlined, UploadOutlined } from "@ant-design/icons";
 
 export function VtDrawer({
   open,
@@ -8,8 +9,8 @@ export function VtDrawer({
   width = 480,
   footer,
   children,
-  offsetRight = 0,
   hideOverlay = false,
+  zIndex = 1000,
 }: {
   open: boolean;
   onClose: () => void;
@@ -17,60 +18,26 @@ export function VtDrawer({
   width?: number;
   footer?: ReactNode;
   children: ReactNode;
-  offsetRight?: number;
   hideOverlay?: boolean;
+  zIndex?: number;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
   return (
-    <div
-      className={`fixed inset-0 z-50 transition ${open ? "pointer-events-auto" : "pointer-events-none"}`}
-      aria-hidden={!open}
+    <Drawer
+      title={title}
+      open={open}
+      onClose={onClose}
+      width={width}
+      zIndex={zIndex}
+      mask={!hideOverlay}
+      destroyOnClose
+      styles={{ body: { paddingTop: 8 } }}
+      footer={footer ? <div className="flex justify-end gap-2">{footer}</div> : undefined}
     >
-      {!hideOverlay && (
-        <div
-          onClick={onClose}
-          className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity ${
-            open ? "opacity-100" : "opacity-0"
-          }`}
-        />
-      )}
-      <aside
-        style={{
-          width,
-          right: offsetRight,
-          transform: open ? "translateX(0)" : `translateX(calc(100% + ${offsetRight}px))`,
-        }}
-        className="absolute top-0 flex h-full flex-col border-l border-panel-border bg-background shadow-2xl transition-transform duration-300"
-      >
-        <header className="flex h-14 items-center justify-between border-b border-panel-border px-5">
-          <h3 className="font-heading text-sm font-semibold tracking-wider text-foreground">
-            {title}
-          </h3>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-text-muted transition hover:bg-panel hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-        <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
-        {footer && (
-          <footer className="flex justify-end gap-2 border-t border-panel-border px-5 py-3">
-            {footer}
-          </footer>
-        )}
-      </aside>
-    </div>
+      {children}
+    </Drawer>
   );
 }
 
-/* ---- form primitives ---- */
 export function VtField({
   label,
   children,
@@ -80,50 +47,40 @@ export function VtField({
   label: string;
   children: ReactNode;
   required?: boolean;
-  /** Stack label above content (use for wide editors like tables) */
   full?: boolean;
 }) {
-  if (full) {
-    return (
-      <div className="mb-4">
-        <label className="mb-1 block text-xs text-text-secondary">
-          {required && <span className="mr-0.5 text-status-critical">*</span>}
-          {label}
-        </label>
-        <div>{children}</div>
-      </div>
-    );
-  }
   return (
-    <div className="mb-4 grid grid-cols-[72px_1fr] items-center gap-3">
-      <label className="text-right text-xs text-text-secondary">
-        {required && <span className="mr-0.5 text-status-critical">*</span>}
-        {label}
-      </label>
-      <div>{children}</div>
-    </div>
+    <Form.Item
+      label={label}
+      required={required}
+      layout={full ? "vertical" : "horizontal"}
+      labelCol={full ? undefined : { flex: "72px" }}
+      wrapperCol={full ? undefined : { flex: 1 }}
+      className="mb-3"
+    >
+      {children}
+    </Form.Item>
   );
 }
 
-export const vtInputCls =
-  "h-9 w-full rounded-md border border-panel-border bg-background/40 px-3 text-sm text-foreground placeholder:text-text-muted outline-none focus:border-primary/60";
+/** 兼容旧页面原生 input — 推荐逐步改用 antd Input */
+export const vtInputCls = "vt-ant-input-bridge";
+
+export const vtSelectCls = "vt-ant-select-bridge";
 
 export function VtBtn({
   variant = "primary",
   children,
   ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" }) {
-  const cls =
-    variant === "primary"
-      ? "bg-primary text-primary-foreground hover:brightness-110"
-      : "border border-panel-border bg-panel text-text-secondary hover:text-foreground";
+}: Omit<React.ComponentProps<typeof Button>, "variant"> & { variant?: "primary" | "ghost" }) {
   return (
-    <button
+    <Button
+      type={variant === "primary" ? "primary" : "default"}
+      size="small"
       {...rest}
-      className={`h-8 rounded-md px-4 text-xs font-semibold transition ${cls} ${rest.className ?? ""}`}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -137,28 +94,33 @@ export function VtSegmented<T extends string>({
   options: { label: string; value: T; tone?: "critical" | "online" }[];
 }) {
   return (
-    <div className="inline-flex overflow-hidden rounded-md border border-panel-border">
-      {options.map((o) => {
-        const active = value === o.value;
-        const tone =
-          o.tone === "critical"
-            ? "bg-status-critical text-white"
-            : o.tone === "online"
-              ? "bg-status-online text-white"
-              : "bg-primary text-primary-foreground";
-        return (
-          <button
-            key={o.value}
-            type="button"
-            onClick={() => onChange(o.value)}
-            className={`px-3 py-1 text-xs transition ${
-              active ? tone : "bg-panel text-text-secondary hover:text-foreground"
-            }`}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
+    <Segmented
+      size="small"
+      value={value}
+      onChange={(v) => onChange(v as T)}
+      options={options.map((o) => ({ label: o.label, value: o.value }))}
+    />
   );
 }
+
+export function VtFilePickButton({
+  onClick,
+  loading,
+  title,
+}: {
+  onClick: () => void;
+  loading?: boolean;
+  title?: string;
+}) {
+  return (
+    <Button
+      icon={loading ? <LoadingOutlined spin /> : <UploadOutlined />}
+      onClick={onClick}
+      disabled={loading}
+      title={title}
+    />
+  );
+}
+
+/** 统一导出 antd 表单控件，供新页面直接使用 */
+export { Input as VtInput, InputNumber as VtInputNumber, Select as VtSelect, Upload as VtUpload };
