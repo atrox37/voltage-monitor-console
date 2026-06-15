@@ -50,6 +50,8 @@ export type {
   RolePermissionBatchVo,
   SysDimensionPo,
   SysMenuPo,
+  AuditLogPo,
+  AuditLogDto,
   SysUserVO,
   SysRoleVO,
   SysDimension,

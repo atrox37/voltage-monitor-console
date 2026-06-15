@@ -1,9 +1,12 @@
-import { Dropdown, Layout, Space, Typography } from "antd";
+import { Avatar, Button, Dropdown, Layout, Space, Typography } from "antd";
 import {
-  GlobalOutlined, LogoutOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
+  DownOutlined,
+  GlobalOutlined,
+  LogoutOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
 } from "@ant-design/icons";
 import { useTranslation, type Locale } from "@/i18n";
-import { HeaderSearch } from "@/components/header-search";
 
 const { Header } = Layout;
 
@@ -50,38 +53,31 @@ export function AppHeader({
 
   return (
     <Header className="flex items-center justify-between border-b border-[var(--panel-border)] bg-[var(--background)] px-4">
-      <button
-        type="button"
+      <Button
+        type="text"
+        size="small"
+        icon={sidebarExpanded ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
         onClick={onToggleSidebar}
         title={sidebarExpanded ? t("header.collapseSidebar") : t("header.expandSidebar")}
-        className="flex h-8 w-8 items-center justify-center rounded-md border border-[var(--panel-border)] text-[var(--text-secondary)] transition hover:text-foreground"
-      >
-        {sidebarExpanded ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
-      </button>
+      />
 
       <Space size="middle">
-        <HeaderSearch />
         <Dropdown menu={langItems} trigger={["click"]}>
-          <button
-            type="button"
-            className="flex items-center gap-1 rounded-md border border-[var(--panel-border)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:text-foreground"
-          >
-            <GlobalOutlined />
+          <Button size="small" icon={<GlobalOutlined />}>
             {locale === "zh-CN" ? t("header.langZh") : t("header.langEn")}
-          </button>
+            <DownOutlined className="!text-[10px] opacity-70" />
+          </Button>
         </Dropdown>
         <Dropdown menu={userItems} trigger={["click"]}>
-          <button
-            type="button"
-            className="flex items-center gap-2 rounded-md border border-[var(--panel-border)] px-2 py-1 text-[var(--text-secondary)] hover:text-foreground"
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-[var(--primary-foreground)]">
+          <Button size="small" className="!flex !items-center !gap-2">
+            <Avatar size="small" className="!bg-primary !text-[10px] !font-bold">
               {avatarLetter}
-            </div>
+            </Avatar>
             <Typography.Text ellipsis className="max-w-[8rem] !text-xs">
               {displayName}
             </Typography.Text>
-          </button>
+            <DownOutlined className="!text-[10px] opacity-70" />
+          </Button>
         </Dropdown>
       </Space>
     </Header>

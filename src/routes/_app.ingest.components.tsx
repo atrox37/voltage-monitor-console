@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Plus, X, Trash2, Minus } from "lucide-react";
-import { toast } from "sonner";
+import { CloseOutlined, DeleteOutlined, LoadingOutlined, MinusOutlined, PlusOutlined, UploadOutlined } from "@ant-design/icons";
+import { Button, Checkbox, Drawer, Form, Input, InputNumber, Switch } from "antd";
+import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { showError, showSuccess } from "@/lib/api-message";
 import { deleteNetwork, getDimensionTree, pageNetworks, saveNetwork, uploadNetworkFile } from "@/api";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
 import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
-import { VtDrawer, VtField, vtInputCls, VtBtn, VtFilePickButton } from "@/components/vt-drawer";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
 import {
   blankNetworkForm,
@@ -16,9 +17,10 @@ import {
   type NetworkCompForm,
   type NetworkListRow,
   type RecruitRow,
-} from "@/lib/ingest-mappers";
+} from "@/features/ingest/lib/ingest-mappers";
 import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
+import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { useTranslation } from "@/i18n";
 import type { PageQuery } from "@/types";
 
@@ -29,7 +31,6 @@ export const Route = createFileRoute("/_app/ingest/components")({
 const TYPE_OPTIONS: { value: CompType; label: string }[] = [
   { value: "MQTT_CLIENT", label: "MQTT CLIENT" },
 ];
-const TYPE_LABEL: Record<CompType, string> = { MQTT_CLIENT: "MQTT CLIENT" };
 const DEFAULT_SORTS: PageQuery["sorts"] = [{ column: "t.update_time", order: "desc" }];
 
 function NetworkComponentsPage() {
@@ -39,14 +40,13 @@ function NetworkComponentsPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const pageSize = 10;
+  const pageSize = DEFAULT_PAGE_SIZE;
 
   const [filterDraft, setFilterDraft] = useState({ name: "", orgId: "", type: "" });
   const [filterApplied, setFilterApplied] = useState({ name: "", orgId: "", type: "" });
 
-  const [pickingType, setPickingType] = useState(false);
   const [editing, setEditing] = useState<NetworkCompForm | null>(null);
-  const [addingType, setAddingType] = useState<CompType | null>(null);
+  const [addingOpen, setAddingOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const fetchRows = useCallback(async () => {
@@ -71,7 +71,7 @@ function NetworkComponentsPage() {
       if (isRequestCanceled(err)) return;
       setRows([]);
       setTotal(0);
-      toast.error(err instanceof Error ? err.message : t("ingest.components.loadFailed"));
+      showError(err instanceof Error ? err.message : t("ingest.components.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -93,13 +93,13 @@ function NetworkComponentsPage() {
     setSaving(true);
     try {
       await saveNetwork(mapNetworkFormToPo(form));
-      toast.success(t("common.saveSuccess"));
+      showSuccess(t("common.saveSuccess"));
       setEditing(null);
-      setAddingType(null);
+      setAddingOpen(false);
       await fetchRows();
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : t("common.loadFailed"));
+      showError(err instanceof Error ? err.message : t("common.loadFailed"));
     } finally {
       setSaving(false);
     }
@@ -108,11 +108,11 @@ function NetworkComponentsPage() {
   const handleDelete = async (row: NetworkListRow) => {
     try {
       await deleteNetwork(row.id);
-      toast.success(t("common.deleteSuccess"));
+      showSuccess(t("common.deleteSuccess"));
       await fetchRows();
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : t("common.loadFailed"));
+      showError(err instanceof Error ? err.message : t("common.loadFailed"));
     }
   };
 
@@ -146,14 +146,12 @@ function NetworkComponentsPage() {
           })
         }
         filters={[
-          { type: "text", key: "name", label: t("common.nameLabel"), placeholder: t("common.inputPlaceholder") },
+          { type: "text", key: "name", label: t("common.nameLabel") },
           {
             type: "orgTree",
             key: "orgId",
             label: t("common.orgLabel"),
             nodes: orgNodes,
-            allowAll: true,
-            placeholder: t("common.select"),
           },
           {
             type: "select",
@@ -164,11 +162,14 @@ function NetworkComponentsPage() {
         ]}
         columns={[
           { key: "name", title: t("common.nameLabel") },
-          { key: "type", title: t("ingest.components.type"), render: (r) => TYPE_LABEL[r.type as CompType] ?? r.type },
+          { key: "type", title: t("ingest.components.type"), render: (r) => TYPE_OPTIONS.find((o) => o.value === r.type)?.label ?? r.type },
           { key: "org", title: t("common.orgBelong") },
           { key: "updateTime", title: t("common.updatedAt"), render: (r) => <span className="text-text-secondary">{r.updateTime}</span> },
         ]}
-        onAdd={() => setPickingType(true)}
+        onAdd={() => {
+          setAddingOpen(true);
+          setEditing(blankNetworkForm("MQTT_CLIENT"));
+        }}
         rowActions={(r) => (
           <>
             <RowBtn onClick={() => setEditing(mapNetworkVoToForm(r.raw))}>{t("common.edit")}</RowBtn>
@@ -187,64 +188,16 @@ function NetworkComponentsPage() {
         )}
       />
 
-      {pickingType && (
-        <TypePickerDialog
-          onPick={(type) => {
-            setPickingType(false);
-            setAddingType(type);
-            setEditing(blankNetworkForm(type));
-          }}
-          onClose={() => setPickingType(false)}
-        />
-      )}
-
-      {(editing || addingType) && editing && (
+      {(editing || addingOpen) && editing && (
         <ComponentDrawer
-          mode={addingType ? "add" : "edit"}
+          mode={addingOpen ? "add" : "edit"}
           value={editing}
           saving={saving}
-          onClose={() => { setEditing(null); setAddingType(null); }}
+          onClose={() => { setEditing(null); setAddingOpen(false); }}
           onSave={handleSave}
         />
       )}
     </>
-  );
-}
-
-function TypePickerDialog({
-  onPick, onClose,
-}: { onPick: (type: CompType) => void; onClose: () => void }) {
-  const { t } = useTranslation();
-  const [selected, setSelected] = useState<CompType>("MQTT_CLIENT");
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-[420px] overflow-hidden rounded-lg border border-panel-border bg-background shadow-2xl">
-        <header className="flex items-center justify-between border-b border-panel-border px-5 py-3">
-          <h3 className="font-heading text-sm font-semibold tracking-wider text-foreground">{t("ingest.components.pickType")}</h3>
-          <button type="button" onClick={onClose} className="rounded p-1 text-text-muted hover:bg-panel hover:text-foreground">
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-        <div className="space-y-4 px-5 py-5">
-          <label className="block text-xs text-text-secondary">{t("common.compType")}</label>
-          <select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value as CompType)}
-            className="h-9 w-full rounded-md border border-panel-border bg-background/40 px-3 text-sm text-foreground outline-none focus:border-primary/60"
-          >
-            {TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <p className="text-[11px] text-text-muted">{t("ingest.components.pickTypeHint")}</p>
-        </div>
-        <footer className="flex justify-end gap-2 border-t border-panel-border px-5 py-3">
-          <VtBtn variant="ghost" onClick={onClose}>{t("common.cancel")}</VtBtn>
-          <VtBtn onClick={() => onPick(selected)}>{t("common.next")}</VtBtn>
-        </footer>
-      </div>
-    </div>
   );
 }
 
@@ -298,7 +251,7 @@ function ComponentDrawer({
       set(key, res.url);
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : t("ingest.protocols.uploadFailed"));
+      showError(err instanceof Error ? err.message : t("ingest.protocols.uploadFailed"));
     } finally {
       setUploading(false);
       setUploadTag(null);
@@ -315,104 +268,123 @@ function ComponentDrawer({
         accept=".pem,.crt,.key,.cer"
         onChange={(e) => void onFilePicked(e.target.files?.[0])}
       />
-      <VtDrawer
+      <Drawer
         open
         onClose={onClose}
         title={mode === "add" ? t("common.addTitle") : t("common.editTitle")}
         width={560}
-        footer={
-          <>
-            <VtBtn variant="ghost" onClick={onClose}>{t("common.cancel")}</VtBtn>
-            <VtBtn disabled={saving} onClick={() => onSave(d)}>
-              {saving ? t("common.saving") : t("common.save")}
-            </VtBtn>
-          </>
-        }
+        destroyOnHidden
+        styles={{ body: { paddingTop: 8 } }}
+        footer={drawerFooter([
+          { key: "cancel", label: t("common.cancel"), onClick: onClose },
+          {
+            key: "save",
+            label: saving ? t("common.saving") : t("common.save"),
+            type: "primary",
+            disabled: saving,
+            onClick: () => onSave(d),
+          },
+        ])}
       >
-        <div className="mb-4 flex items-center gap-2">
-          <span className="text-xs text-text-secondary">{t("ingest.components.type")}</span>
-          <span className="rounded bg-primary/15 px-2 py-1 text-xs font-semibold text-primary">{TYPE_LABEL[d.type]}</span>
+        <div className="mb-5">
+          <div className="inline-flex overflow-hidden rounded-md border border-panel-border">
+            {TYPE_OPTIONS.map((opt) => {
+              const active = d.type === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  disabled={mode === "edit"}
+                  className={`px-4 py-1.5 text-xs transition ${
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-panel text-text-secondary hover:text-foreground"
+                  } ${mode === "edit" ? "cursor-not-allowed opacity-70" : ""}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <VtField label={t("common.nameLabel")} required>
-          <input className={vtInputCls} value={d.name} onChange={(e) => set("name", e.target.value)} />
-        </VtField>
+        <Form.Item label={t("common.nameLabel")} required {...drawerFormItemProps}>
+          <Input value={d.name} onChange={(e) => set("name", e.target.value)} />
+        </Form.Item>
 
-        <VtField label={t("common.status")}>
-          <button
-            type="button"
+        <Form.Item label={t("common.status")} {...drawerFormItemProps}>
+          <Switch
             disabled={mode === "add"}
-            onClick={() => set("enabled", !d.enabled)}
-            className={`inline-flex h-6 w-12 items-center rounded-full px-0.5 transition ${
-              d.enabled ? "bg-primary justify-end" : "bg-panel-heavy justify-start"
-            } ${mode === "add" ? "opacity-50" : ""}`}
-          >
-            <span className="h-5 w-5 rounded-full bg-white shadow" />
-          </button>
+            checked={d.enabled}
+            onChange={(enabled) => set("enabled", enabled)}
+          />
           <span className="ml-2 text-xs text-text-secondary">{d.enabled ? t("common.on") : t("common.off")}</span>
-        </VtField>
+        </Form.Item>
 
-        <VtField label={t("ingest.components.ip")} required>
-          <input className={vtInputCls} value={d.ip} onChange={(e) => set("ip", e.target.value)} />
-        </VtField>
+        <Form.Item label={t("ingest.components.ip")} required {...drawerFormItemProps}>
+          <Input value={d.ip} onChange={(e) => set("ip", e.target.value)} />
+        </Form.Item>
 
-        <VtField label={t("ingest.components.port")} required>
+        <Form.Item label={t("ingest.components.port")} required {...drawerFormItemProps}>
           <div className="inline-flex items-center overflow-hidden rounded-md border border-panel-border">
             <button type="button" onClick={() => set("port", Math.max(1, d.port - 1))} className="flex h-9 w-9 items-center justify-center bg-panel text-text-secondary hover:text-foreground">
-              <Minus className="h-3.5 w-3.5" />
+              <MinusOutlined className="text-sm" />
             </button>
-            <input type="number" value={d.port} onChange={(e) => set("port", Number(e.target.value) || 0)} className="h-9 w-24 border-x border-panel-border bg-background/40 text-center text-sm text-foreground outline-none" />
+            <InputNumber
+              controls={false}
+              value={d.port}
+              onChange={(v) => set("port", Number(v) || 0)}
+              className="!h-9 !w-24 !rounded-none border-x border-panel-border text-center"
+            />
             <button type="button" onClick={() => set("port", d.port + 1)} className="flex h-9 w-9 items-center justify-center bg-panel text-text-secondary hover:text-foreground">
-              <Plus className="h-3.5 w-3.5" />
+              <PlusOutlined className="text-sm" />
             </button>
           </div>
-        </VtField>
+        </Form.Item>
 
-        <VtField label={t("ingest.components.username")}>
-          <input className={vtInputCls} value={d.username} onChange={(e) => set("username", e.target.value)} />
-        </VtField>
+        <Form.Item label={t("ingest.components.username")} {...drawerFormItemProps}>
+          <Input value={d.username} onChange={(e) => set("username", e.target.value)} />
+        </Form.Item>
 
-        <VtField label={t("ingest.components.password")}>
-          <input type="password" className={vtInputCls} value={d.password} onChange={(e) => set("password", e.target.value)} />
-        </VtField>
+        <Form.Item label={t("ingest.components.password")} {...drawerFormItemProps}>
+          <Input.Password value={d.password} onChange={(e) => set("password", e.target.value)} />
+        </Form.Item>
 
-        <VtField label={t("ingest.components.ssl")}>
-          <button type="button" onClick={() => set("ssl", !d.ssl)} className={`inline-flex h-6 w-12 items-center rounded-full px-0.5 transition ${d.ssl ? "bg-primary justify-end" : "bg-panel-heavy justify-start"}`}>
-            <span className="h-5 w-5 rounded-full bg-white shadow" />
-          </button>
-        </VtField>
+        <Form.Item label={t("ingest.components.ssl")} {...drawerFormItemProps}>
+          <Switch checked={d.ssl} onChange={(ssl) => set("ssl", ssl)} />
+        </Form.Item>
 
         {d.ssl && (
           <>
-            <VtField label={t("ingest.components.caCert")}>
+            <Form.Item label={t("ingest.components.caCert")} {...drawerFormItemProps}>
               <UploadInput value={d.caCert} uploading={uploading && uploadTag === "sslCa"} onPick={() => pickUpload("sslCa")} />
-            </VtField>
-            <VtField label={t("ingest.components.sslCert")}>
+            </Form.Item>
+            <Form.Item label={t("ingest.components.sslCert")} {...drawerFormItemProps}>
               <UploadInput value={d.sslCert} uploading={uploading && uploadTag === "sslCert"} onPick={() => pickUpload("sslCert")} />
-            </VtField>
-            <VtField label={t("ingest.components.sslKey")}>
+            </Form.Item>
+            <Form.Item label={t("ingest.components.sslKey")} {...drawerFormItemProps}>
               <UploadInput value={d.sslKey} uploading={uploading && uploadTag === "sslKey"} onPick={() => pickUpload("sslKey")} />
-            </VtField>
+            </Form.Item>
           </>
         )}
 
-        <VtField label={t("ingest.components.topics")} full>
+        <Form.Item label={t("ingest.components.topics")} {...drawerFormItemProps}>
           <div className="rounded-md border border-panel-border bg-background/40 p-2">
             <div className="flex flex-wrap gap-1.5">
               {d.topics.map((topic, i) => (
                 <span key={i} className="inline-flex items-center gap-1 rounded bg-panel px-2 py-1 text-[11px] text-foreground">
                   {topic}
                   <button type="button" onClick={() => set("topics", d.topics.filter((_, idx) => idx !== i))} className="text-text-muted hover:text-status-critical">
-                    <X className="h-3 w-3" />
+                    <CloseOutlined className="text-xs" />
                   </button>
                 </span>
               ))}
               <input value={topicDraft} onChange={(e) => setTopicDraft(e.target.value)} onKeyDown={addTopic} placeholder={t("ingest.components.topicPlaceholder")} className="min-w-[160px] flex-1 bg-transparent px-1 py-1 text-xs text-foreground placeholder:text-text-muted outline-none" />
             </div>
           </div>
-        </VtField>
+        </Form.Item>
 
-        <VtField label={t("ingest.components.recruit")} full>
+        <Form.Item label={t("ingest.components.recruit")} {...drawerFormItemProps}>
           <div className="rounded-md border border-panel-border">
             <div className="flex items-center border-b border-panel-border bg-panel/40 px-3 py-2 text-[11px] text-text-secondary">
               <div className="w-1/4">{t("ingest.components.recruitColName")}</div>
@@ -420,7 +392,7 @@ function ComponentDrawer({
               <div className="w-1/4">{t("ingest.components.recruitColPayload")}</div>
               <div className="ml-auto">
                 <button type="button" onClick={() => setRecruitOpen(true)} className="flex h-6 w-6 items-center justify-center rounded border border-panel-border text-text-secondary hover:text-primary">
-                  <Plus className="h-3 w-3" />
+                  <PlusOutlined className="text-xs" />
                 </button>
               </div>
             </div>
@@ -433,14 +405,14 @@ function ComponentDrawer({
                   <div className="w-1/3 pr-2 break-all text-text-secondary">{r.topic}</div>
                   <div className="w-1/4 pr-2 break-all text-text-secondary">{r.payload}</div>
                   <button type="button" onClick={() => set("recruits", d.recruits.filter((x) => x.id !== r.id))} className="ml-auto text-text-muted hover:text-status-critical">
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <DeleteOutlined className="text-sm" />
                   </button>
                 </div>
               ))
             )}
           </div>
-        </VtField>
-      </VtDrawer>
+        </Form.Item>
+      </Drawer>
 
       {recruitOpen && (
         <RecruitDialog
@@ -457,8 +429,13 @@ function UploadInput({ value, uploading, onPick }: { value: string; uploading?: 
   const fileName = value ? value.split("/").pop() ?? "" : "";
   return (
     <div className="flex gap-2">
-      <input className={`${vtInputCls} cursor-default`} readOnly placeholder={t("common.selectFile")} value={fileName} />
-      <VtFilePickButton loading={uploading} onClick={onPick} title={t("common.selectFile")} />
+      <Input readOnly placeholder={t("common.selectFile")} value={fileName} />
+      <Button
+        icon={uploading ? <LoadingOutlined spin /> : <UploadOutlined />}
+        onClick={onPick}
+        disabled={uploading}
+        title={t("common.selectFile")}
+      />
     </div>
   );
 }
@@ -472,42 +449,43 @@ function RecruitDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (r: Rec
   const [direct, setDirect] = useState(false);
 
   return (
-    <VtDrawer
+    <Drawer
       open
       onClose={onClose}
       title={t("ingest.components.recruitAdd")}
       width={480}
-      zIndex={70}
-      footer={
-        <>
-          <VtBtn variant="ghost" onClick={onClose}>{t("common.cancel")}</VtBtn>
-          <VtBtn onClick={() => onAdd({ id: String(Date.now()), name, topic, payload, targets: { gateway, direct } })}>
-            {t("common.confirm")}
-          </VtBtn>
-        </>
-      }
+      zIndex={1200}
+      destroyOnHidden
+      styles={{ body: { paddingTop: 8 } }}
+      footer={drawerFooter([
+        { key: "cancel", label: t("common.cancel"), onClick: onClose },
+        {
+          key: "confirm",
+          label: t("common.confirm"),
+          type: "primary",
+          onClick: () => onAdd({ id: String(Date.now()), name, topic, payload, targets: { gateway, direct } }),
+        },
+      ])}
     >
-      <VtField label={t("ingest.components.recruitName")} required>
-        <input className={vtInputCls} placeholder={t("common.inputPlaceholder")} value={name} onChange={(e) => setName(e.target.value)} />
-      </VtField>
-      <VtField label={t("common.topic")} required>
-        <input className={vtInputCls} placeholder={t("common.inputPlaceholder")} value={topic} onChange={(e) => setTopic(e.target.value)} />
-      </VtField>
-      <VtField label={t("common.payload")} full>
-        <textarea className={`${vtInputCls} h-24 py-2`} placeholder={t("common.inputPlaceholder")} value={payload} onChange={(e) => setPayload(e.target.value)} />
-      </VtField>
-      <VtField label={t("common.target")}>
+      <Form.Item label={t("ingest.components.recruitName")} required {...drawerFormItemProps}>
+        <Input placeholder={t("common.inputPlaceholder")} value={name} onChange={(e) => setName(e.target.value)} />
+      </Form.Item>
+      <Form.Item label={t("common.topic")} required {...drawerFormItemProps}>
+        <Input placeholder={t("common.inputPlaceholder")} value={topic} onChange={(e) => setTopic(e.target.value)} />
+      </Form.Item>
+      <Form.Item label={t("common.payload")} {...drawerFormItemProps}>
+        <Input.TextArea rows={4} placeholder={t("common.inputPlaceholder")} value={payload} onChange={(e) => setPayload(e.target.value)} />
+      </Form.Item>
+      <Form.Item label={t("common.target")} {...drawerFormItemProps}>
         <div className="flex items-center gap-5 text-xs text-foreground">
-          <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={gateway} onChange={(e) => setGateway(e.target.checked)} />
+          <Checkbox checked={gateway} onChange={(e) => setGateway(e.target.checked)}>
             {t("common.gateway")}
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input type="checkbox" checked={direct} onChange={(e) => setDirect(e.target.checked)} />
+          </Checkbox>
+          <Checkbox checked={direct} onChange={(e) => setDirect(e.target.checked)}>
             {t("common.directDevice")}
-          </label>
+          </Checkbox>
         </div>
-      </VtField>
-    </VtDrawer>
+      </Form.Item>
+    </Drawer>
   );
 }

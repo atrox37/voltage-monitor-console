@@ -1,13 +1,14 @@
 import { type ReactNode, useCallback, useState } from "react";
 import { Modal } from "antd";
 import { ExclamationCircleOutlined } from "@ant-design/icons";
+import { useTranslation } from "@/i18n";
 
 export function ConfirmDialog({
   open,
-  title = "确认操作",
+  title,
   description,
-  confirmText = "删除",
-  cancelText = "取消",
+  confirmText,
+  cancelText,
   danger = true,
   onConfirm,
   onClose,
@@ -22,23 +23,27 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Modal
-      title={title}
+      title={title ?? t("common.confirmAction")}
       open={open}
       onCancel={onClose}
       onOk={() => {
         onConfirm();
         onClose();
       }}
-      okText={confirmText}
-      cancelText={cancelText}
+      okText={confirmText ?? (danger ? t("common.delete") : t("common.confirm"))}
+      cancelText={cancelText ?? t("common.cancel")}
       okButtonProps={{ danger }}
       centered
-      destroyOnClose
+      destroyOnHidden
     >
       <div className="flex gap-3 py-2">
-        <ExclamationCircleOutlined className={`text-lg ${danger ? "text-[#da2d2c]" : "text-[#ff6900]"}`} />
+        <ExclamationCircleOutlined
+          className={`text-lg ${danger ? "text-[#da2d2c]" : "text-[#ff6900]"}`}
+        />
         <div className="text-sm text-[var(--text-secondary)]">{description}</div>
       </div>
     </Modal>
@@ -46,6 +51,7 @@ export function ConfirmDialog({
 }
 
 export function useConfirm() {
+  const { t } = useTranslation();
   const [state, setState] = useState<{
     description: ReactNode;
     title?: string;
@@ -70,7 +76,7 @@ export function useConfirm() {
       open={!!state}
       title={state?.title}
       description={state?.description ?? ""}
-      confirmText={state?.confirmText}
+      confirmText={state?.confirmText ?? t("common.delete")}
       danger={state?.danger ?? true}
       onConfirm={() => state?.onConfirm()}
       onClose={() => setState(null)}

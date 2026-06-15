@@ -1,13 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import CryptoJS from "crypto-js";
-import { Lock } from "lucide-react";
-import { toast } from "sonner";
-import { deleteUser, getDimensionTree, pageRoles, pageUsers, saveUser } from "@/api/sys";
+import { LockOutlined } from "@ant-design/icons";
+import { Drawer, Form, Input, Select } from "antd";
+import { OptionToggle } from "@/components/option-toggle";
+import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { showError, showSuccess } from "@/lib/api-message";
+import { getDimensionTree, pageRoles, pageUsers, saveUser } from "@/api/sys";
 import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
 import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
-import { VtBtn, VtDrawer, VtField, VtSegmented, vtInputCls } from "@/components/vt-drawer";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
+import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { useTranslation } from "@/i18n";
@@ -26,7 +29,7 @@ type UserRow = {
   orgId: string;
   email: string;
   phone?: string;
-  status: "online" | "disabled";
+  status: "enabled" | "disabled";
   updatedAt: string;
   raw: SysUserPageDto;
 };
@@ -44,7 +47,7 @@ function mapUserRow(dto: SysUserPageDto): UserRow {
     orgId: String(po.orgId ?? ""),
     email: po.email ?? "",
     phone: po.phone,
-    status: po.state === 0 ? "disabled" : "online",
+    status: po.state === 0 ? "disabled" : "enabled",
     updatedAt: po.updateTime ?? "—",
     raw: dto,
   };
@@ -58,7 +61,7 @@ type UserForm = {
   email: string;
   phone: string;
   password: string;
-  status: "online" | "disabled";
+  status: "enabled" | "disabled";
 };
 
 function emptyForm(): UserForm {
@@ -70,7 +73,7 @@ function emptyForm(): UserForm {
     email: "",
     phone: "",
     password: "",
-    status: "online",
+    status: "enabled",
   };
 }
 
@@ -82,7 +85,7 @@ function UsersPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const pageSize = 10;
+  const pageSize = DEFAULT_PAGE_SIZE;
 
   const [filterDraft, setFilterDraft] = useState({ username: "", orgId: "" });
   const [filterApplied, setFilterApplied] = useState({ username: "", orgId: "" });
@@ -104,7 +107,7 @@ function UsersPage() {
       setOrgNodes(dimensionToOrgNodes(root));
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : t("users.loadMetaFailed"));
+      showError(err instanceof Error ? err.message : t("users.loadMetaFailed"));
     }
   }, []);
 
@@ -130,7 +133,7 @@ function UsersPage() {
       if (isRequestCanceled(err)) return;
       setRows([]);
       setTotal(0);
-      toast.error(err instanceof Error ? err.message : t("users.loadFailed"));
+      showError(err instanceof Error ? err.message : t("users.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -159,7 +162,7 @@ function UsersPage() {
       email: po.email ?? "",
       phone: po.phone ?? "",
       password: "",
-      status: po.state === 0 ? "disabled" : "online",
+      status: po.state === 0 ? "disabled" : "enabled",
     });
     setIsAdd(false);
   };
@@ -167,11 +170,11 @@ function UsersPage() {
   const save = async () => {
     if (!editing) return;
     if (!editing.username.trim() || !editing.roleId || !editing.orgId || !editing.email.trim()) {
-      toast.error(t("common.requiredHint"));
+      showError(t("common.requiredHint"));
       return;
     }
     if (isAdd && !editing.password.trim()) {
-      toast.error(t("users.passwordPlaceholder"));
+      showError(t("users.passwordPlaceholder"));
       return;
     }
 
@@ -190,7 +193,7 @@ function UsersPage() {
         payload.password = CryptoJS.MD5(editing.password).toString();
       }
       await saveUser(payload);
-      toast.success(t("common.saveSuccess"));
+      showSuccess(t("common.saveSuccess"));
       setEditing(null);
       setPage(1);
       await fetchUsers();
@@ -213,7 +216,7 @@ function UsersPage() {
         state: passUser.state,
         password: CryptoJS.MD5(newPass).toString(),
       });
-      toast.success(t("users.passwordUpdated"));
+      showSuccess(t("users.passwordUpdated"));
       setPassUser(null);
       setNewPass("");
       await fetchUsers();
@@ -222,16 +225,10 @@ function UsersPage() {
     }
   };
 
-  const handleDelete = async (row: UserRow) => {
-    await deleteUser(row.id);
-    toast.success(t("common.deleteSuccess"));
-    await fetchUsers();
-  };
-
   return (
     <>
       <ListPageTemplate<UserRow>
-        actionColumnWidth={280}
+        actionColumnWidth={220}
         title={t("users.title")}
         loading={loading}
         serverSide
@@ -254,19 +251,12 @@ function UsersPage() {
           setFilterDraft({ username: draft.username ?? "", orgId: draft.orgId ?? "" })
         }
         filters={[
-          {
-            type: "text",
-            key: "username",
-            label: t("users.username"),
-            placeholder: t("users.usernamePlaceholder"),
-          },
+          { type: "text", key: "username", label: t("users.username") },
           {
             type: "orgTree",
             key: "orgId",
             label: t("users.org"),
             nodes: orgNodes,
-            allowAll: true,
-            placeholder: t("users.orgPlaceholder"),
           },
         ]}
         columns={[
@@ -296,7 +286,7 @@ function UsersPage() {
           <>
             <RowBtn onClick={() => openEdit(r)}>{t("common.edit")}</RowBtn>
             <RowBtn
-              icon={Lock}
+              icon={LockOutlined}
               onClick={() => {
                 setPassUser({ ...r.raw.sysUserPo });
                 setNewPass("");
@@ -304,111 +294,95 @@ function UsersPage() {
             >
               {t("users.changePassword")}
             </RowBtn>
-            <RowBtn
-              danger
-              confirm={{
-                description: (
-                  <>
-                    {t("common.confirmDeleteDesc", { target: t("users.deleteTarget"), name: r.username })}
-                  </>
-                ),
-              }}
-              onClick={() => void handleDelete(r)}
-            >
-              {t("common.delete")}
-            </RowBtn>
           </>
         )}
       />
 
-      <VtDrawer
+      <Drawer
         open={!!editing}
         onClose={() => setEditing(null)}
         title={isAdd ? t("users.create") : t("users.edit")}
-        footer={
-          <>
-            <VtBtn variant="ghost" onClick={() => setEditing(null)}>{t("common.close")}</VtBtn>
-            <VtBtn onClick={() => void save()} disabled={saving}>
-              {saving ? t("common.saving") : t("common.saveSubmit")}
-            </VtBtn>
-          </>
-        }
+        width={480}
+        destroyOnHidden
+        styles={{ body: { paddingTop: 8 } }}
+        footer={drawerFooter([
+          { key: "close", label: t("common.close"), onClick: () => setEditing(null) },
+          {
+            key: "save",
+            label: saving ? t("common.saving") : t("common.saveSubmit"),
+            type: "primary",
+            disabled: saving,
+            onClick: () => void save(),
+          },
+        ])}
       >
         {editing && (
-          <div>
-            <VtField label={t("users.username")} required>
-              <input
-                className={vtInputCls}
+          <>
+            <Form.Item label={t("users.username")} required {...drawerFormItemProps}>
+              <Input
                 value={editing.username}
                 placeholder={t("users.usernamePlaceholder")}
                 onChange={(e) => setEditing({ ...editing, username: e.target.value })}
               />
-            </VtField>
-            <VtField label={t("users.role")} required>
-              <select
-                className={vtInputCls}
-                value={editing.roleId}
-                onChange={(e) => setEditing({ ...editing, roleId: e.target.value })}
-              >
-                <option value="">{t("users.selectRole")}</option>
-                {roles.map((r) => (
-                  <option key={String(r.id)} value={String(r.id)}>
-                    {r.roleName}
-                  </option>
-                ))}
-              </select>
-            </VtField>
-            <VtField label={t("users.org")} required>
+            </Form.Item>
+            <Form.Item label={t("users.role")} required {...drawerFormItemProps}>
+              <Select
+                value={editing.roleId || undefined}
+                placeholder={t("users.selectRole")}
+                onChange={(roleId) => setEditing({ ...editing, roleId })}
+                options={roles.map((r) => ({
+                  value: String(r.id),
+                  label: r.roleName ?? "",
+                }))}
+              />
+            </Form.Item>
+            <Form.Item label={t("users.org")} required {...drawerFormItemProps}>
               <OrgTreeSelect
                 nodes={orgNodes}
                 value={editing.orgId}
                 onChange={(v) => setEditing({ ...editing, orgId: v })}
               />
-            </VtField>
-            <VtField label={t("users.email")} required>
-              <input
-                className={vtInputCls}
+            </Form.Item>
+            <Form.Item label={t("users.email")} required {...drawerFormItemProps}>
+              <Input
                 type="email"
                 value={editing.email}
                 placeholder="user@example.com"
                 onChange={(e) => setEditing({ ...editing, email: e.target.value })}
               />
-            </VtField>
-            <VtField label={t("users.phone")}>
-              <input
-                className={vtInputCls}
+            </Form.Item>
+            <Form.Item label={t("users.phone")} {...drawerFormItemProps}>
+              <Input
                 value={editing.phone}
                 placeholder={t("users.phonePlaceholder")}
                 onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
               />
-            </VtField>
+            </Form.Item>
             {isAdd && (
-              <VtField label={t("users.password")} required>
-                <input
-                  className={vtInputCls}
-                  type="password"
+              <Form.Item label={t("users.password")} required {...drawerFormItemProps}>
+                <Input.Password
                   autoComplete="new-password"
                   value={editing.password}
                   placeholder={t("users.passwordPlaceholder")}
                   onChange={(e) => setEditing({ ...editing, password: e.target.value })}
                 />
-              </VtField>
+              </Form.Item>
             )}
-            <VtField label={t("common.status")}>
-              <VtSegmented<UserForm["status"]>
+            <Form.Item label={t("common.status")} {...drawerFormItemProps}>
+              <OptionToggle<UserForm["status"]>
                 value={editing.status}
                 onChange={(v) => setEditing({ ...editing, status: v })}
                 options={[
-                  { label: t("common.disabled"), value: "disabled", tone: "critical" },
-                  { label: t("common.normal"), value: "online", tone: "online" },
+                  { label: t("common.disabled"), value: "disabled" },
+                  { label: t("common.enabled"), value: "enabled" },
                 ]}
               />
-            </VtField>
-          </div>
+            </Form.Item>
+          </>
         )}
-      </VtDrawer>
+      </Drawer>
 
-      <VtDrawer
+      <Drawer
         open={!!passUser}
         onClose={() => {
           setPassUser(null);
@@ -416,36 +390,37 @@ function UsersPage() {
         }}
         title={t("users.changePasswordTitle", { name: passUser?.username ?? "" })}
         width={400}
-        zIndex={60}
-        footer={
-          <>
-            <VtBtn
-              variant="ghost"
-              onClick={() => {
-                setPassUser(null);
-                setNewPass("");
-              }}
-            >
-              {t("common.cancel")}
-            </VtBtn>
-            <VtBtn onClick={() => void savePass()} disabled={saving}>
-              {t("common.modify")}
-            </VtBtn>
-          </>
-        }
+        zIndex={1100}
+        destroyOnHidden
+        styles={{ body: { paddingTop: 8 } }}
+        footer={drawerFooter([
+          {
+            key: "cancel",
+            label: t("common.cancel"),
+            onClick: () => {
+              setPassUser(null);
+              setNewPass("");
+            },
+          },
+          {
+            key: "save",
+            label: t("common.modify"),
+            type: "primary",
+            disabled: saving,
+            onClick: () => void savePass(),
+          },
+        ])}
       >
-        <VtField label={t("users.password")} required>
-          <input
-            className={vtInputCls}
-            type="password"
+        <Form.Item label={t("users.password")} required {...drawerFormItemProps}>
+          <Input.Password
             autoComplete="new-password"
             placeholder={t("users.newPasswordPlaceholder")}
             value={newPass}
             onChange={(e) => setNewPass(e.target.value)}
             autoFocus
           />
-        </VtField>
-      </VtDrawer>
+        </Form.Item>
+      </Drawer>
     </>
   );
 }

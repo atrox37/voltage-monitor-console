@@ -1,28 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Pencil, UsersRound, Plus, Trash2, Search,
-  ChevronsDownUp, ChevronsUpDown, X, Crosshair, ArrowLeft, Loader2,
-  ChevronDown, ChevronRight,
-} from "lucide-react";
-import { toast } from "sonner";
-import {
-  deleteDimension,
-  getDimensionOne,
-  getDimensionTree,
-  getDimensionUsers,
-  saveDimension,
-} from "@/api/sys";
-import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
+  AimOutlined,
+  ArrowLeftOutlined,
+  CompressOutlined,
+  DeleteOutlined,
+  DownOutlined,
+  EditOutlined,
+  ExpandAltOutlined,
+  PlusOutlined,
+  RightOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
+import { Button, Drawer, Empty, Form, Input, Spin, Table } from "antd";
+import { useQueryClient } from "@tanstack/react-query";
+import { type ComponentType, useMemo, useState } from "react";
+import { showSuccess } from "@/lib/api-message";
+import { deleteDimension, getDimensionOne, saveDimension } from "@/api/sys";
 import { OrgTreeSelect, type OrgNode, flattenOrgs } from "@/components/org-tree-select";
 import { StatusBadge } from "@/components/list-page-template";
-import { VtDataTable } from "@/components/vt-table";
 import { useConfirm } from "@/components/confirm-dialog";
-import { dimensionToOrgNodes } from "@/lib/dimension-tree";
-import { termEq, toDbId } from "@/lib/query-terms";
-import { isRequestCanceled } from "@/lib/request";
+import { useOrgMembersQuery } from "@/features/system/hooks/use-org-members-query";
+import { useDimensionTreeQuery } from "@/hooks/use-dimension-tree-query";
+import { queryKeys } from "@/lib/query-keys";
+import { toDbId } from "@/lib/query-terms";
 import { useTranslation } from "@/i18n";
-import type { SysDimensionPo, SysUserPo } from "@/types";
 
 export const Route = createFileRoute("/_app/system/orgs")({
   component: OrgsPage,
@@ -47,8 +48,8 @@ function filterTree(tree: OrgNode[], kw: string): { tree: OrgNode[]; matched: Se
 
 function OrgsPage() {
   const { t } = useTranslation();
-  const [tree, setTree] = useState<OrgNode[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: tree = [], isLoading: loading } = useDimensionTreeQuery();
   const [editing, setEditing] = useState<{
     mode: "edit" | "add";
     id?: string;
@@ -56,56 +57,29 @@ function OrgsPage() {
     name: string;
   } | null>(null);
   const [membersOf, setMembersOf] = useState<OrgNode | null>(null);
-  const [members, setMembers] = useState<SysUserPo[]>([]);
-  const [membersLoading, setMembersLoading] = useState(false);
+  const { data: members = [], isFetching: membersLoading } = useOrgMembersQuery(
+    membersOf?.id ?? null,
+  );
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [keyword, setKeyword] = useState("");
+  const keyword = "";
   const [focusId, setFocusId] = useState("");
   const [saving, setSaving] = useState(false);
   const { confirm, confirmNode } = useConfirm();
 
-  const loadTree = useCallback(async () => {
-    setLoading(true);
-    try {
-      const root = await getDimensionTree();
-      setTree(dimensionToOrgNodes(root));
-    } catch (err) {
-      if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : t("orgs.loadFailed"));
-      setTree([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadTree();
-  }, [loadTree]);
-
-  useEffect(() => {
-    if (!membersOf) return;
-    setMembersLoading(true);
-    void getDimensionUsers({
-      terms: [{ column: "t.org_id", value: toDbId(membersOf.id), termType: "eq" }],
-    })
-      .then(setMembers)
-      .catch((err) => {
-        if (isRequestCanceled(err)) return;
-        setMembers([]);
-      })
-      .finally(() => setMembersLoading(false));
-  }, [membersOf]);
+  const invalidateTree = () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.dimensionTree });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.orgs.root });
+  };
 
   const allOrgs = useMemo(() => flattenOrgs(tree), [tree]);
   const focusedNode = useMemo(
     () => (focusId ? allOrgs.find((n) => n.id === focusId) : undefined),
     [focusId, allOrgs],
   );
-  const baseTree = focusedNode ? [focusedNode] : tree;
-  const { tree: viewTree, matched } = useMemo(
-    () => filterTree(baseTree, keyword),
-    [baseTree, keyword],
-  );
+  const { tree: viewTree, matched } = useMemo(() => {
+    const baseTree = focusedNode ? [focusedNode] : tree;
+    return filterTree(baseTree, keyword);
+  }, [focusedNode, tree, keyword]);
 
   const handleAction = async (
     cmd: "edit" | "members" | "add" | "delete" | "toggle" | "focus",
@@ -137,9 +111,9 @@ function OrgsPage() {
         description: t("orgs.deleteConfirm", { name: node.label }),
         onConfirm: async () => {
           await deleteDimension(node.id);
-          toast.success(t("common.deleteSuccess"));
+          showSuccess(t("common.deleteSuccess"));
           if (focusId === node.id) setFocusId("");
-          await loadTree();
+          invalidateTree();
         },
       });
     }
@@ -157,9 +131,9 @@ function OrgsPage() {
           parentId: toDbId(editing.parentId),
         });
       }
-      toast.success(t("common.saveSuccess"));
+      showSuccess(t("common.saveSuccess"));
       setEditing(null);
-      await loadTree();
+      invalidateTree();
     } finally {
       setSaving(false);
     }
@@ -182,64 +156,45 @@ function OrgsPage() {
   const focusLabel = focusedNode?.label ?? "";
 
   return (
-    <main className="vt-page-content vt-page-fill">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <h2 className="vt-section-title text-base">{t("orgs.title")}</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
-            <input
-              className={`${vtInputCls} w-56 pl-7 pr-7`}
-              placeholder={t("orgs.searchPlaceholder")}
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-            />
-            {keyword && (
-              <button
-                type="button"
-                onClick={() => setKeyword("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-foreground"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-          <div className="w-56">
-            <OrgTreeSelect
-              nodes={tree}
-              value={focusId}
-              onChange={setFocusId}
-              placeholder={t("orgs.focusPlaceholder")}
-              allowAll
-            />
-          </div>
-          <VtBtn variant="ghost" onClick={expandAll}>
-            <ChevronsUpDown className="h-3.5 w-3.5" /> {t("orgs.expand")}
-          </VtBtn>
-          <VtBtn variant="ghost" onClick={collapseAll}>
-            <ChevronsDownUp className="h-3.5 w-3.5" /> {t("orgs.collapse")}
-          </VtBtn>
+    <main className="vt-page-content vt-page-fill flex flex-col gap-3 p-4">
+      <h2 className="vt-section-title text-base">{t("orgs.title")}</h2>
+
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        <div className="w-56">
+          <OrgTreeSelect
+            nodes={tree}
+            value={focusId}
+            onChange={setFocusId}
+            placeholder={t("orgs.focusPlaceholder")}
+            allowAll
+          />
         </div>
+        <Button type="default" size="small" icon={<ExpandAltOutlined />} onClick={expandAll}>
+          {t("orgs.expand")}
+        </Button>
+        <Button type="default" size="small" icon={<CompressOutlined />} onClick={collapseAll}>
+          {t("orgs.collapse")}
+        </Button>
       </div>
 
       {focusId && (
         <div className="flex shrink-0 items-center gap-2 text-xs text-text-secondary">
-          <ArrowLeft className="h-3 w-3" />
-          <button type="button" onClick={() => setFocusId("")} className="hover:text-primary">
+          <ArrowLeftOutlined />
+          <Button type="link" size="small" className="!px-0" onClick={() => setFocusId("")}>
             {t("orgs.backFull")}
-          </button>
+          </Button>
           <span className="text-text-muted">{t("orgs.focusCurrent")}</span>
           <span className="font-medium text-primary">{focusLabel}</span>
         </div>
       )}
 
-      <div className="vt-glass vt-scrollbar min-h-0 flex-1 overflow-auto p-8">
+      <div className="vt-glass min-h-0 flex-1 overflow-auto border border-panel-border p-8">
         {loading ? (
           <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-text-muted" />
+            <Spin size="large" />
           </div>
         ) : viewTree.length === 0 ? (
-          <div className="py-20 text-center text-sm text-text-muted">{t("orgs.notFound")}</div>
+          <Empty className="py-20" description={t("orgs.notFound")} />
         ) : (
           <div className="flex min-w-max justify-center">
             {viewTree.map((root) => (
@@ -255,63 +210,97 @@ function OrgsPage() {
         )}
       </div>
 
-      <VtDrawer
+      <Drawer
         open={!!editing}
         onClose={() => setEditing(null)}
         title={editing?.mode === "add" ? t("orgs.add") : t("orgs.edit")}
+        width={480}
+        destroyOnHidden
+        styles={{ body: { paddingTop: 8 } }}
         footer={
-          <>
-            <VtBtn variant="ghost" onClick={() => setEditing(null)}>{t("common.close")}</VtBtn>
-            <VtBtn onClick={() => void saveEditing()} disabled={saving}>{t("common.save")}</VtBtn>
-          </>
+          <div className="flex justify-end gap-2">
+            <Button type="default" size="small" onClick={() => setEditing(null)}>
+              {t("common.close")}
+            </Button>
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => void saveEditing()}
+              disabled={saving}
+            >
+              {t("common.save")}
+            </Button>
+          </div>
         }
       >
         {editing && (
           <>
             {editing.mode === "edit" && editing.id && (
-              <VtField label={t("orgs.orgId")}>
-                <input className={vtInputCls} value={editing.id} disabled />
-              </VtField>
+              <Form.Item
+                label={t("orgs.orgId")}
+                layout="horizontal"
+                labelCol={{ flex: "72px" }}
+                wrapperCol={{ flex: 1 }}
+                className="mb-3"
+              >
+                <Input value={editing.id} disabled />
+              </Form.Item>
             )}
             {editing.mode === "add" && editing.parentId && (
-              <VtField label={t("orgs.parentOrg")}>
-                <input
-                  className={vtInputCls}
+              <Form.Item
+                label={t("orgs.parentOrg")}
+                layout="horizontal"
+                labelCol={{ flex: "72px" }}
+                wrapperCol={{ flex: 1 }}
+                className="mb-3"
+              >
+                <Input
                   value={allOrgs.find((n) => n.id === editing.parentId)?.label ?? editing.parentId}
                   disabled
                 />
-              </VtField>
+              </Form.Item>
             )}
-            <VtField label={t("orgs.orgName")} required>
-              <input
-                className={vtInputCls}
+            <Form.Item
+              label={t("orgs.orgName")}
+              required
+              layout="horizontal"
+              labelCol={{ flex: "72px" }}
+              wrapperCol={{ flex: 1 }}
+              className="mb-3"
+            >
+              <Input
                 value={editing.name}
                 placeholder={t("orgs.orgNamePlaceholder")}
                 onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                 autoFocus
               />
-            </VtField>
+            </Form.Item>
           </>
         )}
-      </VtDrawer>
+      </Drawer>
 
-      <VtDrawer
+      <Drawer
         open={!!membersOf}
         onClose={() => setMembersOf(null)}
         title={t("orgs.membersTitle", { name: membersOf?.label ?? "" })}
         width={420}
+        destroyOnHidden
+        styles={{ body: { paddingTop: 8 } }}
       >
         {membersLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
+            <Spin />
           </div>
         ) : members.length === 0 ? (
           <div className="py-16 text-center text-sm text-text-muted">{t("orgs.noMembers")}</div>
         ) : (
-          <VtDataTable
+          <Table
             rowKey={(m) => String(m.id ?? m.username)}
             size="small"
+            tableLayout="fixed"
             pagination={false}
+            className="vt-ant-data-table"
+            scroll={{ x: "max-content" }}
             dataSource={members}
             columns={[
               { key: "username", title: t("orgs.userCol"), dataIndex: "username" },
@@ -319,12 +308,12 @@ function OrgsPage() {
                 key: "status",
                 title: t("common.status"),
                 align: "center",
-                render: (_, m) => <StatusBadge status={m.state === 0 ? "disabled" : "online"} />,
+                render: (_, m) => <StatusBadge status={m.state === 0 ? "disabled" : "enabled"} />,
               },
             ]}
           />
         )}
-      </VtDrawer>
+      </Drawer>
 
       {confirmNode}
     </main>
@@ -429,7 +418,7 @@ function NodeCard({
       </div>
       <div className="flex items-center justify-between border-b border-panel-border/60 px-3 py-1.5 text-xs text-text-secondary">
         <span className="inline-flex items-center gap-1">
-          <UsersRound className="h-3 w-3" />
+          <TeamOutlined />
           {t("orgs.childCount")} <span className="font-mono text-foreground">{count}</span>
         </span>
         <div className="flex items-center gap-1">
@@ -446,12 +435,12 @@ function NodeCard({
             >
               {collapsed ? (
                 <>
-                  <ChevronRight className="h-3 w-3" />
+                  <RightOutlined />
                   {t("orgs.expandNode")}
                 </>
               ) : (
                 <>
-                  <ChevronDown className="h-3 w-3" />
+                  <DownOutlined />
                   {t("orgs.collapseNode")}
                 </>
               )}
@@ -463,15 +452,32 @@ function NodeCard({
             title={t("orgs.focus")}
             className="text-text-muted hover:text-primary"
           >
-            <Crosshair className="h-3 w-3" />
+            <AimOutlined />
           </button>
         </div>
       </div>
       <div className="flex items-stretch divide-x divide-panel-border/60">
-        <IconBtn icon={Pencil} label={t("common.edit")} onClick={() => onAction("edit", node)} />
-        <IconBtn icon={UsersRound} label={t("orgs.members")} onClick={() => onAction("members", node)} />
-        <IconBtn icon={Plus} label={t("orgs.subOrg")} onClick={() => onAction("add", node)} />
-        <IconBtn icon={Trash2} label={t("common.delete")} danger onClick={() => onAction("delete", node)} />
+        <IconBtn
+          icon={EditOutlined}
+          label={t("common.edit")}
+          onClick={() => onAction("edit", node)}
+        />
+        <IconBtn
+          icon={TeamOutlined}
+          label={t("orgs.members")}
+          onClick={() => onAction("members", node)}
+        />
+        <IconBtn
+          icon={PlusOutlined}
+          label={t("orgs.subOrg")}
+          onClick={() => onAction("add", node)}
+        />
+        <IconBtn
+          icon={DeleteOutlined}
+          label={t("common.delete")}
+          danger
+          onClick={() => onAction("delete", node)}
+        />
       </div>
     </div>
   );
@@ -483,7 +489,7 @@ function IconBtn({
   onClick,
   danger,
 }: {
-  icon: typeof Pencil;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   onClick: () => void;
   danger?: boolean;
@@ -499,7 +505,7 @@ function IconBtn({
           : "text-text-muted hover:bg-panel hover:text-primary"
       }`}
     >
-      <Icon className="h-3.5 w-3.5" />
+      <Icon />
       {label}
     </button>
   );

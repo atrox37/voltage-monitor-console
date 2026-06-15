@@ -9,7 +9,7 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 import { messages } from "./locales";
-import type { Locale, NavSearchItem, TranslationDict } from "./types";
+import type { Locale, TranslationDict } from "./types";
 
 export type { Locale, NavSearchItem, TranslationDict } from "./types";
 

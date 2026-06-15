@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { DownOutlined, LoadingOutlined, RightOutlined } from "@ant-design/icons";
+import { Checkbox, Drawer, Form, Input } from "antd";
+import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { showError, showSuccess } from "@/lib/api-message";
 import {
   deleteRole,
   getDimensionTree,
@@ -15,16 +17,16 @@ import {
 } from "@/api/sys";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
 import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
-import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
 import {
   buildRoleMenuTree,
   bubbleMenuTreeState,
   collectRoleMenuChanges,
   type RoleMenuTreeNode,
-} from "@/lib/role-menu-tree";
-import { toDbId } from "@/lib/query-terms";
+} from "@/features/system/lib/role-menu-tree";
+import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
+import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { useTranslation } from "@/i18n";
 import type { PageQuery, SysRolePageDto, SysRolePermissionDto } from "@/types";
 
@@ -62,7 +64,9 @@ function RolesPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const pageSize = 10;
+  const pageSize = DEFAULT_PAGE_SIZE;
+  const [filterDraft, setFilterDraft] = useState({ name: "", orgId: "" });
+  const [filterApplied, setFilterApplied] = useState({ name: "", orgId: "" });
 
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState({ name: "", orgId: "" });
@@ -82,9 +86,15 @@ function RolesPage() {
   const fetchRoles = useCallback(async () => {
     setLoading(true);
     try {
+      const terms = [];
+      const { name, orgId } = filterApplied;
+      if (name) terms.push(termLike("t.role_name", name));
+      if (orgId) terms.push(termEq("t.org_id", toDbId(orgId)));
+
       const result = await pageRoles({
         current: page,
         size: pageSize,
+        terms,
         sorts: DEFAULT_SORTS,
       });
       const list = result.records ?? result.data ?? [];
@@ -94,18 +104,18 @@ function RolesPage() {
       if (isRequestCanceled(err)) return;
       setRows([]);
       setTotal(0);
-      toast.error(err instanceof Error ? err.message : t("roles.loadFailed"));
+      showError(err instanceof Error ? err.message : t("roles.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [filterApplied, page, pageSize, t]);
 
   useEffect(() => {
     void getDimensionTree()
       .then((root) => setOrgNodes(dimensionToOrgNodes(root)))
       .catch((err) => {
         if (isRequestCanceled(err)) return;
-        toast.error(err instanceof Error ? err.message : t("roles.loadOrgFailed"));
+        showError(err instanceof Error ? err.message : t("roles.loadOrgFailed"));
       });
     void fetchRoles();
   }, [fetchRoles]);
@@ -186,7 +196,7 @@ function RolesPage() {
     setSaving(true);
     try {
       await saveRoleMenus(changes);
-      toast.success(t("roles.menuSaved"));
+      showSuccess(t("roles.menuSaved"));
       setMenuRole(null);
       await fetchRoles();
     } finally {
@@ -205,7 +215,7 @@ function RolesPage() {
     setSaving(true);
     try {
       await saveRolePermissions(submitData);
-      toast.success(t("roles.permSaved"));
+      showSuccess(t("roles.permSaved"));
       setPermNode(null);
     } finally {
       setSaving(false);
@@ -214,13 +224,13 @@ function RolesPage() {
 
   const saveAdd = async () => {
     if (!draft.name.trim() || !draft.orgId) {
-      toast.error(t("common.requiredHint"));
+      showError(t("common.requiredHint"));
       return;
     }
     setSaving(true);
     try {
       await saveRole({ roleName: draft.name.trim(), orgId: toDbId(draft.orgId) });
-      toast.success(t("roles.addSuccess"));
+      showSuccess(t("roles.addSuccess"));
       setAddOpen(false);
       setDraft({ name: "", orgId: "" });
       setPage(1);
@@ -232,7 +242,7 @@ function RolesPage() {
 
   const handleDelete = async (row: RoleRow) => {
     await deleteRole(row.id);
-    toast.success(t("common.deleteSuccess"));
+    showSuccess(t("common.deleteSuccess"));
     await fetchRoles();
   };
 
@@ -247,6 +257,29 @@ function RolesPage() {
         page={page}
         pageSize={pageSize}
         onPageChange={setPage}
+        onSearch={() => {
+          setFilterApplied({ ...filterDraft });
+          setPage(1);
+        }}
+        onReset={() => {
+          const empty = { name: "", orgId: "" };
+          setFilterDraft(empty);
+          setFilterApplied(empty);
+          setPage(1);
+        }}
+        filterValues={filterDraft}
+        onFilterValuesChange={(draft) =>
+          setFilterDraft({ name: draft.name ?? "", orgId: draft.orgId ?? "" })
+        }
+        filters={[
+          { type: "text", key: "name", label: t("roles.name") },
+          {
+            type: "orgTree",
+            key: "orgId",
+            label: t("roles.org"),
+            nodes: orgNodes,
+          },
+        ]}
         columns={[
           {
             key: "name",
@@ -293,53 +326,64 @@ function RolesPage() {
         )}
       />
 
-      <VtDrawer
+      <Drawer
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title={t("roles.add")}
-        footer={
-          <>
-            <VtBtn variant="ghost" onClick={() => setAddOpen(false)}>{t("common.close")}</VtBtn>
-            <VtBtn onClick={() => void saveAdd()} disabled={saving}>{t("common.save")}</VtBtn>
-          </>
-        }
+        width={480}
+        destroyOnHidden
+        styles={{ body: { paddingTop: 8 } }}
+        footer={drawerFooter([
+          { key: "close", label: t("common.close"), onClick: () => setAddOpen(false) },
+          {
+            key: "save",
+            label: t("common.save"),
+            type: "primary",
+            disabled: saving,
+            onClick: () => void saveAdd(),
+          },
+        ])}
       >
-        <VtField label={t("roles.name")} required>
-          <input
-            className={vtInputCls}
+        <Form.Item label={t("roles.name")} required {...drawerFormItemProps}>
+          <Input
             placeholder={t("roles.namePlaceholder")}
             value={draft.name}
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
           />
-        </VtField>
-        <VtField label={t("users.org")} required>
+        </Form.Item>
+        <Form.Item label={t("users.org")} required {...drawerFormItemProps}>
           <OrgTreeSelect
             nodes={orgNodes}
             value={draft.orgId}
             onChange={(v) => setDraft({ ...draft, orgId: v })}
           />
-        </VtField>
-      </VtDrawer>
+        </Form.Item>
+      </Drawer>
 
-      <VtDrawer
+      <Drawer
         open={!!menuRole}
         onClose={() => {
           setMenuRole(null);
           setPermNode(null);
         }}
         title={t("roles.menuDrawer")}
-        width={420}
-        zIndex={50}
-        footer={
-          <>
-            <VtBtn variant="ghost" onClick={() => setMenuRole(null)}>{t("common.close")}</VtBtn>
-            <VtBtn onClick={() => void saveMenu()} disabled={saving}>{t("common.saveSubmit")}</VtBtn>
-          </>
-        }
+        width={permNode ? 480 : 420}
+        destroyOnHidden
+        styles={{ body: { paddingTop: 8 } }}
+        footer={drawerFooter([
+          { key: "close", label: t("common.close"), onClick: () => { setMenuRole(null); setPermNode(null); } },
+          {
+            key: "save",
+            label: t("common.saveSubmit"),
+            type: "primary",
+            disabled: saving,
+            onClick: () => void saveMenu(),
+          },
+        ])}
       >
         {menuLoading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
+            <LoadingOutlined spin className="text-2xl text-text-muted" />
           </div>
         ) : (
           <div className="text-xs">
@@ -356,69 +400,75 @@ function RolesPage() {
             ))}
           </div>
         )}
-      </VtDrawer>
+      </Drawer>
 
-      <VtDrawer
-        open={!!permNode}
-        onClose={() => setPermNode(null)}
-        title={t("roles.permDrawer")}
-        width={560}
-        zIndex={60}
-        hideOverlay
-        footer={
-          <>
-            <VtBtn variant="ghost" onClick={() => setPermNode(null)}>{t("common.cancel")}</VtBtn>
-            <VtBtn onClick={() => void savePerm()} disabled={saving}>{t("common.save")}</VtBtn>
-          </>
-        }
-      >
-        {permLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-text-muted" />
-          </div>
-        ) : permNode ? (
-          <>
-            <VtField label={t("roles.menuName")}>
-              <input className={vtInputCls} value={permNode.label} disabled />
-            </VtField>
-            <VtField label={t("roles.menuPath")}>
-              <input className={vtInputCls} value={permNode.path ?? "—"} disabled />
-            </VtField>
-            <VtField label={t("roles.permission")}>
-              <div className="flex flex-wrap gap-2">
-                {permOptions.map((p) => {
-                  const active = permChecked.has(p.id!);
-                  return (
-                    <label
-                      key={String(p.id)}
-                      className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition ${
-                        active
-                          ? "border-primary/60 bg-primary/15 text-primary"
-                          : "border-panel-border bg-panel/40 text-text-secondary hover:text-foreground"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        className="accent-primary"
-                        checked={active}
-                        onChange={() => {
-                          setPermChecked((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(p.id!)) next.delete(p.id!);
-                            else next.add(p.id!);
-                            return next;
-                          });
-                        }}
-                      />
-                      {permNode.label}-{p.name}
-                    </label>
-                  );
-                })}
-              </div>
-            </VtField>
-          </>
-        ) : null}
-      </VtDrawer>
+      {menuRole && (
+        <Drawer
+          open={!!permNode}
+          onClose={() => setPermNode(null)}
+          title={t("roles.permDrawer")}
+          width={560}
+          zIndex={1100}
+          mask={false}
+          destroyOnHidden
+          styles={{ body: { paddingTop: 8 } }}
+          footer={drawerFooter([
+            { key: "cancel", label: t("common.cancel"), onClick: () => setPermNode(null) },
+            {
+              key: "save",
+              label: t("common.save"),
+              type: "primary",
+              disabled: saving,
+              onClick: () => void savePerm(),
+            },
+          ])}
+        >
+          {permLoading ? (
+            <div className="flex justify-center py-12">
+              <LoadingOutlined spin className="text-2xl text-text-muted" />
+            </div>
+          ) : permNode ? (
+            <>
+              <Form.Item label={t("roles.menuName")} {...drawerFormItemProps}>
+                <Input value={permNode.label} disabled />
+              </Form.Item>
+              <Form.Item label={t("roles.menuPath")} {...drawerFormItemProps}>
+                <Input value={permNode.path ?? "—"} disabled />
+              </Form.Item>
+              <Form.Item label={t("roles.permission")} {...drawerFormItemProps}>
+                <div className="flex flex-wrap gap-2">
+                  {permOptions.map((p) => {
+                    const active = permChecked.has(p.id!);
+                    return (
+                      <label
+                        key={String(p.id)}
+                        className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition ${
+                          active
+                            ? "border-primary/60 bg-primary/15 text-primary"
+                            : "border-panel-border bg-panel/40 text-text-secondary hover:text-foreground"
+                        }`}
+                      >
+                        <Checkbox
+                          checked={active}
+                          onChange={() => {
+                            setPermChecked((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(p.id!)) next.delete(p.id!);
+                              else next.add(p.id!);
+                              return next;
+                            });
+                          }}
+                        />
+                        {permNode.label}-{p.name}
+                      </label>
+                    );
+                  })}
+                </div>
+              </Form.Item>
+            </>
+          ) : null}
+        </Drawer>
+      )}
     </>
   );
 }
@@ -450,7 +500,7 @@ function MenuTreeNode({
       <div className="flex items-center gap-1.5 py-1">
         {hasChildren ? (
           <button type="button" onClick={() => setOpen((o) => !o)} className="text-text-muted">
-            {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            {open ? <DownOutlined className="text-xs" /> : <RightOutlined className="text-xs" />}
           </button>
         ) : (
           <span className="w-3" />

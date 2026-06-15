@@ -12,6 +12,7 @@ export * from "./network";
 export * from "./gateway";
 export * from "./protocol";
 export * from "./register";
+export * from "./timeseries";
 export * from "./notify";
 export * from "./product";
 export * from "./device";

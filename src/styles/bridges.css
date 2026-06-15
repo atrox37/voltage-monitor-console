@@ -1,0 +1,72 @@
+﻿@layer components {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  select.vt-select,
+  .vt-page-content select {
+    appearance: none;
+    background-color: oklch(0.22 0.03 270 / 0.4);
+    background-image: url("/icons/chevron-down.svg");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 12px;
+    padding-right: 2rem;
+    cursor: pointer;
+  }
+
+  .vt-ant-input-bridge,
+  .vt-ant-select-bridge,
+  .vt-page-content input:not([class*="ant-"]),
+  .vt-page-content select:not([class*="ant-"]) {
+    height: 32px;
+    width: 100%;
+    border-radius: 6px;
+    border: 1px solid var(--panel-border);
+    background: oklch(0.22 0.03 270 / 0.4);
+    padding: 0 12px;
+    font-size: 14px;
+    color: var(--foreground);
+    outline: none;
+  }
+
+  .vt-ant-input-bridge:focus,
+  .vt-page-content input:not([class*="ant-"]):focus {
+    border-color: oklch(0.72 0.18 50 / 0.6);
+  }
+
+  .vt-ant-select-bridge,
+  .vt-page-content select:not([class*="ant-"]) {
+    appearance: none;
+    padding-right: 2rem;
+    cursor: pointer;
+  }
+
+  .vt-ant-filter-card,
+  .vt-ant-table-card {
+    background: oklch(0.36 0.045 270 / 0.2) !important;
+    border: 1px solid var(--panel-border) !important;
+  }
+
+  .ant-layout-header {
+    height: 56px !important;
+    line-height: 56px !important;
+    padding-inline: 16px !important;
+  }
+}

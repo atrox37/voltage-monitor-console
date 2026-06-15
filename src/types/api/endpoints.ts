@@ -30,6 +30,8 @@ export const API = {
     dimensionSearchOne: 'POST /sys-app/sys-dimension/_search_one',
     dimensionSave: 'POST /sys-app/sys-dimension/_save_or_update',
     dimensionDelete: 'GET /sys-app/sys-dimension/_delete',
+    auditLogPage: 'POST /sys-app/audit_log/_page',
+    auditLogDeleteBatch: 'POST /sys-app/audit_log/_delete_batch',
   },
   iot: {
     unit: 'GET /iot-app/configuration/unit',

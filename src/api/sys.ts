@@ -19,6 +19,7 @@ import type {
   MenuPermissionRequest,
   RolePermissionBatchVo,
   SysMenuPo,
+  AuditLogDto,
 } from "@/types";
 import { apiPath } from "./paths";
 
@@ -121,3 +122,15 @@ export function deleteDimension(id: number | string): Promise<SaveResult> {
 export function getDimensionUsers(params: QueryParam): Promise<SysUserPo[]> {
   return searchAllUsers(params);
 }
+
+/** POST /sys-app/audit_log/_page */
+export function pageAuditLogs(params: PageQuery): Promise<PageResult<AuditLogDto>> {
+  return Request.post<PageResult<AuditLogDto>>(apiPath(API.sys.auditLogPage), params);
+}
+
+/** POST /sys-app/audit_log/_delete_batch */
+export function deleteAuditLogBatch(ids: number[]): Promise<void> {
+  return Request.post<void>(apiPath(API.sys.auditLogDeleteBatch), ids);
+}
+
+export type { AuditLogDto } from "@/types";

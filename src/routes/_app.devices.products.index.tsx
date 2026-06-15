@@ -1,25 +1,29 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
-import { deleteProduct, getDimensionTree, pageProducts, saveProduct } from "@/api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button, Drawer, Form, Input } from "antd";
+import { OptionToggle } from "@/components/option-toggle";
+import { useMemo, useState } from "react";
+import { showApiError, showSuccess } from "@/lib/api-message";
+import { deleteProduct, pageProducts, saveProduct } from "@/api";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
-import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { VtDrawer, VtField, VtBtn, vtInputCls } from "@/components/vt-drawer";
-import { dimensionToOrgNodes } from "@/lib/dimension-tree";
+import { useDimensionTreeQuery } from "@/hooks/use-dimension-tree-query";
+import { useServerPageQuery } from "@/hooks/use-server-page-query";
 import {
   mapCreateFormToPo,
   mapProductDtoToRow,
-  PRODUCT_TYPE_LABEL,
-  PRODUCT_TYPE_OPTIONS,
   type ProductCreateForm,
   type ProductListRow,
-  type ProductType,
-} from "@/lib/product-mappers";
+} from "@/features/products/lib/product-mappers";
+import {
+  useProductTypeLabel,
+  useProductTypeOptions,
+} from "@/features/products/lib/product-type-i18n";
+import { useListPagination } from "@/lib/list-pagination";
+import { queryKeys } from "@/lib/query-keys";
 import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { useTranslation } from "@/i18n";
-import type { PageQuery } from "@/types";
+import type { DeviceProductPageDto, PageQuery } from "@/types";
 
 export const Route = createFileRoute("/_app/devices/products/")({
   component: ProductsPage,
@@ -30,121 +34,103 @@ const emptyDraft = (): ProductCreateForm => ({ name: "", sn: "", type: "device" 
 
 function ProductsPage() {
   const { t } = useTranslation();
+  const productTypeLabel = useProductTypeLabel();
+  const productTypeOptions = useProductTypeOptions();
   const navigate = useNavigate();
-  const [rows, setRows] = useState<ProductListRow[]>([]);
-  const [orgNodes, setOrgNodes] = useState<OrgNode[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const pageSize = 10;
+  const queryClient = useQueryClient();
+  const { data: orgNodes = [] } = useDimensionTreeQuery();
+  const { page, setPage, pageSize, onPageSizeChange } = useListPagination();
 
   const [filterDraft, setFilterDraft] = useState({ name: "", orgId: "", type: "" });
   const [filterApplied, setFilterApplied] = useState({ name: "", orgId: "", type: "" });
 
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<ProductCreateForm>(emptyDraft());
-  const [saving, setSaving] = useState(false);
-  const [delTarget, setDelTarget] = useState<ProductListRow | null>(null);
 
   const goDetail = (id: string) => navigate({ to: "/devices/products/$id", params: { id } });
 
-  const fetchRows = useCallback(async () => {
-    setLoading(true);
-    try {
-      const terms = [];
-      const name = filterApplied.name.trim();
-      if (name) terms.push(termLike("t.name", name));
-      if (filterApplied.orgId) {
-        terms.push(termEq("t.org_id", toDbId(filterApplied.orgId)));
-      }
-      if (filterApplied.type) terms.push(termEq("t.type", filterApplied.type));
+  const listQuery = useMemo(() => {
+    const terms = [];
+    const name = filterApplied.name.trim();
+    if (name) terms.push(termLike("t.name", name));
+    if (filterApplied.orgId) terms.push(termEq("t.org_id", toDbId(filterApplied.orgId)));
+    if (filterApplied.type) terms.push(termEq("t.type", filterApplied.type));
+    return { terms, sorts: DEFAULT_SORTS };
+  }, [filterApplied]);
 
-      const result = await pageProducts({
-        current: page,
-        size: pageSize,
-        terms,
-        sorts: DEFAULT_SORTS,
-      });
-      const list = result.records ?? result.data ?? [];
-      setRows(list.map(mapProductDtoToRow));
-      setTotal(result.total ?? list.length);
-    } catch (err) {
-      if (isRequestCanceled(err)) return;
-      setRows([]);
-      setTotal(0);
-      toast.error(err instanceof Error ? err.message : "加载产品列表失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [filterApplied.name, filterApplied.orgId, filterApplied.type, page]);
+  const { rows, total, loading } = useServerPageQuery<DeviceProductPageDto, ProductListRow>({
+    queryKey: queryKeys.products.list(listQuery),
+    page,
+    pageSize,
+    query: listQuery,
+    fetchPage: pageProducts,
+    mapRow: mapProductDtoToRow,
+    errorMessage: t("devices.products.list.loadFailed"),
+  });
 
-  useEffect(() => {
-    void getDimensionTree()
-      .then((root) => setOrgNodes(dimensionToOrgNodes(root)))
-      .catch((err) => {
-        if (isRequestCanceled(err)) return;
-      });
-  }, []);
+  const invalidateList = () =>
+    void queryClient.invalidateQueries({ queryKey: queryKeys.products.root });
 
-  useEffect(() => {
-    void fetchRows();
-  }, [fetchRows]);
-
-  const saveAdd = async () => {
-    if (!draft.name.trim() || !draft.sn.trim()) return;
-    setSaving(true);
-    try {
-      await saveProduct(mapCreateFormToPo(draft));
-      toast.success(t("common.saveSuccess"));
+  const saveMutation = useMutation({
+    mutationFn: (form: ProductCreateForm) => saveProduct(mapCreateFormToPo(form)),
+    onSuccess: () => {
+      showSuccess(t("common.saveSuccess"));
       setAddOpen(false);
       setDraft(emptyDraft());
-      await fetchRows();
-    } catch (err) {
+      invalidateList();
+    },
+    onError: (err) => {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : "创建产品失败");
-    } finally {
-      setSaving(false);
-    }
+      showApiError(err, t("devices.products.list.createFailed"));
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteProduct(id),
+    onSuccess: () => {
+      showSuccess(t("common.deleteSuccess"));
+      invalidateList();
+    },
+    onError: (err) => {
+      if (isRequestCanceled(err)) return;
+      showApiError(err, t("devices.products.list.deleteFailed"));
+    },
+  });
+
+  const saveAdd = () => {
+    if (!draft.name.trim() || !draft.sn.trim()) return;
+    saveMutation.mutate(draft);
   };
 
-  const handleDelete = async () => {
-    if (!delTarget) return;
-    try {
-      await deleteProduct(delTarget.id);
-      toast.success(t("common.deleteSuccess"));
-      setDelTarget(null);
-      await fetchRows();
-    } catch (err) {
-      if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : "删除产品失败");
-    }
+  const handleDelete = (row: ProductListRow) => {
+    deleteMutation.mutate(row.id);
   };
+
+  const saving = saveMutation.isPending;
 
   return (
     <>
       <ListPageTemplate<ProductListRow>
-        title="产品列表"
+        title={t("devices.products.list.title")}
         filters={[
-          { type: "text", key: "name", label: "产品名称", placeholder: "请输入产品名称" },
+          { type: "text", key: "name", label: t("common.productName") },
           {
             type: "orgTree",
             key: "orgId",
-            label: "机构",
+            label: t("common.orgLabel"),
             nodes: orgNodes,
-            allowAll: true,
-            placeholder: t("common.all"),
           },
           {
             type: "select",
             key: "type",
-            label: "产品类型",
-            options: [{ label: t("common.all"), value: "" }, ...PRODUCT_TYPE_OPTIONS],
+            label: t("common.productType"),
+            options: productTypeOptions,
           },
         ]}
         columns={[
           {
             key: "name",
-            title: "产品名称",
+            title: t("common.productName"),
             render: (r) => (
               <button
                 onClick={() => goDetail(r.id)}
@@ -156,10 +142,10 @@ function ProductsPage() {
           },
           {
             key: "type",
-            title: "产品类型",
+            title: t("common.productType"),
             render: (r) => (
               <span
-                className={`rounded px-1.5 py-0.5 text-xs ${
+                className={`whitespace-nowrap rounded px-1.5 py-0.5 text-xs ${
                   r.type === "gateway"
                     ? "bg-primary/15 text-primary"
                     : r.type === "device"
@@ -167,24 +153,28 @@ function ProductsPage() {
                       : "bg-status-warning/15 text-status-warning"
                 }`}
               >
-                {PRODUCT_TYPE_LABEL[r.type] ?? r.type}
+                {productTypeLabel(r.type)}
               </span>
             ),
           },
-          { key: "creator", title: "创建人" },
-          { key: "org", title: "机构" },
+          { key: "creator", title: t("common.creator") },
+          { key: "org", title: t("common.orgLabel") },
           {
             key: "updateTime",
-            title: "更新时间",
-            render: (r) => <span className="font-mono text-xs text-text-secondary">{r.updateTime}</span>,
+            title: t("common.updateTime"),
+            render: (r) => (
+              <span className="font-mono text-xs text-text-secondary">{r.updateTime}</span>
+            ),
           },
         ]}
         rows={rows}
         loading={loading}
         serverSide
         page={page}
+        pageSize={pageSize}
         totalCount={total}
         onPageChange={setPage}
+        onPageSizeChange={onPageSizeChange}
         filterValues={filterDraft}
         onFilterValuesChange={(next) =>
           setFilterDraft({
@@ -209,38 +199,43 @@ function ProductsPage() {
         }}
         rowActions={(r) => (
           <>
-            <RowBtn onClick={() => goDetail(r.id)}>详情</RowBtn>
-            <RowBtn danger onClick={() => setDelTarget(r)}>{t("common.delete")}</RowBtn>
+            <RowBtn onClick={() => goDetail(r.id)}>{t("common.details")}</RowBtn>
+            <RowBtn
+              danger
+              confirm={{
+                description: t("common.confirmDeleteDesc", {
+                  target: t("devices.products.list.deleteTarget"),
+                  name: r.name,
+                }),
+              }}
+              onClick={() => handleDelete(r)}
+            >
+              {t("common.delete")}
+            </RowBtn>
           </>
         )}
       />
 
-      <VtDrawer
+      <Drawer
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        title="新建产品"
+        title={t("devices.products.list.addDrawerTitle")}
+        width={480}
+        destroyOnHidden
+        styles={{ body: { paddingTop: 8 } }}
         footer={
-          <>
-            <VtBtn variant="ghost" onClick={() => setAddOpen(false)}>{t("common.close")}</VtBtn>
-            <VtBtn disabled={saving} onClick={() => void saveAdd()}>
+          <div className="flex justify-end gap-2">
+            <Button type="default" size="small" onClick={() => setAddOpen(false)}>
+              {t("common.close")}
+            </Button>
+            <Button type="primary" size="small" disabled={saving} onClick={() => void saveAdd()}>
               {saving ? t("common.saving") : t("common.saveSubmit")}
-            </VtBtn>
-          </>
+            </Button>
+          </div>
         }
       >
         <ProductForm value={draft} onChange={setDraft} />
-      </VtDrawer>
-
-      {delTarget && (
-        <ConfirmDialog
-          open
-          title={t("common.confirmDelete")}
-          description={t("common.confirmDeleteDesc", { target: "产品", name: delTarget.name })}
-          danger
-          onClose={() => setDelTarget(null)}
-          onConfirm={() => void handleDelete()}
-        />
-      )}
+      </Drawer>
     </>
   );
 }
@@ -252,35 +247,53 @@ function ProductForm({
   value: ProductCreateForm;
   onChange: (v: ProductCreateForm) => void;
 }) {
+  const { t } = useTranslation();
+  const productTypeOptions = useProductTypeOptions();
+
   return (
     <>
-      <VtField label="产品名称" required>
-        <input
-          className={vtInputCls}
+      <Form.Item
+        label={t("common.productName")}
+        required
+        layout="horizontal"
+        labelCol={{ flex: "72px" }}
+        wrapperCol={{ flex: 1 }}
+        className="mb-3"
+      >
+        <Input
           value={value.name}
-          placeholder="请输入产品名称"
+          placeholder={t("devices.products.list.namePlaceholder")}
           onChange={(e) => onChange({ ...value, name: e.target.value })}
         />
-      </VtField>
-      <VtField label="产品型号" required>
-        <input
-          className={vtInputCls}
+      </Form.Item>
+      <Form.Item
+        label={t("common.productModel")}
+        required
+        layout="horizontal"
+        labelCol={{ flex: "72px" }}
+        wrapperCol={{ flex: 1 }}
+        className="mb-3"
+      >
+        <Input
           value={value.sn}
-          placeholder="请输入产品型号 (SN)"
+          placeholder={t("devices.products.list.modelPlaceholder")}
           onChange={(e) => onChange({ ...value, sn: e.target.value })}
         />
-      </VtField>
-      <VtField label="产品类型" required>
-        <select
-          className={vtInputCls}
+      </Form.Item>
+      <Form.Item
+        label={t("common.productType")}
+        required
+        layout="horizontal"
+        labelCol={{ flex: "72px" }}
+        wrapperCol={{ flex: 1 }}
+        className="mb-3"
+      >
+        <OptionToggle
           value={value.type}
-          onChange={(e) => onChange({ ...value, type: e.target.value as ProductType })}
-        >
-          {PRODUCT_TYPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </VtField>
+          onChange={(v) => onChange({ ...value, type: v })}
+          options={productTypeOptions.map((opt) => ({ label: opt.label, value: opt.value }))}
+        />
+      </Form.Item>
     </>
   );
 }

@@ -40,7 +40,10 @@ export function deleteProduct(id: number | string): Promise<SaveResult> {
 }
 
 /** POST /iot-app/product/_parse */
-export function parseProductRule(data: { sql?: string; param?: Record<string, unknown[]> }): Promise<JSqlColumn[][]> {
+export function parseProductRule(data: {
+  sql?: string;
+  param?: Record<string, unknown[]>;
+}): Promise<JSqlColumn[][]> {
   return Request.post<JSqlColumn[][]>(apiPath(API.iot.productParse), data);
 }
 

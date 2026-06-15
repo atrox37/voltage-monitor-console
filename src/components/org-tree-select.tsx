@@ -11,25 +11,6 @@ export type OrgNode = {
   children?: OrgNode[];
 };
 
-const FALLBACK_ORG_TREE: OrgNode[] = [
-  {
-    id: "root",
-    label: "Group Root",
-    children: [
-      {
-        id: "c1",
-        label: "Group Children1",
-        parentId: "root",
-        children: [{ id: "c1-1", label: "Group Children1-1", parentId: "c1" }],
-      },
-      { id: "c2", label: "Group Children2", parentId: "root" },
-      { id: "c3", label: "Group Children3", parentId: "root" },
-    ],
-  },
-];
-
-export const ORG_TREE = FALLBACK_ORG_TREE;
-
 export function findOrg(id: string, tree: OrgNode[]): OrgNode | undefined {
   for (const n of tree) {
     if (n.id === id) return n;
@@ -42,7 +23,11 @@ export function findOrg(id: string, tree: OrgNode[]): OrgNode | undefined {
 
 export function flattenOrgs(tree: OrgNode[]): OrgNode[] {
   const out: OrgNode[] = [];
-  const walk = (ns: OrgNode[]) => ns.forEach((n) => { out.push(n); if (n.children) walk(n.children); });
+  const walk = (ns: OrgNode[]) =>
+    ns.forEach((n) => {
+      out.push(n);
+      if (n.children) walk(n.children);
+    });
   walk(tree);
   return out;
 }
@@ -67,16 +52,17 @@ function toTreeData(
 export function OrgTreeSelect({
   value,
   onChange,
-  nodes = FALLBACK_ORG_TREE,
+  nodes = [],
   placeholder,
-  allowAll,
+  // allowAll 保留 prop 定义以兼容调用方，行为改为始终 allowClear（清除=选择全部）
+  allowAll: _allowAll,
   disabled,
   matchBy = "id",
   className,
   style,
 }: {
-  value: string;
-  onChange: (v: string) => void;
+  value?: string;
+  onChange?: (v: string) => void;
   nodes?: OrgNode[];
   placeholder?: string;
   allowAll?: boolean;
@@ -89,27 +75,26 @@ export function OrgTreeSelect({
   const resolvedPlaceholder = placeholder ?? t("common.select");
 
   const treeData = useMemo(() => {
-    const data = toTreeData(nodes, matchBy);
-    if (allowAll) {
-      return [{ title: t("common.all"), value: "", key: "__all__" }, ...data];
-    }
-    return data;
-  }, [allowAll, matchBy, nodes, t]);
+    return toTreeData(nodes, matchBy);
+  }, [matchBy, nodes]);
 
   return (
     <TreeSelect
-      className={className}
+      className={["vt-select-control", className].filter(Boolean).join(" ")}
+      classNames={{ popup: { root: "vt-select-popup" } }}
       style={{ width: "100%", ...style }}
-      value={value || undefined}
+      value={value === "" || value == null ? undefined : value}
       placeholder={resolvedPlaceholder}
       disabled={disabled}
-      allowClear={allowAll}
+      allowClear
       treeDefaultExpandAll
       treeLine
       showSearch
       treeNodeFilterProp="title"
       treeData={treeData}
-      onChange={(v) => onChange(String(v ?? ""))}
+      onChange={(v) => {
+        onChange?.(v == null ? "" : String(v));
+      }}
     />
   );
 }

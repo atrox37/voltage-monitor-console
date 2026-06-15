@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Radio, X, CalendarDays, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { CalendarOutlined, LoadingOutlined, RadarChartOutlined } from "@ant-design/icons";
+import { showError, showSuccess } from "@/lib/api-message";
 import {
   deleteGateway,
   getDimensionTree,
@@ -11,18 +11,26 @@ import {
   pageProtocols,
   saveGateway,
 } from "@/api";
-import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
-import { VtDataTable } from "@/components/vt-table";
+import { DatePicker, Drawer, Form, Input, Pagination, Select, Switch, Table } from "antd";
+import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
-import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
-import { VtDrawer, VtField, vtInputCls, VtBtn } from "@/components/vt-drawer";
+import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
+import type { OrgNode } from "@/components/org-tree-select";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
-import { mapGatewayDtoToRow, type GatewayListRow, type MqttClientConfiguration } from "@/lib/ingest-mappers";
+import {
+  mapGatewayDtoToRow,
+  networkPoFromGatewayDto,
+  type GatewayListRow,
+  type MqttClientConfiguration,
+} from "@/features/ingest/lib/ingest-mappers";
 import { ALL_PAGE_QUERY, termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
+import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import stompManager from "@/lib/stomp";
+import { useTableHeight } from "@/lib/use-table-height";
 import { useTranslation } from "@/i18n";
-import type { DeviceProtocolPageDto, NetworkConfigPo, PageQuery } from "@/types";
+import type { DeviceProtocolPageDto, GatewayDto, NetworkConfigPo, PageQuery } from "@/types";
 
 export const Route = createFileRoute("/_app/ingest/gateways")({
   component: GatewaysPage,
@@ -47,14 +55,25 @@ function GatewaysPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const pageSize = 10;
+  const pageSize = DEFAULT_PAGE_SIZE;
 
   const [filterDraft, setFilterDraft] = useState({ name: "", orgId: "", networkComponentType: "" });
-  const [filterApplied, setFilterApplied] = useState({ name: "", orgId: "", networkComponentType: "" });
+  const [filterApplied, setFilterApplied] = useState({
+    name: "",
+    orgId: "",
+    networkComponentType: "",
+  });
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState<"add" | "edit">("add");
-  const [form, setForm] = useState<GatewayForm>({ id: "", name: "", networkId: "", protocolId: "", enabled: false });
+  const [editGatewayRaw, setEditGatewayRaw] = useState<GatewayDto | null>(null);
+  const [form, setForm] = useState<GatewayForm>({
+    id: "",
+    name: "",
+    networkId: "",
+    protocolId: "",
+    enabled: false,
+  });
   const [saving, setSaving] = useState(false);
   const [zhaoTarget, setZhaoTarget] = useState<GatewayListRow | null>(null);
 
@@ -65,7 +84,8 @@ function GatewaysPage() {
       const name = filterApplied.name.trim();
       if (name) terms.push(termLike("t.name", name));
       if (filterApplied.orgId) terms.push(termEq("t.org_id", toDbId(filterApplied.orgId)));
-      if (filterApplied.networkComponentType) terms.push(termEq("t1.type", filterApplied.networkComponentType));
+      if (filterApplied.networkComponentType)
+        terms.push(termEq("t1.type", filterApplied.networkComponentType));
 
       const result = await pageGateways({
         current: page,
@@ -80,11 +100,18 @@ function GatewaysPage() {
       if (isRequestCanceled(err)) return;
       setRows([]);
       setTotal(0);
-      toast.error(err instanceof Error ? err.message : t("ingest.gateways.loadFailed"));
+      showError(err instanceof Error ? err.message : t("ingest.gateways.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [filterApplied.name, filterApplied.orgId, filterApplied.networkComponentType, page, t]);
+  }, [
+    filterApplied.name,
+    filterApplied.orgId,
+    filterApplied.networkComponentType,
+    page,
+    pageSize,
+    t,
+  ]);
 
   useEffect(() => {
     void getDimensionTree()
@@ -100,12 +127,14 @@ function GatewaysPage() {
 
   const openAdd = () => {
     setDrawerMode("add");
+    setEditGatewayRaw(null);
     setForm({ id: "", name: "", networkId: "", protocolId: "", enabled: false });
     setDrawerOpen(true);
   };
 
   const openEdit = (row: GatewayListRow) => {
     setDrawerMode("edit");
+    setEditGatewayRaw(row.raw);
     setForm({
       id: row.id,
       name: row.name,
@@ -126,12 +155,12 @@ function GatewaysPage() {
         networkId: toDbId(data.networkId),
         protocolId: toDbId(data.protocolId),
       });
-      toast.success(t("common.saveSuccess"));
+      showSuccess(t("common.saveSuccess"));
       setDrawerOpen(false);
       await fetchRows();
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : t("common.loadFailed"));
+      showError(err instanceof Error ? err.message : t("common.loadFailed"));
     } finally {
       setSaving(false);
     }
@@ -140,11 +169,11 @@ function GatewaysPage() {
   const handleDelete = async (row: GatewayListRow) => {
     try {
       await deleteGateway(row.id);
-      toast.success(t("common.deleteSuccess"));
+      showSuccess(t("common.deleteSuccess"));
       await fetchRows();
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : t("common.loadFailed"));
+      showError(err instanceof Error ? err.message : t("common.loadFailed"));
     }
   };
 
@@ -179,14 +208,12 @@ function GatewaysPage() {
           })
         }
         filters={[
-          { type: "text", key: "name", label: t("common.nameLabel"), placeholder: t("common.inputPlaceholder") },
+          { type: "text", key: "name", label: t("common.nameLabel") },
           {
             type: "orgTree",
             key: "orgId",
             label: t("common.orgLabel"),
             nodes: orgNodes,
-            allowAll: true,
-            placeholder: t("common.select"),
           },
           {
             type: "select",
@@ -203,7 +230,9 @@ function GatewaysPage() {
             render: (r) => (
               <span className="inline-flex items-center gap-2">
                 <span className="text-foreground">{r.networkComponent}</span>
-                <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] text-primary">{r.networkComponentType}</span>
+                <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] text-primary">
+                  {r.networkComponentType}
+                </span>
               </span>
             ),
           },
@@ -213,23 +242,34 @@ function GatewaysPage() {
             key: "enabled",
             title: t("common.status"),
             render: (r) => (
-              <span className={`rounded px-2 py-0.5 text-[11px] ${r.enabled ? "bg-status-online/15 text-status-online" : "bg-status-warning/15 text-status-warning"}`}>
+              <span
+                className={`rounded px-2 py-0.5 text-[11px] ${r.enabled ? "bg-status-online/15 text-status-online" : "bg-status-warning/15 text-status-warning"}`}
+              >
                 {r.enabled ? t("common.yes") : t("common.no")}
               </span>
             ),
           },
-          { key: "updateTime", title: t("common.updatedAt"), render: (r) => <span className="text-text-secondary">{r.updateTime}</span> },
+          {
+            key: "updateTime",
+            title: t("common.updatedAt"),
+            render: (r) => <span className="text-text-secondary">{r.updateTime}</span>,
+          },
         ]}
         onAdd={openAdd}
         rowActions={(r) => (
           <>
             <RowBtn onClick={() => openEdit(r)}>{t("common.edit")}</RowBtn>
-            <RowBtn icon={Radio} onClick={() => setZhaoTarget(r)}>{t("ingest.gateways.recruit")}</RowBtn>
+            <RowBtn icon={RadarChartOutlined} onClick={() => setZhaoTarget(r)}>
+              {t("ingest.gateways.recruit")}
+            </RowBtn>
             <RowBtn
               danger
               confirm={{
                 title: t("common.confirmDelete"),
-                description: t("common.confirmDeleteDesc", { target: t("ingest.gateways.title"), name: r.name }),
+                description: t("common.confirmDeleteDesc", {
+                  target: t("ingest.gateways.title"),
+                  name: r.name,
+                }),
                 confirmText: t("common.delete"),
               }}
               onClick={() => void handleDelete(r)}
@@ -244,24 +284,29 @@ function GatewaysPage() {
         <GatewayDrawer
           mode={drawerMode}
           value={form}
+          fallbackNetwork={editGatewayRaw ? networkPoFromGatewayDto(editGatewayRaw) : undefined}
           saving={saving}
           onClose={() => setDrawerOpen(false)}
           onSave={handleSave}
         />
       )}
 
-      {zhaoTarget && (
-        <ZhaoDialog gateway={zhaoTarget} onClose={() => setZhaoTarget(null)} />
-      )}
+      {zhaoTarget && <ZhaoDrawer gateway={zhaoTarget} onClose={() => setZhaoTarget(null)} />}
     </>
   );
 }
 
 function GatewayDrawer({
-  mode, value, saving, onClose, onSave,
+  mode,
+  value,
+  fallbackNetwork,
+  saving,
+  onClose,
+  onSave,
 }: {
   mode: "add" | "edit";
   value: GatewayForm;
+  fallbackNetwork?: NetworkConfigPo;
   saving: boolean;
   onClose: () => void;
   onSave: (g: GatewayForm) => void;
@@ -287,18 +332,25 @@ function GatewayDrawer({
         if (canceled) return;
         const netList = (netRes.records ?? netRes.data ?? []).map((row) => row.t1.networkConfigPo);
         const protoList = protoRes.records ?? protoRes.data ?? [];
-        setNetworks(netList);
+        const mergedNetworks = [...netList];
+        if (value.networkId) {
+          const exists = mergedNetworks.some((n) => String(n.id) === value.networkId);
+          if (!exists && fallbackNetwork) mergedNetworks.unshift(fallbackNetwork);
+        }
+        setNetworks(mergedNetworks);
         setProtocols(protoList);
       })
       .catch((err) => {
         if (isRequestCanceled(err) || canceled) return;
-        toast.error(err instanceof Error ? err.message : t("ingest.gateways.loadOptionsFailed"));
+        showError(err instanceof Error ? err.message : t("ingest.gateways.loadOptionsFailed"));
       })
       .finally(() => {
         if (!canceled) setOptionsLoading(false);
       });
-    return () => { canceled = true; };
-  }, [t]);
+    return () => {
+      canceled = true;
+    };
+  }, [fallbackNetwork, t, value.networkId]);
 
   const selectedNetwork = networks.find((n) => String(n.id) === d.networkId);
   const protocolOptions = useMemo(() => {
@@ -310,76 +362,86 @@ function GatewayDrawer({
     setD((x) => ({ ...x, [k]: v }));
 
   return (
-    <VtDrawer
+    <Drawer
       open
       onClose={onClose}
       title={mode === "add" ? t("common.addTitle") : t("common.editTitle")}
       width={520}
-      footer={
-        <>
-          <VtBtn variant="ghost" onClick={onClose}>{t("common.cancel")}</VtBtn>
-          <VtBtn disabled={saving || optionsLoading} onClick={() => onSave(d)}>
-            {saving ? t("common.saving") : t("common.save")}
-          </VtBtn>
-        </>
-      }
+      destroyOnHidden
+      styles={{ body: { paddingTop: 8 } }}
+      footer={drawerFooter([
+        { key: "cancel", label: t("common.cancel"), onClick: onClose },
+        {
+          key: "save",
+          label: saving ? t("common.saving") : t("common.save"),
+          type: "primary",
+          disabled: saving || optionsLoading,
+          onClick: () => onSave(d),
+        },
+      ])}
     >
       {optionsLoading && (
         <div className="mb-3 flex items-center gap-2 text-xs text-text-secondary">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <LoadingOutlined spin className="text-sm" />
           {t("common.loading")}
         </div>
       )}
-      <VtField label={t("common.nameLabel")} required>
-        <input className={vtInputCls} placeholder={t("common.inputPlaceholder")} value={d.name} onChange={(e) => set("name", e.target.value)} />
-      </VtField>
+      <Form.Item label={t("common.nameLabel")} required {...drawerFormItemProps}>
+        <Input
+          placeholder={t("common.inputPlaceholder")}
+          value={d.name}
+          onChange={(e) => set("name", e.target.value)}
+        />
+      </Form.Item>
 
-      <VtField label={t("ingest.gateways.networkComp")} required>
-        <select
-          className={vtInputCls}
-          value={d.networkId}
-          onChange={(e) => {
-            set("networkId", e.target.value);
+      <Form.Item label={t("ingest.gateways.networkComp")} required {...drawerFormItemProps}>
+        <Select
+          value={d.networkId || undefined}
+          placeholder={t("common.select")}
+          onChange={(networkId) => {
+            set("networkId", networkId);
             set("protocolId", "");
           }}
-        >
-          <option value="">{t("common.select")}</option>
-          {networks.map((n) => (
-            <option key={String(n.id)} value={String(n.id)}>{n.name} ({n.type})</option>
-          ))}
-        </select>
-      </VtField>
+          options={networks.map((n) => ({
+            value: String(n.id),
+            label: `${n.name} (${n.type})`,
+          }))}
+        />
+      </Form.Item>
 
-      <VtField label={t("ingest.gateways.protocol")} required>
-        <select className={vtInputCls} value={d.protocolId} onChange={(e) => set("protocolId", e.target.value)}>
-          <option value="">{t("common.select")}</option>
-          {protocolOptions.map((p) => (
-            <option key={String(p.id)} value={String(p.id)}>{p.name}</option>
-          ))}
-        </select>
-      </VtField>
+      <Form.Item label={t("ingest.gateways.protocol")} required {...drawerFormItemProps}>
+        <Select
+          value={d.protocolId || undefined}
+          placeholder={d.networkId ? t("common.select") : t("ingest.gateways.selectNetworkFirst")}
+          disabled={!d.networkId || optionsLoading}
+          onChange={(protocolId) => set("protocolId", protocolId)}
+          options={protocolOptions.map((p) => ({
+            value: String(p.id),
+            label: p.name ?? "",
+          }))}
+        />
+      </Form.Item>
 
-      <VtField label={t("common.status")}>
-        <button
-          type="button"
-          onClick={() => set("enabled", !d.enabled)}
-          className={`inline-flex h-6 w-12 items-center rounded-full px-0.5 transition ${d.enabled ? "bg-primary justify-end" : "bg-panel-heavy justify-start"}`}
-        >
-          <span className="h-5 w-5 rounded-full bg-white shadow" />
-        </button>
-        <span className="ml-2 text-xs text-text-secondary">{d.enabled ? t("common.on") : t("common.off")}</span>
-      </VtField>
-    </VtDrawer>
+      <Form.Item label={t("common.status")} {...drawerFormItemProps}>
+        <Switch checked={d.enabled} onChange={(enabled) => set("enabled", enabled)} />
+        <span className="ml-2 text-xs text-text-secondary">
+          {d.enabled ? t("common.on") : t("common.off")}
+        </span>
+      </Form.Item>
+    </Drawer>
   );
 }
 
 type BoardItem = { id: string; name: string };
 
-function ZhaoDialog({ gateway, onClose }: { gateway: GatewayListRow; onClose: () => void }) {
+function ZhaoDrawer({ gateway, onClose }: { gateway: GatewayListRow; onClose: () => void }) {
   const { t } = useTranslation();
-  const netId = gateway.raw.networkConfigPo?.id;
-  const cfg = (gateway.raw.networkConfigPo?.configuration ?? {}) as MqttClientConfiguration;
-  const boards: BoardItem[] = (cfg.boards ?? []).map((b) => ({ id: String(b.id ?? ""), name: b.name ?? "" }));
+  const network = networkPoFromGatewayDto(gateway.raw);
+  const netId = network?.id;
+  const boards = useMemo<BoardItem[]>(() => {
+    const cfg = (network?.configuration ?? {}) as MqttClientConfiguration;
+    return (cfg.boards ?? []).map((b) => ({ id: String(b.id ?? ""), name: b.name ?? "" }));
+  }, [network?.configuration]);
 
   const [checked, setChecked] = useState<string[]>([]);
   const [from, setFrom] = useState(() => {
@@ -389,12 +451,18 @@ function ZhaoDialog({ gateway, onClose }: { gateway: GatewayListRow; onClose: ()
   });
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
-  const [records, setRecords] = useState<Array<{ time: string; name: string; device: string; sn: string; status: string }>>([]);
+  const [records, setRecords] = useState<
+    Array<{ time: string; name: string; device: string; sn: string; status: string }>
+  >([]);
   const [loading, setLoading] = useState(false);
-  const pageSize = 10;
+  const tableScrollY = Math.max(240, Math.min(640, useTableHeight(420)));
 
-  const boardNameMap = useMemo(() => Object.fromEntries(boards.map((b) => [b.id, b.name])), [boards]);
+  const boardNameMap = useMemo(
+    () => Object.fromEntries(boards.map((b) => [b.id, b.name])),
+    [boards],
+  );
 
   const fetchRecords = useCallback(async () => {
     if (!netId) return;
@@ -429,7 +497,7 @@ function ZhaoDialog({ gateway, onClose }: { gateway: GatewayListRow; onClose: ()
     } finally {
       setLoading(false);
     }
-  }, [boardNameMap, from, netId, page, to]);
+  }, [boardNameMap, from, netId, page, pageSize, to]);
 
   useEffect(() => {
     void fetchRecords();
@@ -438,41 +506,69 @@ function ZhaoDialog({ gateway, onClose }: { gateway: GatewayListRow; onClose: ()
   useEffect(() => {
     if (!netId) return;
     stompManager.connect();
-    const subId = stompManager.subscribe(
-      { destination: `/topic/board_network_${netId}` },
-      () => { /* topic heartbeat */ },
-    );
+    const subId = stompManager.subscribe({ destination: `/topic/board_network_${netId}` }, () => {
+      /* topic heartbeat */
+    });
     return () => {
       stompManager.unsubscribe(subId);
     };
   }, [netId]);
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
-  type RecruitRecord = { key: number; time: string; name: string; device: string; sn: string; status: string };
+  type RecruitRecord = {
+    key: number;
+    time: string;
+    name: string;
+    device: string;
+    sn: string;
+    status: string;
+  };
   const recordRows: RecruitRecord[] = records.map((r, i) => ({ key: i, ...r }));
-  const recordColumns: ColumnsType<RecruitRecord> = [
-    { key: "time", title: t("ingest.gateways.time"), dataIndex: "time", render: (v) => <span className="text-text-secondary">{v}</span> },
-    { key: "name", title: t("ingest.gateways.recruitName"), dataIndex: "name" },
-    { key: "device", title: t("ingest.gateways.deviceName"), dataIndex: "device", render: (v) => <span className="text-text-secondary">{v}</span> },
-    { key: "sn", title: t("ingest.gateways.deviceSn"), dataIndex: "sn", render: (v) => <span className="text-text-secondary">{v}</span> },
-    {
-      key: "status",
-      title: t("common.status"),
-      dataIndex: "status",
-      render: (status: string) => (
-        <span className={`rounded px-2 py-0.5 ${
-          status === "success"
-            ? "bg-status-online/15 text-status-online"
-            : status === "timeout"
-              ? "bg-status-warning/15 text-status-warning"
-              : "bg-panel text-text-secondary"
-        }`}>
-          {status === "success" ? t("common.success") : status === "timeout" ? t("common.timeout") : status}
-        </span>
-      ),
-    },
-  ];
+  const recordColumns: ColumnsType<RecruitRecord> = useMemo(
+    () => [
+      {
+        key: "time",
+        title: t("ingest.gateways.time"),
+        dataIndex: "time",
+        render: (v) => <span className="text-text-secondary">{v}</span>,
+      },
+      { key: "name", title: t("ingest.gateways.recruitName"), dataIndex: "name" },
+      {
+        key: "device",
+        title: t("ingest.gateways.deviceName"),
+        dataIndex: "device",
+        render: (v) => <span className="text-text-secondary">{v}</span>,
+      },
+      {
+        key: "sn",
+        title: t("ingest.gateways.deviceSn"),
+        dataIndex: "sn",
+        render: (v) => <span className="text-text-secondary">{v}</span>,
+      },
+      {
+        key: "status",
+        title: t("common.status"),
+        dataIndex: "status",
+        render: (status: string) => (
+          <span
+            className={`rounded px-2 py-0.5 ${
+              status === "success"
+                ? "bg-status-online/15 text-status-online"
+                : status === "timeout"
+                  ? "bg-status-warning/15 text-status-warning"
+                  : "bg-panel text-text-secondary"
+            }`}
+          >
+            {status === "success"
+              ? t("common.success")
+              : status === "timeout"
+                ? t("common.timeout")
+                : status}
+          </span>
+        ),
+      },
+    ],
+    [t],
+  );
 
   const toggleBoard = (id: string) => {
     setChecked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -480,88 +576,132 @@ function ZhaoDialog({ gateway, onClose }: { gateway: GatewayListRow; onClose: ()
 
   const handleSend = () => {
     if (!netId || checked.length === 0) {
-      toast.error(t("ingest.gateways.recruitPickHint"));
+      showError(t("ingest.gateways.recruitPickHint"));
       return;
     }
     if (!stompManager.isConnected) {
-      toast.error(t("common.loadFailed"));
+      showError(t("common.loadFailed"));
       return;
     }
     const payload = checked.map((id) => ({ netId: toDbId(netId), data: { id } }));
     stompManager.send("/queue/queue_stomp_board", payload, { "reply-to": "/temp-queue/foo" });
-    toast.success(t("ingest.gateways.recruitSent", { items: checked.map((id) => boardNameMap[id] ?? id).join(", ") }));
+    showSuccess(
+      t("ingest.gateways.recruitSent", {
+        items: checked.map((id) => boardNameMap[id] ?? id).join(", "),
+      }),
+    );
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex max-h-[85vh] w-[760px] flex-col overflow-hidden rounded-lg border border-panel-border bg-background shadow-2xl">
-        <header className="flex items-center justify-between border-b border-panel-border px-5 py-3">
-          <h3 className="font-heading text-sm font-semibold tracking-wider text-foreground">
-            {t("ingest.gateways.recruitTitle", { name: gateway.name })}
-          </h3>
-          <button type="button" onClick={onClose} className="rounded p-1 text-text-muted hover:bg-panel hover:text-foreground">
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          {boards.length === 0 ? (
-            <div className="mb-4 text-xs text-text-muted">{t("common.noData")}</div>
-          ) : (
-            <div className="mb-4 flex flex-wrap gap-3">
-              {boards.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => toggleBoard(b.id)}
-                  className={`flex items-center gap-2 rounded border px-3 py-1.5 text-xs ${
-                    checked.includes(b.id) ? "border-primary/60 bg-primary/10 text-primary" : "border-panel-border text-text-secondary"
+    <Drawer
+      open
+      onClose={onClose}
+      title={t("ingest.gateways.recruitTitle", { name: gateway.name })}
+      width={760}
+      destroyOnHidden
+      classNames={{ body: "vt-drawer-fill-body" }}
+      styles={{ body: { paddingTop: 8 } }}
+      footer={drawerFooter([
+        { key: "close", label: t("common.close"), onClick: onClose },
+        {
+          key: "send",
+          label: t("ingest.gateways.recruitSend"),
+          type: "primary",
+          disabled: checked.length === 0,
+          onClick: handleSend,
+        },
+      ])}
+    >
+      <div className="flex min-h-0 flex-1 flex-col">
+        {boards.length === 0 ? (
+          <div className="mb-4 shrink-0 text-xs text-text-muted">{t("common.noData")}</div>
+        ) : (
+          <div className="mb-4 flex shrink-0 flex-wrap gap-3">
+            {boards.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => toggleBoard(b.id)}
+                className={`flex items-center gap-2 rounded border px-3 py-1.5 text-xs ${
+                  checked.includes(b.id)
+                    ? "border-primary/60 bg-primary/10 text-primary"
+                    : "border-panel-border text-text-secondary"
+                }`}
+              >
+                <span
+                  className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${
+                    checked.includes(b.id)
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-panel-border"
                   }`}
                 >
-                  <span className={`flex h-3.5 w-3.5 items-center justify-center rounded border ${
-                    checked.includes(b.id) ? "border-primary bg-primary text-primary-foreground" : "border-panel-border"
-                  }`}>{checked.includes(b.id) ? "✓" : ""}</span>
-                  {b.name}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="mb-2 text-xs font-semibold text-foreground">{t("common.record")}</div>
-
-          <div className="mb-3 flex w-fit items-center gap-2 rounded-md border border-panel-border bg-background/40 px-2 py-1.5 text-xs text-text-secondary">
-            <CalendarDays className="h-3.5 w-3.5 text-text-muted" />
-            <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} className="bg-transparent text-foreground outline-none" />
-            <span>{t("common.dateTo")}</span>
-            <input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} className="bg-transparent text-foreground outline-none" />
+                  {checked.includes(b.id) ? "✓" : ""}
+                </span>
+                {b.name}
+              </button>
+            ))}
           </div>
+        )}
 
+        <div className="mb-2 shrink-0 text-xs font-semibold text-foreground">
+          {t("common.record")}
+        </div>
+
+        <div className="mb-3 flex w-fit shrink-0 items-center gap-2 rounded-md border border-panel-border bg-background/40 px-2 py-1.5 text-xs text-text-secondary">
+          <CalendarOutlined className="text-sm text-text-muted" />
+          <DatePicker.RangePicker
+            size="small"
+            value={[from ? dayjs(from) : null, to ? dayjs(to) : null]}
+            onChange={(dates) => {
+              setFrom(dates?.[0]?.format("YYYY-MM-DD") ?? from);
+              setTo(dates?.[1]?.format("YYYY-MM-DD") ?? to);
+              setPage(1);
+            }}
+          />
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="overflow-hidden rounded-md border border-panel-border">
-            <VtDataTable<RecruitRecord>
+            <Table<RecruitRecord>
               rowKey="key"
               size="small"
               loading={loading}
+              tableLayout="fixed"
               pagination={false}
+              className="vt-ant-data-table"
               columns={recordColumns}
               dataSource={recordRows}
+              scroll={{ x: "max-content", y: tableScrollY }}
               locale={{ emptyText: t("common.noData") }}
             />
           </div>
 
-          <div className="mt-3 flex items-center justify-center gap-1">
-            <button type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="flex h-7 w-7 items-center justify-center rounded border border-panel-border bg-panel text-text-secondary disabled:opacity-40">‹</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button key={p} type="button" onClick={() => setPage(p)} className={`h-7 min-w-[28px] rounded px-2 text-xs ${page === p ? "bg-primary text-primary-foreground" : "border border-panel-border bg-panel text-text-secondary"}`}>{p}</button>
-            ))}
-            <button type="button" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))} className="flex h-7 w-7 items-center justify-center rounded border border-panel-border bg-panel text-text-secondary disabled:opacity-40">›</button>
+          <div className="vt-table-pagination-bar shrink-0 border-t border-panel-border px-0 py-2">
+            <Pagination
+              className="vt-ant-pagination"
+              size="small"
+              current={page}
+              pageSize={pageSize}
+              total={total}
+              showSizeChanger
+              pageSizeOptions={[10, 20, 50, 100]}
+              hideOnSinglePage={false}
+              onChange={(p, s) => {
+                if (s !== pageSize) {
+                  setPageSize(s);
+                  setPage(1);
+                } else {
+                  setPage(p);
+                }
+              }}
+              onShowSizeChange={(_current, s) => {
+                setPageSize(s);
+                setPage(1);
+              }}
+            />
           </div>
         </div>
-
-        <footer className="flex justify-end gap-2 border-t border-panel-border px-5 py-3">
-          <VtBtn onClick={handleSend}>{t("ingest.gateways.recruitSend")}</VtBtn>
-        </footer>
       </div>
-    </div>
+    </Drawer>
   );
 }

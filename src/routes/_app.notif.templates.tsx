@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Drawer, Form, Input, Select } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { showError, showSuccess } from "@/lib/api-message";
 import {
   deleteNotifyTemplate,
-  getNotifySupport,
   pageNotifyConfigs,
   pageNotifyTemplates,
   saveNotifyTemplate,
@@ -12,8 +13,6 @@ import {
 } from "@/api";
 import { pageUsers } from "@/api/sys";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { VtDrawer, VtField, vtInputCls, VtBtn } from "@/components/vt-drawer";
 import {
   blankTemplateForm,
   buildTemplateTestPayload,
@@ -24,11 +23,12 @@ import {
   type NotifyChannelCode,
   type TemplateEditorForm,
   type TemplateListRow,
-} from "@/lib/notify-mappers";
-import { termEq, termLike } from "@/lib/query-terms";
+} from "@/features/notif/lib/notify-mappers";
+import { termEqId, termLike } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
+import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { useTranslation } from "@/i18n";
-import type { NotifySupportItem, PageQuery, SysUserPageDto } from "@/types";
+import type { PageQuery, SysUserPageDto } from "@/types";
 
 export const Route = createFileRoute("/_app/notif/templates")({
   component: NotifyTemplatesPage,
@@ -42,19 +42,16 @@ function NotifyTemplatesPage() {
   const { t } = useTranslation();
   const [rows, setRows] = useState<TemplateListRow[]>([]);
   const [configs, setConfigs] = useState<ConfigOption[]>([]);
-  const [support, setSupport] = useState<NotifySupportItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const pageSize = 10;
+  const pageSize = DEFAULT_PAGE_SIZE;
 
   const [filterDraft, setFilterDraft] = useState({ name: "" });
   const [filterApplied, setFilterApplied] = useState({ name: "" });
 
-  const [pickingConfig, setPickingConfig] = useState(false);
+  const [addingOpen, setAddingOpen] = useState(false);
   const [editing, setEditing] = useState<TemplateEditorForm | null>(null);
-  const [adding, setAdding] = useState<TemplateEditorForm | null>(null);
-  const [delTarget, setDelTarget] = useState<TemplateListRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
@@ -65,7 +62,12 @@ function NotifyTemplatesPage() {
 
   const fetchConfigs = useCallback(async () => {
     try {
-      const result = await pageNotifyConfigs({ current: 1, size: -1, terms: [], sorts: DEFAULT_SORTS });
+      const result = await pageNotifyConfigs({
+        current: 1,
+        size: -1,
+        terms: [],
+        sorts: DEFAULT_SORTS,
+      });
       const list = result.records ?? result.data ?? [];
       setConfigs(
         list.map((dto) => ({
@@ -76,7 +78,7 @@ function NotifyTemplatesPage() {
       );
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : t("notif.templates.loadConfigsFailed"));
+      showError(err instanceof Error ? err.message : t("notif.templates.loadConfigsFailed"));
     }
   }, [t]);
 
@@ -100,18 +102,13 @@ function NotifyTemplatesPage() {
       if (isRequestCanceled(err)) return;
       setRows([]);
       setTotal(0);
-      toast.error(err instanceof Error ? err.message : t("notif.templates.loadFailed"));
+      showError(err instanceof Error ? err.message : t("notif.templates.loadFailed"));
     } finally {
       setLoading(false);
     }
   }, [filterApplied.name, page, t]);
 
   useEffect(() => {
-    void getNotifySupport()
-      .then(setSupport)
-      .catch((err) => {
-        if (isRequestCanceled(err)) return;
-      });
     void fetchConfigs();
   }, [fetchConfigs]);
 
@@ -122,7 +119,7 @@ function NotifyTemplatesPage() {
   const openEdit = async (row: TemplateListRow) => {
     setLoadingDetail(true);
     try {
-      const detail = await searchNotifyTemplateOne({ terms: [termEq("t.id", row.id)] });
+      const detail = await searchNotifyTemplateOne({ terms: [termEqId("t.id", row.id)] });
       if (detail) setEditing(mapTemplateDtoToEditorForm(detail));
       else setEditing(mapTemplateDtoToEditorForm(row.raw));
     } catch (err) {
@@ -137,28 +134,26 @@ function NotifyTemplatesPage() {
     setSaving(true);
     try {
       await saveNotifyTemplate(mapTemplateEditorFormToPo(form));
-      toast.success(t("common.saveSuccess"));
+      showSuccess(t("common.saveSuccess"));
       setEditing(null);
-      setAdding(null);
+      setAddingOpen(false);
       await fetchRows();
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : t("notif.templates.saveFailed"));
+      showError(err instanceof Error ? err.message : t("notif.templates.saveFailed"));
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!delTarget) return;
+  const handleDelete = async (row: TemplateListRow) => {
     try {
-      await deleteNotifyTemplate(delTarget.id);
-      toast.success(t("common.deleteSuccess"));
-      setDelTarget(null);
+      await deleteNotifyTemplate(row.id);
+      showSuccess(t("common.deleteSuccess"));
       await fetchRows();
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : t("notif.templates.deleteFailed"));
+      showError(err instanceof Error ? err.message : t("notif.templates.deleteFailed"));
     }
   };
 
@@ -179,7 +174,7 @@ function NotifyTemplatesPage() {
             title: t("notif.templates.templateType"),
             render: (r) => (
               <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] text-primary">
-                {codeLabel(r.configCode, support)}
+                {codeLabel(r.configCode)}
               </span>
             ),
           },
@@ -188,12 +183,16 @@ function NotifyTemplatesPage() {
           {
             key: "createTime",
             title: t("notif.templates.createTime"),
-            render: (r) => <span className="font-mono text-xs text-text-secondary">{r.createTime}</span>,
+            render: (r) => (
+              <span className="font-mono text-xs text-text-secondary">{r.createTime}</span>
+            ),
           },
           {
             key: "updateTime",
             title: t("notif.templates.updateTime"),
-            render: (r) => <span className="font-mono text-xs text-text-secondary">{r.updateTime}</span>,
+            render: (r) => (
+              <span className="font-mono text-xs text-text-secondary">{r.updateTime}</span>
+            ),
           },
         ]}
         rows={rows}
@@ -213,67 +212,63 @@ function NotifyTemplatesPage() {
           setFilterApplied({ name: "" });
           setPage(1);
         }}
-        onAdd={() => setPickingConfig(true)}
+        onAdd={() => setAddingOpen(true)}
         rowActions={(r) => (
           <>
             <RowBtn onClick={() => void openEdit(r)}>{t("common.edit")}</RowBtn>
-            <RowBtn danger onClick={() => setDelTarget(r)}>{t("common.delete")}</RowBtn>
+            <RowBtn
+              danger
+              confirm={{
+                description: t("common.confirmDeleteDesc", {
+                  target: t("notif.templates.deleteTarget"),
+                  name: r.name,
+                }),
+              }}
+              onClick={() => void handleDelete(r)}
+            >
+              {t("common.delete")}
+            </RowBtn>
           </>
         )}
       />
 
-      {pickingConfig && (
-        <AddTemplateDialog
+      {addingOpen && (
+        <AddTemplateDrawer
           configs={configs}
-          onCancel={() => setPickingConfig(false)}
-          onNext={(name, configId) => {
+          saving={saving}
+          onCancel={() => setAddingOpen(false)}
+          onSave={(name, configId) => {
             const cfg = configById[configId];
-            setPickingConfig(false);
-            setAdding(blankTemplateForm(name, configId, cfg?.code ?? "email"));
+            void handleSave(blankTemplateForm(name, configId, cfg?.code ?? "aws-email"));
           }}
         />
       )}
 
-      {(editing || adding) && (
+      {editing && (
         <TemplateDrawer
-          mode={adding ? "add" : "edit"}
-          value={editing ?? adding!}
+          mode="edit"
+          value={editing}
           configs={configs}
-          support={support}
           saving={saving}
-          onClose={() => {
-            setEditing(null);
-            setAdding(null);
-          }}
+          onClose={() => setEditing(null)}
           onSave={handleSave}
         />
       )}
 
-      {delTarget && (
-        <ConfirmDialog
-          open
-          title={t("common.confirmDelete")}
-          description={t("common.confirmDeleteDesc", {
-            target: t("notif.templates.deleteTarget"),
-            name: delTarget.name,
-          })}
-          danger
-          onClose={() => setDelTarget(null)}
-          onConfirm={() => void handleDelete()}
-        />
-      )}
     </>
   );
 }
 
-function AddTemplateDialog({
+function AddTemplateDrawer({
   configs,
+  saving,
   onCancel,
-  onNext,
+  onSave,
 }: {
   configs: ConfigOption[];
+  saving: boolean;
   onCancel: () => void;
-  onNext: (name: string, configId: string) => void;
+  onSave: (name: string, configId: string) => void;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
@@ -281,40 +276,40 @@ function AddTemplateDialog({
   const valid = name.trim() && configId;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-[460px] overflow-hidden rounded-lg border border-panel-border bg-background shadow-2xl">
-        <header className="flex items-center justify-between border-b border-panel-border px-5 py-3">
-          <h3 className="font-heading text-sm font-semibold tracking-wider text-foreground">
-            {t("notif.templates.addTitle")}
-          </h3>
-        </header>
-        <div className="space-y-4 px-5 py-5">
-          <VtField label={t("notif.templates.notifyName")} required>
-            <input
-              className={vtInputCls}
-              placeholder={t("notif.templates.notifyNamePlaceholder")}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </VtField>
-          <VtField label={t("notif.templates.notifyConfig")} required>
-            <select className={vtInputCls} value={configId} onChange={(e) => setConfigId(e.target.value)}>
-              <option value="">{t("common.select")}</option>
-              {configs.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </VtField>
-        </div>
-        <footer className="flex justify-end gap-2 border-t border-panel-border px-5 py-3">
-          <VtBtn variant="ghost" onClick={onCancel}>{t("common.cancel")}</VtBtn>
-          <VtBtn disabled={!valid} onClick={() => valid && onNext(name.trim(), configId)}>
-            {t("common.next")}
-          </VtBtn>
-        </footer>
-      </div>
-    </div>
+    <Drawer
+      open
+      onClose={onCancel}
+      title={t("notif.templates.addTitle")}
+      width={480}
+      destroyOnHidden
+      styles={{ body: { paddingTop: 8 } }}
+      footer={drawerFooter([
+        { key: "cancel", label: t("common.cancel"), onClick: onCancel },
+        {
+          key: "save",
+          label: saving ? t("common.saving") : t("common.save"),
+          type: "primary",
+          disabled: !valid || saving,
+          onClick: () => valid && onSave(name.trim(), configId),
+        },
+      ])}
+    >
+      <Form.Item label={t("notif.templates.notifyName")} required {...drawerFormItemProps}>
+        <Input
+          placeholder={t("notif.templates.notifyNamePlaceholder")}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </Form.Item>
+      <Form.Item label={t("notif.templates.notifyConfig")} required {...drawerFormItemProps}>
+        <Select
+          value={configId || undefined}
+          placeholder={t("common.select")}
+          onChange={setConfigId}
+          options={configs.map((c) => ({ value: c.id, label: c.name }))}
+        />
+      </Form.Item>
+    </Drawer>
   );
 }
 
@@ -322,7 +317,6 @@ function TemplateDrawer({
   mode,
   value,
   configs,
-  support,
   saving,
   onClose,
   onSave,
@@ -330,7 +324,6 @@ function TemplateDrawer({
   mode: "add" | "edit";
   value: TemplateEditorForm;
   configs: ConfigOption[];
-  support: NotifySupportItem[];
   saving: boolean;
   onClose: () => void;
   onSave: (t: TemplateEditorForm) => void;
@@ -371,59 +364,62 @@ function TemplateDrawer({
 
   return (
     <>
-      <VtDrawer
+      <Drawer
         open
         onClose={onClose}
         title={t("notif.templates.detailTitle")}
-        width={640}
-        footer={
-          <>
-            <VtBtn variant="ghost" onClick={onClose}>{t("common.cancel")}</VtBtn>
-            <VtBtn variant="ghost" onClick={() => setTestOpen(true)}>{t("common.test")}</VtBtn>
-            <VtBtn disabled={saving} onClick={() => onSave(d)}>
-              {saving ? t("common.saving") : t("notif.templates.saveTemplate")}
-            </VtBtn>
-          </>
-        }
+        width={testOpen ? 700 : 640}
+        destroyOnHidden
+        styles={{ body: { paddingTop: 8 } }}
+        footer={drawerFooter([
+          { key: "cancel", label: t("common.cancel"), onClick: onClose },
+          { key: "test", label: t("common.test"), onClick: () => setTestOpen(true) },
+          {
+            key: "save",
+            label: saving ? t("common.saving") : t("notif.templates.saveTemplate"),
+            type: "primary",
+            disabled: saving,
+            onClick: () => onSave(d),
+          },
+        ])}
       >
         <section className="mb-6">
           <h4 className="mb-4 border-b border-panel-border pb-2 text-sm font-semibold text-foreground">
             {t("notif.templates.basicInfo")}
           </h4>
-          <VtField label={t("notif.templates.templateName")} required>
-            <input className={vtInputCls} value={d.name} onChange={(e) => set("name", e.target.value)} />
-          </VtField>
-          <VtField label={t("notif.templates.notifyConfig")} required>
+          <Form.Item label={t("notif.templates.templateName")} required {...drawerFormItemProps}>
+            <Input value={d.name} onChange={(e) => set("name", e.target.value)} />
+          </Form.Item>
+          <Form.Item label={t("notif.templates.notifyConfig")} required {...drawerFormItemProps}>
             <div className="flex items-center gap-2">
               {cfg && (
                 <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] text-primary">
-                  {codeLabel(cfg.code, support)}
+                  {codeLabel(cfg.code)}
                 </span>
               )}
-              <select
-                className={vtInputCls}
+              <Select
+                className="flex-1"
                 disabled={mode === "edit"}
                 value={d.configId}
-                onChange={(e) => handleConfigChange(e.target.value)}
-              >
-                {configs.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+                onChange={handleConfigChange}
+                options={configs.map((c) => ({ value: c.id, label: c.name }))}
+              />
             </div>
-          </VtField>
-          <VtField label={t("notif.templates.contentTitle")} required>
-            <input className={vtInputCls} value={d.contentTitle} onChange={(e) => set("contentTitle", e.target.value)} />
-          </VtField>
-          <VtField label={t("notif.templates.contentBody")} required full>
-            <textarea
-              className={`${vtInputCls} h-28 py-2`}
+          </Form.Item>
+          <Form.Item label={t("notif.templates.contentTitle")} required {...drawerFormItemProps}>
+            <Input value={d.contentTitle} onChange={(e) => set("contentTitle", e.target.value)} />
+          </Form.Item>
+          <Form.Item label={t("notif.templates.contentBody")} required {...drawerFormItemProps}>
+            <Input.TextArea
+              rows={5}
               value={d.contentBody}
               onChange={(e) => set("contentBody", e.target.value)}
               placeholder={t("notif.templates.contentBodyPlaceholder")}
             />
-            <p className="mt-1 text-[11px] text-text-muted">{t("notif.templates.contentBodyHint")}</p>
-          </VtField>
+            <p className="mt-1 text-[11px] text-text-muted">
+              {t("notif.templates.contentBodyHint")}
+            </p>
+          </Form.Item>
         </section>
 
         <section className="mb-6">
@@ -434,14 +430,13 @@ function TemplateDrawer({
             <p className="text-xs text-text-muted">{t("notif.templates.noVarTokens")}</p>
           ) : (
             tokens.vars.map((v) => (
-              <VtField key={v} label={v}>
-                <input
-                  className={vtInputCls}
+              <Form.Item key={v} label={v} {...drawerFormItemProps}>
+                <Input
                   value={d.variables[v] ?? ""}
                   onChange={(e) => upsertVar(v, e.target.value)}
                   placeholder="none"
                 />
-              </VtField>
+              </Form.Item>
             ))
           )}
         </section>
@@ -454,23 +449,22 @@ function TemplateDrawer({
             <p className="text-xs text-text-muted">{t("notif.templates.noPointTokens")}</p>
           ) : (
             tokens.pts.map((p) => (
-              <VtField key={p} label={p}>
-                <input
-                  className={vtInputCls}
+              <Form.Item key={p} label={p} {...drawerFormItemProps}>
+                <Input
                   value={d.points[p] ?? ""}
                   onChange={(e) => upsertPt(p, e.target.value)}
                   placeholder="none"
                 />
-              </VtField>
+              </Form.Item>
             ))
           )}
         </section>
-      </VtDrawer>
+      </Drawer>
 
       {testOpen && (
-        <TestSendDialog
+        <TestSendDrawer
           form={d}
-          onCancel={() => setTestOpen(false)}
+          onClose={() => setTestOpen(false)}
           onSent={() => setTestOpen(false)}
         />
       )}
@@ -478,13 +472,13 @@ function TemplateDrawer({
   );
 }
 
-function TestSendDialog({
+function TestSendDrawer({
   form,
-  onCancel,
+  onClose,
   onSent,
 }: {
   form: TemplateEditorForm;
-  onCancel: () => void;
+  onClose: () => void;
   onSent: () => void;
 }) {
   const { t } = useTranslation();
@@ -498,7 +492,7 @@ function TestSendDialog({
       .then((res) => setUsers(res.records ?? res.data ?? []))
       .catch((err) => {
         if (isRequestCanceled(err)) return;
-        toast.error(err instanceof Error ? err.message : t("notif.templates.loadUsersFailed"));
+        showError(err instanceof Error ? err.message : t("notif.templates.loadUsersFailed"));
       })
       .finally(() => setLoadingUsers(false));
   }, [t]);
@@ -508,49 +502,49 @@ function TestSendDialog({
     setSending(true);
     try {
       await sendNotifyTemplateTest(buildTemplateTestPayload(form, receiver));
-      toast.success(t("notif.templates.testSent"));
+      showSuccess(t("notif.templates.testSent"));
       onSent();
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : t("notif.templates.testFailed"));
+      showError(err instanceof Error ? err.message : t("notif.templates.testFailed"));
     } finally {
       setSending(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-[460px] overflow-hidden rounded-lg border border-panel-border bg-background shadow-2xl">
-        <header className="flex items-center justify-between border-b border-panel-border px-5 py-3">
-          <h3 className="font-heading text-sm font-semibold tracking-wider text-foreground">
-            {t("notif.templates.testTitle")}
-          </h3>
-        </header>
-        <div className="px-5 py-5">
-          <VtField label={t("notif.templates.recipient")} required>
-            <select
-              className={vtInputCls}
-              value={receiver}
-              disabled={loadingUsers}
-              onChange={(e) => setReceiver(e.target.value)}
-            >
-              <option value="">{t("notif.templates.recipientPlaceholder")}</option>
-              {users.map((u) => (
-                <option key={String(u.sysUserPo.id)} value={String(u.sysUserPo.id)}>
-                  {u.sysUserPo.username}
-                </option>
-              ))}
-            </select>
-          </VtField>
-        </div>
-        <footer className="flex justify-end gap-2 border-t border-panel-border px-5 py-3">
-          <VtBtn variant="ghost" onClick={onCancel}>{t("common.cancel")}</VtBtn>
-          <VtBtn disabled={!receiver || sending} onClick={() => void handleSend()}>
-            {sending ? t("common.saving") : t("notif.templates.sendTest")}
-          </VtBtn>
-        </footer>
-      </div>
-    </div>
+    <Drawer
+      open
+      onClose={onClose}
+      title={t("notif.templates.testTitle")}
+      width={480}
+      zIndex={1100}
+      mask={false}
+      destroyOnHidden
+      styles={{ body: { paddingTop: 8 } }}
+      footer={drawerFooter([
+        { key: "cancel", label: t("common.cancel"), onClick: onClose },
+        {
+          key: "send",
+          label: sending ? t("common.saving") : t("notif.templates.sendTest"),
+          type: "primary",
+          disabled: !receiver || sending,
+          onClick: () => void handleSend(),
+        },
+      ])}
+    >
+      <Form.Item label={t("notif.templates.recipient")} required {...drawerFormItemProps}>
+        <Select
+          value={receiver || undefined}
+          disabled={loadingUsers}
+          placeholder={t("notif.templates.recipientPlaceholder")}
+          onChange={setReceiver}
+          options={users.map((u) => ({
+            value: String(u.sysUserPo.id),
+            label: u.sysUserPo.username,
+          }))}
+        />
+      </Form.Item>
+    </Drawer>
   );
 }

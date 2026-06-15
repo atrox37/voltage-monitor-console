@@ -1,0 +1,115 @@
+/* @layer components {
+  :where(
+    body,
+    .vt-scrollbar,
+    .vt-page-content,
+    .vt-ant-sider-menu,
+    .ant-layout-sider,
+    .ant-modal .ant-modal-body,
+    .ant-drawer .ant-drawer-body
+  ) {
+    scrollbar-gutter: stable !important;
+  }
+} */
+
+/* ============================================================
+   全局滚动条统一样式
+
+   关键：Ant Design v6 CSS-in-JS 会在组件上生成
+     scrollbar-color: var(--ant-xxx) var(--ant-yyy);
+   Chrome 121+ 中一旦元素存在非 auto 的 scrollbar-color，
+   所有 ::-webkit-scrollbar 伪元素自定义会被浏览器忽略。
+   因此必须先用 scrollbar-color: auto 全局重置，
+   再用 ::-webkit-scrollbar 伪元素接管样式。
+   ============================================================ */
+
+/* 重置：禁用 Ant Design 注入的 scrollbar-color，让 webkit 伪元素生效 */
+* {
+  scrollbar-color: auto !important;
+}
+
+*::-webkit-scrollbar {
+  width: var(--ant-scrollbar-size) !important;
+  height: var(--ant-scrollbar-size) !important;
+}
+
+*::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--ant-scrollbar-track) !important;
+  border-radius: 999px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    var(--ant-scrollbar-thumb),
+    color-mix(in oklab, var(--ant-scrollbar-thumb) 78%, white 8%)
+  ) !important;
+  border-radius: 999px !important;
+  border: 2px solid color-mix(in oklab, var(--ant-scrollbar-track) 82%, transparent) !important;
+  background-clip: padding-box !important;
+  min-height: 28px !important;
+  min-width: 28px !important;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    var(--ant-scrollbar-thumb-hover),
+    color-mix(in oklab, var(--ant-scrollbar-thumb-hover) 84%, white 6%)
+  ) !important;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent !important;
+}
+
+/* Firefox：webkit 伪元素不生效，用标准属性 */
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-width: thin !important;
+    scrollbar-color: var(--ant-scrollbar-thumb) var(--ant-scrollbar-track) !important;
+  }
+}
+
+/* ============================================================
+   Ant Design sticky 横向滚动条 — 与上方全局样式统一
+   ============================================================ */
+/* @layer components {
+  .ant-table-sticky-scroll {
+    height: var(--ant-scrollbar-size) !important;
+    background: var(--ant-scrollbar-track) !important;
+    border-top: none !important;
+  }
+
+  .ant-table-sticky-scroll-bar {
+    height: calc(var(--ant-scrollbar-size) - 4px) !important;
+    top: 2px !important;
+    bottom: auto !important;
+    border-radius: 999px !important;
+    background: linear-gradient(
+      90deg,
+      var(--ant-scrollbar-thumb),
+      color-mix(in oklab, var(--ant-scrollbar-thumb) 78%, white 8%)
+    ) !important;
+    border: 2px solid color-mix(in oklab, var(--ant-scrollbar-track) 82%, transparent) !important;
+    background-clip: padding-box !important;
+  }
+
+  .ant-table-sticky-scroll:hover .ant-table-sticky-scroll-bar,
+  .ant-table-sticky-scroll-bar:hover,
+  .ant-table-sticky-scroll-bar-active {
+    background: linear-gradient(
+      90deg,
+      var(--ant-scrollbar-thumb-hover),
+      color-mix(in oklab, var(--ant-scrollbar-thumb-hover) 84%, white 6%)
+    ) !important;
+  }
+} */

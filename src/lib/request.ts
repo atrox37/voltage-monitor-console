@@ -1,6 +1,6 @@
 import axios from "axios";
 import type { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from "axios";
-import { toast } from "sonner";
+import { getApiMessage, showError } from "@/lib/api-message";
 import type { ApiResponse } from "@/types";
 import { getAuthToken } from "@/lib/auth-token";
 
@@ -89,7 +89,7 @@ class RequestService {
 
         if (data.code !== 200) {
           const errMsg = data.msg || data.message || "请求失败";
-          toast.error(errMsg);
+          showError(errMsg);
           return Promise.reject(new Error(errMsg));
         }
 
@@ -121,7 +121,7 @@ class RequestService {
           axiosError.code === "ECONNABORTED" ||
           axiosError.message?.includes("timeout")
         ) {
-          toast.error("请求超时");
+          showError(getApiMessage(null, "请求超时"));
           return Promise.reject(error);
         }
 
@@ -163,9 +163,9 @@ class RequestService {
           });
         }
 
-        if (status === 403) toast.error("无权限访问");
-        else if (status === 404) toast.error("资源不存在");
-        else if (status === 500) toast.error("服务器内部错误");
+        if (status === 403) showError("无权限访问");
+        else if (status === 404) showError("资源不存在");
+        else if (status === 500) showError("服务器内部错误");
 
         return Promise.reject(error);
       },

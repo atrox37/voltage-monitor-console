@@ -1,0 +1,312 @@
+﻿@layer components {
+  .vt-glass {
+    position: relative;
+    background: var(--panel);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    background-clip: padding-box;
+  }
+
+  /* .vt-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      117deg,
+      oklch(0.78 0.04 255 / 0.35) 0%,
+      oklch(0.78 0.04 255 / 0) 35%,
+      oklch(0.78 0.04 255 / 0.08) 65%,
+      oklch(0.78 0.04 255 / 0.35) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  } */
+
+  .vt-glass-strong {
+    background: var(--panel-strong);
+  }
+  .vt-glass-heavy {
+    background: var(--panel-heavy);
+  }
+
+  .vt-page-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .vt-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 56px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 100;
+  }
+
+  .vt-page-main {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 0;
+  }
+
+  .vt-page-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    padding: 20px 24px 24px;
+  }
+
+  .vt-page-fill {
+    overflow: hidden;
+  }
+
+  .vt-table-head {
+    background: #192237;
+  }
+
+  .vt-table-head th {
+    background: #192237;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--panel-border);
+    font-weight: 500;
+  }
+
+  .vt-table-panel {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: var(--radius);
+    border: 1px solid var(--panel-border);
+    background: #141b2e;
+  }
+
+  .vt-table-panel__toolbar {
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--panel-border);
+    background: #192237;
+  }
+
+  .vt-table-scroll-area {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .vt-table-head-wrap {
+    flex-shrink: 0;
+    overflow: hidden;
+    border-bottom: 1px solid var(--panel-border);
+  }
+
+  .vt-table-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    background: #141b2e;
+  }
+
+  .vt-table-panel__footer {
+    flex-shrink: 0;
+    border-top: 1px solid var(--panel-border);
+    background: #141b2e;
+  }
+
+  .vt-data-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.875rem;
+  }
+
+  .vt-data-table .vt-col-actions {
+    width: 9rem;
+  }
+
+  .vt-data-table .vt-cell-actions {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: #141b2e;
+    box-shadow: -6px 0 10px oklch(0 0 0 / 0.18);
+  }
+
+  .vt-table-head .vt-cell-actions {
+    z-index: 3;
+    background: #192237;
+  }
+
+  .vt-data-table tbody tr:hover .vt-cell-actions {
+    background: oklch(0.36 0.045 270 / 0.55);
+  }
+
+  .vt-data-table tbody tr {
+    border-top: 1px solid oklch(0.78 0.04 255 / 0.12);
+    transition: background-color 0.15s ease;
+  }
+
+  .vt-data-table tbody tr:hover {
+    background: oklch(0.36 0.045 270 / 0.35);
+  }
+
+  .vt-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+  }
+
+  .vt-section-title {
+    position: relative;
+    padding-left: 12px;
+    font-family: var(--font-heading);
+    font-weight: 600;
+    color: var(--foreground);
+  }
+
+  .vt-section-title::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 3px;
+    height: 14px;
+    transform: translateY(-50%);
+    background: var(--primary);
+    border-radius: 1px;
+  }
+
+  .vt-kpi-value {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    color: var(--foreground);
+    line-height: 1;
+    letter-spacing: 0.02em;
+  }
+
+  .vt-kpi-unit {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    margin-left: 4px;
+  }
+
+  .alarm-level--1 {
+    color: var(--status-critical);
+  }
+  .alarm-level--2 {
+    color: var(--status-warning);
+  }
+  .alarm-level--3 {
+    color: var(--status-info);
+  }
+
+  /* 详情页表格外功能按钮：白字白图标 */
+  .vt-detail-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: none;
+    border-radius: 0.25rem;
+    background: var(--primary);
+    color: #fff;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+
+  .vt-detail-action-btn:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  .vt-detail-action-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .vt-detail-action-btn .anticon {
+    color: currentColor;
+  }
+
+  .vt-detail-outline-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--panel-border);
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    transition:
+      border-color 0.15s ease,
+      opacity 0.15s ease;
+  }
+
+  .vt-detail-outline-btn:hover:not(:disabled) {
+    border-color: oklch(0.72 0.18 50 / 0.45);
+  }
+
+  .vt-detail-outline-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .vt-detail-outline-btn .anticon {
+    color: currentColor;
+  }
+
+  .vt-detail-outline-btn--danger:hover:not(:disabled) {
+    border-color: oklch(0.62 0.22 25 / 0.55);
+    color: var(--status-critical);
+  }
+
+  .vt-detail-icon-btn {
+    border: none;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: oklch(1 0 0 / 0.75);
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease;
+  }
+
+  .vt-detail-icon-btn:hover:not(:disabled) {
+    color: #fff;
+    background: oklch(1 0 0 / 0.08);
+  }
+
+  .vt-detail-icon-btn--danger:hover:not(:disabled) {
+    color: var(--status-critical);
+    background: oklch(0.62 0.22 25 / 0.12);
+  }
+
+  .vt-detail-icon-btn .anticon {
+    color: currentColor;
+  }
+}

@@ -1,3 +1,5 @@
+import { getLocale } from "@/i18n";
+
 /** 数据类型 — 对齐 model/device/DeviceUnit.ts deviceUnits + unitApi */
 export type DataTypeOption = { id: string; name: string };
 
@@ -51,10 +53,11 @@ export const PROPERTY_RW: { label: string; value: string }[] = [
   { label: "无", value: "none" },
 ];
 
-export function unitLabel(unit: string | null | undefined): string {
+export function unitLabel(unit: string | null | undefined, _loc = getLocale()): string {
   if (!unit) return "—";
   const hit = DATA_UNITS.find((u) => u.unit.toLowerCase() === String(unit).toLowerCase());
-  return hit ? `${hit.en} (${hit.unit})` : unit;
+  if (!hit) return unit;
+  return hit.unit || "—";
 }
 
 export function defaultPropertyValueType(type = "string") {
@@ -62,7 +65,11 @@ export function defaultPropertyValueType(type = "string") {
     return { type: "number" as const, extra: { point: 1 }, unit: "" };
   }
   if (type === "enum") {
-    return { type: "enum" as const, extra: { enumData: [] as { key: string; value: string }[] }, unit: "" };
+    return {
+      type: "enum" as const,
+      extra: { enumData: [] as { key: string; value: string }[] },
+      unit: "",
+    };
   }
   return { type: "string" as const, extra: { length: null as null }, unit: "" };
 }

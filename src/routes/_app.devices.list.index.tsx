@@ -1,19 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Button, Drawer, Form, Input, Select } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { showError, showSuccess } from "@/lib/api-message";
 import { deleteDevice, pageDevices, pageGateways, pageProducts, saveDevice } from "@/api";
+import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
 import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { VtDrawer, VtField, VtBtn, vtInputCls, vtSelectCls } from "@/components/vt-drawer";
 import {
   mapCreateFormToDevicePo,
   mapDeviceDtoToRow,
   type DeviceCreateForm,
   type DeviceListRow,
-} from "@/lib/device-mappers";
-import { PRODUCT_TYPE_LABEL, PRODUCT_TYPE_OPTIONS } from "@/lib/product-mappers";
+} from "@/features/devices/lib/device-mappers";
+import { PRODUCT_TYPE_LABEL, PRODUCT_TYPE_OPTIONS } from "@/features/products/lib/product-mappers";
 import { ALL_PAGE_QUERY, termEq, termLike } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
+import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import type { GatewayDto, PageQuery } from "@/types";
 
 export const Route = createFileRoute("/_app/devices/list/")({
@@ -33,7 +34,8 @@ function DevicesPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [sorts, setSorts] = useState<PageQuery["sorts"]>(DEFAULT_SORTS);
 
   const [filterDraft, setFilterDraft] = useState({ name: "", sn: "", productType: "", status: "" });
   const [filterApplied, setFilterApplied] = useState({ name: "", sn: "", productType: "", status: "" });
@@ -41,7 +43,6 @@ function DevicesPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<DeviceCreateForm>(emptyDraft());
   const [saving, setSaving] = useState(false);
-  const [delTarget, setDelTarget] = useState<DeviceListRow | null>(null);
 
   const goDetail = (id: string) => navigate({ to: "/devices/list/$id", params: { id } });
 
@@ -60,7 +61,7 @@ function DevicesPage() {
         current: page,
         size: pageSize,
         terms,
-        sorts: DEFAULT_SORTS,
+        sorts,
       });
       const list = result.records ?? result.data ?? [];
       setRows(list.map(mapDeviceDtoToRow));
@@ -69,11 +70,11 @@ function DevicesPage() {
       if (isRequestCanceled(err)) return;
       setRows([]);
       setTotal(0);
-      toast.error(err instanceof Error ? err.message : "加载设备列表失败");
+      showError(err instanceof Error ? err.message : "加载设备列表失败");
     } finally {
       setLoading(false);
     }
-  }, [filterApplied.name, filterApplied.sn, filterApplied.productType, filterApplied.status, page]);
+  }, [filterApplied.name, filterApplied.sn, filterApplied.productType, filterApplied.status, page, pageSize, sorts]);
 
   useEffect(() => {
     void pageProducts(ALL_PAGE_QUERY)
@@ -109,28 +110,26 @@ function DevicesPage() {
     setSaving(true);
     try {
       await saveDevice(mapCreateFormToDevicePo(draft));
-      toast.success("创建设备成功");
+      showSuccess("创建设备成功");
       setAddOpen(false);
       setDraft(emptyDraft());
       await fetchRows();
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : "创建设备失败");
+      showError(err instanceof Error ? err.message : "创建设备失败");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!delTarget) return;
+  const handleDelete = async (row: DeviceListRow) => {
     try {
-      await deleteDevice(delTarget.id);
-      toast.success("删除成功");
-      setDelTarget(null);
+      await deleteDevice(row.id);
+      showSuccess("删除成功");
       await fetchRows();
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      toast.error(err instanceof Error ? err.message : "删除设备失败");
+      showError(err instanceof Error ? err.message : "删除设备失败");
     }
   };
 
@@ -144,6 +143,15 @@ function DevicesPage() {
         pageSize={pageSize}
         totalCount={total}
         onPageChange={setPage}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+        sorts={sorts}
+        onSortsChange={(next) => {
+          setSorts(next.length ? next : DEFAULT_SORTS);
+          setPage(1);
+        }}
         onSearch={() => { setPage(1); setFilterApplied({ ...filterDraft }); }}
         onReset={() => {
           const empty = { name: "", sn: "", productType: "", status: "" };
@@ -161,16 +169,15 @@ function DevicesPage() {
           })
         }
         filters={[
-          { type: "text", key: "name", label: "设备名称", placeholder: "请输入设备名称" },
+          { type: "text", key: "name", label: "设备名称" },
           { type: "text", key: "sn", label: "SN" },
           {
             type: "select", key: "productType", label: "产品类型",
-            options: [{ label: "全部", value: "" }, ...PRODUCT_TYPE_OPTIONS],
+            options: PRODUCT_TYPE_OPTIONS.map((o) => ({ label: o.label, value: o.value })),
           },
           {
             type: "select", key: "status", label: "状态",
             options: [
-              { label: "全部", value: "" },
               { label: "在线", value: "online" },
               { label: "离线", value: "offline" },
             ],
@@ -218,8 +225,11 @@ function DevicesPage() {
             ),
           },
           {
-            key: "statusTime", title: "最近上报",
-            render: (r) => <span className="font-mono text-xs text-text-secondary">{r.statusTime}</span>,
+            key: "createTime",
+            title: "创建时间",
+            sortable: true,
+            sortKey: "t.create_time",
+            render: (r) => <span className="font-mono text-xs text-text-secondary">{r.createTime}</span>,
           },
         ]}
         rows={rows}
@@ -227,32 +237,43 @@ function DevicesPage() {
         rowActions={(r) => (
           <>
             <RowBtn onClick={() => goDetail(r.id)}>详情</RowBtn>
-            <RowBtn danger onClick={() => setDelTarget(r)}>删除</RowBtn>
+            <RowBtn
+              danger
+              confirm={{
+                description: (
+                  <>
+                    确定要删除设备 <span className="font-semibold text-foreground">「{r.name}」</span> 吗？该操作不可恢复。
+                  </>
+                ),
+              }}
+              onClick={() => void handleDelete(r)}
+            >
+              删除
+            </RowBtn>
           </>
         )}
       />
 
-      <VtDrawer
+      <Drawer
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title="新建设备"
-        footer={<>
-          <VtBtn variant="ghost" onClick={() => setAddOpen(false)}>关闭</VtBtn>
-          <VtBtn disabled={saving} onClick={() => void saveAdd()}>{saving ? "提交中…" : "保存提交"}</VtBtn>
-        </>}
+        width={480}
+        destroyOnHidden
+        styles={{ body: { paddingTop: 8 } }}
+        footer={drawerFooter([
+          { key: "close", label: "关闭", onClick: () => setAddOpen(false) },
+          {
+            key: "save",
+            label: saving ? "提交中…" : "保存提交",
+            type: "primary",
+            disabled: saving,
+            onClick: () => void saveAdd(),
+          },
+        ])}
       >
         <DeviceForm value={draft} onChange={setDraft} products={products} gateways={gateways} />
-      </VtDrawer>
-
-      <ConfirmDialog
-        open={!!delTarget}
-        title="确认删除"
-        description={delTarget ? <>确定要删除设备 <span className="font-semibold text-foreground">「{delTarget.name}」</span> 吗？该操作不可恢复。</> : null}
-        confirmText="删除"
-        danger
-        onConfirm={() => void handleDelete()}
-        onClose={() => setDelTarget(null)}
-      />
+      </Drawer>
     </>
   );
 }
@@ -270,35 +291,43 @@ function DeviceForm({
 
   return (
     <>
-      <VtField label="设备名称" required>
-        <input className={vtInputCls} value={value.name} placeholder="请输入设备名称"
-          onChange={(e) => onChange({ ...value, name: e.target.value })} />
-      </VtField>
-      <VtField label="SN" required>
-        <input className={vtInputCls} value={value.sn} placeholder="请输入设备 SN"
-          onChange={(e) => onChange({ ...value, sn: e.target.value })} />
-      </VtField>
-      <VtField label="所属产品" required>
-        <select className={vtSelectCls} value={value.productId}
-          onChange={(e) => onChange({ ...value, productId: e.target.value, gatewayId: "" })}>
-          <option value="">请选择产品</option>
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>{p.name} ({PRODUCT_TYPE_LABEL[p.type as keyof typeof PRODUCT_TYPE_LABEL] ?? p.type})</option>
-          ))}
-        </select>
-      </VtField>
+      <Form.Item label="设备名称" required {...drawerFormItemProps}>
+        <Input
+          value={value.name}
+          placeholder="请输入设备名称"
+          onChange={(e) => onChange({ ...value, name: e.target.value })}
+        />
+      </Form.Item>
+      <Form.Item label="SN" required {...drawerFormItemProps}>
+        <Input
+          value={value.sn}
+          placeholder="请输入设备 SN"
+          onChange={(e) => onChange({ ...value, sn: e.target.value })}
+        />
+      </Form.Item>
+      <Form.Item label="所属产品" required {...drawerFormItemProps}>
+        <Select
+          value={value.productId || undefined}
+          placeholder="请选择产品"
+          onChange={(productId) => onChange({ ...value, productId, gatewayId: "" })}
+          options={products.map((p) => ({
+            value: p.id,
+            label: `${p.name} (${PRODUCT_TYPE_LABEL[p.type as keyof typeof PRODUCT_TYPE_LABEL] ?? p.type})`,
+          }))}
+        />
+      </Form.Item>
       {showNetworkGateway && (
-        <VtField label="采集网关" required>
-          <select className={vtSelectCls} value={value.gatewayId}
-            onChange={(e) => onChange({ ...value, gatewayId: e.target.value })}>
-            <option value="">请选择采集网关</option>
-            {gateways.map((g) => (
-              <option key={g.gatewayPo?.id} value={String(g.gatewayPo?.id ?? "")}>
-                {g.gatewayPo?.name ?? "—"}
-              </option>
-            ))}
-          </select>
-        </VtField>
+        <Form.Item label="采集网关" required {...drawerFormItemProps}>
+          <Select
+            value={value.gatewayId || undefined}
+            placeholder="请选择采集网关"
+            onChange={(gatewayId) => onChange({ ...value, gatewayId })}
+            options={gateways.map((g) => ({
+              value: String(g.gatewayPo?.id ?? ""),
+              label: g.gatewayPo?.name ?? "—",
+            }))}
+          />
+        </Form.Item>
       )}
     </>
   );

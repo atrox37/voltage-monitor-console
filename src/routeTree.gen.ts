@@ -15,6 +15,7 @@ import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppSystemUsersRouteImport } from './routes/_app.system.users'
 import { Route as AppSystemRolesRouteImport } from './routes/_app.system.roles'
 import { Route as AppSystemOrgsRouteImport } from './routes/_app.system.orgs'
+import { Route as AppSystemAuditRouteImport } from './routes/_app.system.audit'
 import { Route as AppNotifTemplatesRouteImport } from './routes/_app.notif.templates'
 import { Route as AppNotifConfigsRouteImport } from './routes/_app.notif.configs'
 import { Route as AppIngestProtocolsRouteImport } from './routes/_app.ingest.protocols'
@@ -54,6 +55,11 @@ const AppSystemRolesRoute = AppSystemRolesRouteImport.update({
 const AppSystemOrgsRoute = AppSystemOrgsRouteImport.update({
   id: '/system/orgs',
   path: '/system/orgs',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSystemAuditRoute = AppSystemAuditRouteImport.update({
+  id: '/system/audit',
+  path: '/system/audit',
   getParentRoute: () => AppRoute,
 } as any)
 const AppNotifTemplatesRoute = AppNotifTemplatesRouteImport.update({
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/ingest/protocols': typeof AppIngestProtocolsRoute
   '/notif/configs': typeof AppNotifConfigsRoute
   '/notif/templates': typeof AppNotifTemplatesRoute
+  '/system/audit': typeof AppSystemAuditRoute
   '/system/orgs': typeof AppSystemOrgsRoute
   '/system/roles': typeof AppSystemRolesRoute
   '/system/users': typeof AppSystemUsersRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   '/ingest/protocols': typeof AppIngestProtocolsRoute
   '/notif/configs': typeof AppNotifConfigsRoute
   '/notif/templates': typeof AppNotifTemplatesRoute
+  '/system/audit': typeof AppSystemAuditRoute
   '/system/orgs': typeof AppSystemOrgsRoute
   '/system/roles': typeof AppSystemRolesRoute
   '/system/users': typeof AppSystemUsersRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/_app/ingest/protocols': typeof AppIngestProtocolsRoute
   '/_app/notif/configs': typeof AppNotifConfigsRoute
   '/_app/notif/templates': typeof AppNotifTemplatesRoute
+  '/_app/system/audit': typeof AppSystemAuditRoute
   '/_app/system/orgs': typeof AppSystemOrgsRoute
   '/_app/system/roles': typeof AppSystemRolesRoute
   '/_app/system/users': typeof AppSystemUsersRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/ingest/protocols'
     | '/notif/configs'
     | '/notif/templates'
+    | '/system/audit'
     | '/system/orgs'
     | '/system/roles'
     | '/system/users'
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/ingest/protocols'
     | '/notif/configs'
     | '/notif/templates'
+    | '/system/audit'
     | '/system/orgs'
     | '/system/roles'
     | '/system/users'
@@ -213,6 +224,7 @@ export interface FileRouteTypes {
     | '/_app/ingest/protocols'
     | '/_app/notif/configs'
     | '/_app/notif/templates'
+    | '/_app/system/audit'
     | '/_app/system/orgs'
     | '/_app/system/roles'
     | '/_app/system/users'
@@ -269,6 +281,13 @@ declare module '@tanstack/react-router' {
       path: '/system/orgs'
       fullPath: '/system/orgs'
       preLoaderRoute: typeof AppSystemOrgsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/system/audit': {
+      id: '/_app/system/audit'
+      path: '/system/audit'
+      fullPath: '/system/audit'
+      preLoaderRoute: typeof AppSystemAuditRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/notif/templates': {
@@ -387,6 +406,7 @@ interface AppRouteChildren {
   AppIngestProtocolsRoute: typeof AppIngestProtocolsRoute
   AppNotifConfigsRoute: typeof AppNotifConfigsRoute
   AppNotifTemplatesRoute: typeof AppNotifTemplatesRoute
+  AppSystemAuditRoute: typeof AppSystemAuditRoute
   AppSystemOrgsRoute: typeof AppSystemOrgsRoute
   AppSystemRolesRoute: typeof AppSystemRolesRoute
   AppSystemUsersRoute: typeof AppSystemUsersRoute
@@ -401,6 +421,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppIngestProtocolsRoute: AppIngestProtocolsRoute,
   AppNotifConfigsRoute: AppNotifConfigsRoute,
   AppNotifTemplatesRoute: AppNotifTemplatesRoute,
+  AppSystemAuditRoute: AppSystemAuditRoute,
   AppSystemOrgsRoute: AppSystemOrgsRoute,
   AppSystemRolesRoute: AppSystemRolesRoute,
   AppSystemUsersRoute: AppSystemUsersRoute,
@@ -415,13 +436,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

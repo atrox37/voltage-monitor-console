@@ -1,0 +1,183 @@
+@import "tailwindcss" source(none);
+@source "..";
+@import "tw-animate-css";
+@import "./patterns.css";
+@import "./bridges.css";
+@import "./ant-overrides.css";
+@import "./scrollbars.css";
+
+@font-face {
+  font-family: "Arimo";
+  src: url("/fonts/Arimo.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Arimo";
+  src: url("/fonts/Arimo-Italic.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("/fonts/Montserrat.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Montserrat";
+  src: url("/fonts/Montserrat-Italic.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 10px;
+
+  --font-sans: "Arimo", "Inter", system-ui, sans-serif;
+  --font-heading: "Montserrat", "Arimo", system-ui, sans-serif;
+  --font-mono: "Arimo", "Inter", system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+
+  --color-page: var(--page);
+  --color-panel: var(--panel);
+  --color-panel-strong: var(--panel-strong);
+  --color-panel-heavy: var(--panel-heavy);
+  --color-panel-border: var(--panel-border);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  --color-status-online: var(--status-online);
+  --color-status-critical: var(--status-critical);
+  --color-status-warning: var(--status-warning);
+  --color-status-info: var(--status-info);
+
+  --color-energy-pv: var(--energy-pv);
+  --color-energy-ess: var(--energy-ess);
+  --color-energy-dg: var(--energy-dg);
+
+  --color-chart-1: var(--energy-pv);
+  --color-chart-2: var(--energy-ess);
+  --color-chart-3: var(--energy-dg);
+  --color-chart-4: var(--status-warning);
+  --color-chart-5: var(--primary);
+}
+
+:root {
+  --radius: 6px;
+  --background: oklch(0.22 0.04 265);
+  --page: oklch(0.27 0.045 265);
+  --foreground: oklch(0.985 0 0);
+  --text-secondary: oklch(0.78 0.04 255);
+  --text-muted: oklch(0.62 0.04 255);
+
+  --panel: oklch(0.36 0.045 270 / 0.2);
+  --panel-strong: oklch(0.36 0.045 270 / 0.35);
+  --panel-heavy: oklch(0.36 0.045 270 / 0.5);
+  --panel-border: oklch(0.78 0.04 255 / 0.25);
+
+  --primary: oklch(0.72 0.18 50);
+  --primary-foreground: oklch(0.18 0.02 265);
+
+  --secondary: oklch(0.36 0.045 270 / 0.35);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.36 0.045 270 / 0.25);
+  --muted-foreground: oklch(0.78 0.04 255);
+  --accent: oklch(0.72 0.18 50);
+  --accent-foreground: oklch(0.18 0.02 265);
+
+  --ant-scrollbar-size: 10px;
+  --ant-color-split: transparent;
+  --ant-scrollbar-track: oklch(0.24 0.03 268 / 0.72);
+  --ant-scrollbar-thumb: oklch(0.46 0.075 252 / 0.72);
+  --ant-scrollbar-thumb-hover: oklch(0.56 0.1 248 / 0.9);
+
+  --status-online: oklch(0.78 0.22 135);
+  --status-critical: oklch(0.62 0.24 27);
+  --status-warning: oklch(0.74 0.18 48);
+  --status-info: oklch(0.8 0.16 80);
+  --destructive: var(--status-critical);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --energy-pv: oklch(0.78 0.14 230);
+  --energy-ess: oklch(0.62 0.16 250);
+  --energy-dg: oklch(0.78 0.16 85);
+
+  --card: oklch(0.36 0.045 270 / 0.35);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.27 0.045 265);
+  --popover-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.78 0.04 255 / 0.2);
+  --input: oklch(0.78 0.04 255 / 0.2);
+  --ring: oklch(0.72 0.18 50);
+}
+
+.dark {
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    background-image:
+      radial-gradient(1200px 600px at 10% -10%, oklch(0.45 0.1 265 / 0.35), transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, oklch(0.5 0.12 250 / 0.25), transparent 60%),
+      linear-gradient(180deg, var(--background), var(--page));
+    background-attachment: fixed;
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+    letter-spacing: 0.01em;
+  }
+}
