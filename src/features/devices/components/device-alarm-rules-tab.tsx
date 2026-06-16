@@ -300,7 +300,7 @@ export function DeviceAlarmRulesTab() {
             ? t("devices.detail.rules.addRuleDrawer")
             : t("devices.detail.rules.editRule")
         }
-        width={760}
+        size={760}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={
@@ -327,7 +327,7 @@ export function DeviceAlarmRulesTab() {
               label={t("common.ruleName")}
               required
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -341,7 +341,7 @@ export function DeviceAlarmRulesTab() {
             <Form.Item
               label={t("common.status")}
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -357,7 +357,7 @@ export function DeviceAlarmRulesTab() {
             <Form.Item
               label={t("devices.detail.rules.triggerTime")}
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -368,7 +368,7 @@ export function DeviceAlarmRulesTab() {
             <Form.Item
               label={t("common.pollInterval")}
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -392,7 +392,7 @@ export function DeviceAlarmRulesTab() {
             <Form.Item
               label={t("common.thresholdCount")}
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >

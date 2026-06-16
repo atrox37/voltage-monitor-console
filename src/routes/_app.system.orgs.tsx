@@ -214,7 +214,7 @@ function OrgsPage() {
         open={!!editing}
         onClose={() => setEditing(null)}
         title={editing?.mode === "add" ? t("orgs.add") : t("orgs.edit")}
-        width={480}
+        size={480}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={
@@ -239,7 +239,7 @@ function OrgsPage() {
               <Form.Item
                 label={t("orgs.orgId")}
                 layout="horizontal"
-                labelCol={{ flex: "72px" }}
+                labelCol={{ flex: "120px" }}
                 wrapperCol={{ flex: 1 }}
                 className="mb-3"
               >
@@ -250,7 +250,7 @@ function OrgsPage() {
               <Form.Item
                 label={t("orgs.parentOrg")}
                 layout="horizontal"
-                labelCol={{ flex: "72px" }}
+                labelCol={{ flex: "120px" }}
                 wrapperCol={{ flex: 1 }}
                 className="mb-3"
               >
@@ -264,7 +264,7 @@ function OrgsPage() {
               label={t("orgs.orgName")}
               required
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -283,7 +283,7 @@ function OrgsPage() {
         open={!!membersOf}
         onClose={() => setMembersOf(null)}
         title={t("orgs.membersTitle", { name: membersOf?.label ?? "" })}
-        width={420}
+        size={420}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
       >

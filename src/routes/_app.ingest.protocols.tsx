@@ -28,6 +28,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { useTranslation } from "@/i18n";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import type { DeviceProtocolPageDto, PageQuery } from "@/types";
 
 export const Route = createFileRoute("/_app/ingest/protocols")({
@@ -301,6 +302,7 @@ function ProtocolDrawer({
   onSave: (p: ProtocolForm) => void;
 }) {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const [draft, setDraft] = useState<ProtocolForm>(value);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -350,7 +352,7 @@ function ProtocolDrawer({
         open
         onClose={onClose}
         title={mode === "add" ? t("common.addTitle") : t("common.editTitle")}
-        width={520}
+        size={520}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={
@@ -373,12 +375,12 @@ function ProtocolDrawer({
           label={t("common.nameLabel")}
           required
           layout="horizontal"
-          labelCol={{ flex: "72px" }}
+          labelCol={{ flex: "120px" }}
           wrapperCol={{ flex: 1 }}
           className="mb-3"
         >
           <Input
-            placeholder={t("common.inputPlaceholder")}
+            placeholder={ph.input(t("common.nameLabel"))}
             value={draft.name}
             onChange={(e) => set("name", e.target.value)}
           />
@@ -388,7 +390,7 @@ function ProtocolDrawer({
           <Form.Item
             label={t("ingest.protocols.supportProtocol")}
             layout="horizontal"
-            labelCol={{ flex: "72px" }}
+            labelCol={{ flex: "120px" }}
             wrapperCol={{ flex: 1 }}
             className="mb-3"
           >
@@ -409,7 +411,7 @@ function ProtocolDrawer({
           label={t("ingest.protocols.storage")}
           required
           layout="horizontal"
-          labelCol={{ flex: "72px" }}
+          labelCol={{ flex: "120px" }}
           wrapperCol={{ flex: 1 }}
           className="mb-3"
         >
@@ -428,12 +430,12 @@ function ProtocolDrawer({
           label={t("ingest.protocols.pkg")}
           required
           layout="horizontal"
-          labelCol={{ flex: "72px" }}
+          labelCol={{ flex: "120px" }}
           wrapperCol={{ flex: 1 }}
           className="mb-3"
         >
           <Input
-            placeholder={t("common.inputPlaceholder")}
+            placeholder={ph.input(t("ingest.protocols.pkg"))}
             value={draft.provider}
             onChange={(e) => set("provider", e.target.value)}
           />
@@ -443,15 +445,14 @@ function ProtocolDrawer({
           label={t("ingest.protocols.upload")}
           required
           layout="horizontal"
-          labelCol={{ flex: "72px" }}
+          labelCol={{ flex: "120px" }}
           wrapperCol={{ flex: 1 }}
           className="mb-3"
         >
           <div className="flex gap-2">
-            <input
-              className="cursor-default"
+            <Input
               readOnly
-              placeholder={t("common.selectFile")}
+              placeholder={ph.select(t("ingest.protocols.upload"))}
               value={draft.location ? (draft.location.split("/").pop() ?? "") : ""}
             />
             <Button
@@ -466,12 +467,12 @@ function ProtocolDrawer({
         <Form.Item
           label={t("ingest.protocols.description")}
           layout="horizontal"
-          labelCol={{ flex: "72px" }}
+          labelCol={{ flex: "120px" }}
           wrapperCol={{ flex: 1 }}
           className="mb-3"
         >
           <Input
-            placeholder={t("ingest.protocols.descPlaceholder")}
+            placeholder={ph.input(t("ingest.protocols.description"))}
             value={draft.description}
             onChange={(e) => set("description", e.target.value)}
           />
@@ -524,7 +525,7 @@ function ProtocolTestDrawer({
       open
       onClose={onClose}
       title={t("ingest.protocols.testTitle", { type: typeLabel })}
-      width={520}
+      size={520}
       destroyOnHidden
       styles={{ body: { paddingTop: 8 } }}
       footer={
@@ -538,7 +539,7 @@ function ProtocolTestDrawer({
       <Form.Item
         label={t("common.topic")}
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >
@@ -548,7 +549,7 @@ function ProtocolTestDrawer({
         <Form.Item
           label="clientId"
           layout="horizontal"
-          labelCol={{ flex: "72px" }}
+          labelCol={{ flex: "120px" }}
           wrapperCol={{ flex: 1 }}
           className="mb-3"
         >

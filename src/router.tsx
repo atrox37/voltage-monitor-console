@@ -1,4 +1,4 @@
-import { createRouter } from "@tanstack/react-router";
+﻿import { createRouter } from "@tanstack/react-router";
 import { createAppQueryClient } from "@/lib/query-client";
 import { routeTree } from "./routeTree.gen";
 

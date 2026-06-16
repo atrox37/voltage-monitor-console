@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
 import { OptionToggle } from "@/components/option-toggle";
@@ -242,7 +242,7 @@ export function TabRule() {
               label="规则名称"
               required
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -256,7 +256,7 @@ export function TabRule() {
             <Form.Item
               label="工作状态"
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -272,7 +272,7 @@ export function TabRule() {
             <Form.Item
               label="触发方式"
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -283,7 +283,7 @@ export function TabRule() {
             <Form.Item
               label="轮询周期"
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -307,7 +307,7 @@ export function TabRule() {
             <Form.Item
               label="触发阈值"
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >

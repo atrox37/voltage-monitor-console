@@ -14,6 +14,7 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { useTranslation } from "@/i18n";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import type { PageQuery, SysRolePo, SysUserPageDto, SysUserPo } from "@/types";
 
 export const Route = createFileRoute("/_app/system/users")({
@@ -79,6 +80,7 @@ function emptyForm(): UserForm {
 
 function UsersPage() {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const [rows, setRows] = useState<UserRow[]>([]);
   const [roles, setRoles] = useState<SysRolePo[]>([]);
   const [orgNodes, setOrgNodes] = useState<OrgNode[]>([]);
@@ -302,7 +304,7 @@ function UsersPage() {
         open={!!editing}
         onClose={() => setEditing(null)}
         title={isAdd ? t("users.create") : t("users.edit")}
-        width={480}
+        size={480}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={drawerFooter([
@@ -321,14 +323,14 @@ function UsersPage() {
             <Form.Item label={t("users.username")} required {...drawerFormItemProps}>
               <Input
                 value={editing.username}
-                placeholder={t("users.usernamePlaceholder")}
+                placeholder={ph.input(t("users.username"))}
                 onChange={(e) => setEditing({ ...editing, username: e.target.value })}
               />
             </Form.Item>
             <Form.Item label={t("users.role")} required {...drawerFormItemProps}>
               <Select
                 value={editing.roleId || undefined}
-                placeholder={t("users.selectRole")}
+                placeholder={ph.select(t("users.role"))}
                 onChange={(roleId) => setEditing({ ...editing, roleId })}
                 options={roles.map((r) => ({
                   value: String(r.id),
@@ -340,6 +342,7 @@ function UsersPage() {
               <OrgTreeSelect
                 nodes={orgNodes}
                 value={editing.orgId}
+                placeholder={ph.select(t("users.org"))}
                 onChange={(v) => setEditing({ ...editing, orgId: v })}
               />
             </Form.Item>
@@ -347,14 +350,14 @@ function UsersPage() {
               <Input
                 type="email"
                 value={editing.email}
-                placeholder="user@example.com"
+                placeholder={ph.input(t("users.email"))}
                 onChange={(e) => setEditing({ ...editing, email: e.target.value })}
               />
             </Form.Item>
             <Form.Item label={t("users.phone")} {...drawerFormItemProps}>
               <Input
                 value={editing.phone}
-                placeholder={t("users.phonePlaceholder")}
+                placeholder={ph.input(t("users.phone"))}
                 onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
               />
             </Form.Item>
@@ -363,7 +366,7 @@ function UsersPage() {
                 <Input.Password
                   autoComplete="new-password"
                   value={editing.password}
-                  placeholder={t("users.passwordPlaceholder")}
+                  placeholder={ph.input(t("users.password"))}
                   onChange={(e) => setEditing({ ...editing, password: e.target.value })}
                 />
               </Form.Item>
@@ -389,7 +392,7 @@ function UsersPage() {
           setNewPass("");
         }}
         title={t("users.changePasswordTitle", { name: passUser?.username ?? "" })}
-        width={400}
+        size={400}
         zIndex={1100}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
@@ -414,7 +417,7 @@ function UsersPage() {
         <Form.Item label={t("users.password")} required {...drawerFormItemProps}>
           <Input.Password
             autoComplete="new-password"
-            placeholder={t("users.newPasswordPlaceholder")}
+            placeholder={ph.input(t("users.password"))}
             value={newPass}
             onChange={(e) => setNewPass(e.target.value)}
             autoFocus

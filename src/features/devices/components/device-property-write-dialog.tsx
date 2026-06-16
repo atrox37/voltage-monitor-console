@@ -43,7 +43,7 @@ export function DevicePropertyWriteDialog({
       title={`\u5199\u5165\uff1a${property.name}`}
       onClose={onClose}
       destroyOnHidden
-      width={420}
+      size={420}
       footer={
         <div className="flex justify-end gap-2">
           <Button size="small" onClick={onClose}>

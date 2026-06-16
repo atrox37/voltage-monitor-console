@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button, Checkbox, Drawer, Form, Input } from "antd";
 import { useTranslation } from "@/i18n";
@@ -26,7 +26,7 @@ export function FunctionDrawer({
       open={open}
       onClose={onClose}
       title={value?.id ? t("common.editFunction") : t("common.addFunction")}
-      width={480}
+      size={480}
       destroyOnHidden
       styles={{ body: { paddingTop: 8 } }}
       footer={
@@ -48,7 +48,7 @@ export function FunctionDrawer({
         label={t("common.identifier")}
         required
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >
@@ -62,7 +62,7 @@ export function FunctionDrawer({
         label={t("common.name")}
         required
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >
@@ -71,7 +71,7 @@ export function FunctionDrawer({
       <Form.Item
         label={t("common.asyncLabel")}
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >

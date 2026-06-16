@@ -15,6 +15,7 @@ import { DatePicker, Drawer, Form, Input, Pagination, Select, Switch, Table } fr
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
 import type { OrgNode } from "@/components/org-tree-select";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
@@ -312,6 +313,7 @@ function GatewayDrawer({
   onSave: (g: GatewayForm) => void;
 }) {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const [d, setD] = useState<GatewayForm>(value);
   const [networks, setNetworks] = useState<NetworkConfigPo[]>([]);
   const [protocols, setProtocols] = useState<DeviceProtocolPageDto[]>([]);
@@ -366,7 +368,7 @@ function GatewayDrawer({
       open
       onClose={onClose}
       title={mode === "add" ? t("common.addTitle") : t("common.editTitle")}
-      width={520}
+      size={520}
       destroyOnHidden
       styles={{ body: { paddingTop: 8 } }}
       footer={drawerFooter([
@@ -388,7 +390,7 @@ function GatewayDrawer({
       )}
       <Form.Item label={t("common.nameLabel")} required {...drawerFormItemProps}>
         <Input
-          placeholder={t("common.inputPlaceholder")}
+          placeholder={ph.input(t("common.nameLabel"))}
           value={d.name}
           onChange={(e) => set("name", e.target.value)}
         />
@@ -396,8 +398,10 @@ function GatewayDrawer({
 
       <Form.Item label={t("ingest.gateways.networkComp")} required {...drawerFormItemProps}>
         <Select
+          className="vt-select-control"
+          classNames={{ popup: { root: "vt-select-popup" } }}
           value={d.networkId || undefined}
-          placeholder={t("common.select")}
+          placeholder={ph.select(t("ingest.gateways.networkComp"))}
           onChange={(networkId) => {
             set("networkId", networkId);
             set("protocolId", "");
@@ -411,8 +415,14 @@ function GatewayDrawer({
 
       <Form.Item label={t("ingest.gateways.protocol")} required {...drawerFormItemProps}>
         <Select
+          className="vt-select-control"
+          classNames={{ popup: { root: "vt-select-popup" } }}
           value={d.protocolId || undefined}
-          placeholder={d.networkId ? t("common.select") : t("ingest.gateways.selectNetworkFirst")}
+          placeholder={
+            d.networkId
+              ? ph.select(t("ingest.gateways.protocol"))
+              : t("ingest.gateways.selectNetworkFirst")
+          }
           disabled={!d.networkId || optionsLoading}
           onChange={(protocolId) => set("protocolId", protocolId)}
           options={protocolOptions.map((p) => ({
@@ -597,7 +607,7 @@ function ZhaoDrawer({ gateway, onClose }: { gateway: GatewayListRow; onClose: ()
       open
       onClose={onClose}
       title={t("ingest.gateways.recruitTitle", { name: gateway.name })}
-      width={760}
+      size={760}
       destroyOnHidden
       classNames={{ body: "vt-drawer-fill-body" }}
       styles={{ body: { paddingTop: 8 } }}

@@ -235,7 +235,7 @@ export function DevicePropertyHistoryDialog({
       open={open}
       title={`\u5c5e\u6027\u8bb0\u5f55 - ${property.name}`}
       onClose={onClose}
-      width={560}
+      size={560}
       styles={{ body: { minHeight: 420 } }}
       destroyOnHidden
     >

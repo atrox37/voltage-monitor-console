@@ -31,7 +31,7 @@ export function PropertyDrawer({
       open={open}
       onClose={onClose}
       title={value?.id ? t("common.editProperty") : t("common.addProperty")}
-      width={480}
+      size={480}
       destroyOnHidden
       styles={{ body: { paddingTop: 8 } }}
       footer={
@@ -53,7 +53,7 @@ export function PropertyDrawer({
         label={t("common.identifier")}
         required
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >
@@ -67,7 +67,7 @@ export function PropertyDrawer({
         label={t("common.name")}
         required
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >
@@ -76,7 +76,7 @@ export function PropertyDrawer({
       <Form.Item
         label={t("common.type")}
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >
@@ -97,7 +97,7 @@ export function PropertyDrawer({
       <Form.Item
         label={t("common.unit")}
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >
@@ -123,7 +123,7 @@ export function PropertyDrawer({
       <Form.Item
         label={t("common.tag")}
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >

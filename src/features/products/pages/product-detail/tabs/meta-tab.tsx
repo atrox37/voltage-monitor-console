@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
 import { OptionToggle } from "@/components/option-toggle";
@@ -353,7 +353,7 @@ export function TabMeta() {
               label="属性标识"
               required
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -369,7 +369,7 @@ export function TabMeta() {
               label="属性名称"
               required
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -383,7 +383,7 @@ export function TabMeta() {
             <Form.Item
               label="数据类型"
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -408,7 +408,7 @@ export function TabMeta() {
               <Form.Item
                 label="小数位"
                 layout="horizontal"
-                labelCol={{ flex: "72px" }}
+                labelCol={{ flex: "120px" }}
                 wrapperCol={{ flex: 1 }}
                 className="mb-3"
               >
@@ -457,7 +457,7 @@ export function TabMeta() {
             <Form.Item
               label="单位"
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -489,7 +489,7 @@ export function TabMeta() {
             <Form.Item
               label="读写"
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -502,7 +502,7 @@ export function TabMeta() {
             <Form.Item
               label="所属分组"
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -604,7 +604,7 @@ export function TabMeta() {
             label="分组名称"
             required
             layout="horizontal"
-            labelCol={{ flex: "72px" }}
+            labelCol={{ flex: "120px" }}
             wrapperCol={{ flex: 1 }}
             className="mb-3"
           >

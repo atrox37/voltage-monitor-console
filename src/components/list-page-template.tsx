@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useRef, useState } from "react";
+﻿import { type ReactNode, useMemo, useRef, useState } from "react";
 import { Button, Card, Dropdown, Form, Input, Pagination, Select, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
@@ -8,6 +8,7 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { getSorterColumnKey, useTableScrollSync, vtActionColumn } from "@/lib/table-utils";
 import { useAdaptiveTableScrollY, useTableBodyMaxScrollY } from "@/lib/use-table-height";
 import { useTranslation } from "@/i18n";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 
 export {
   RowActionBtn,
@@ -92,6 +93,7 @@ export function ListPageTemplate<T extends { id: string | number }>({
   onSortsChange,
 }: ListPageProps<T>) {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const resolvedEmpty = emptyText ?? t("common.noData");
   const [localDraft, setLocalDraft] = useState<Record<string, string>>({});
   const [filterState, setFilterState] = useState<Record<string, string>>({});
@@ -106,8 +108,8 @@ export function ListPageTemplate<T extends { id: string | number }>({
     else setLocalDraft(next);
   };
 
-  const inputPlaceholder = (label: string) => `${t("common.inputPlaceholder")}${label}`;
-  const selectPlaceholder = (label: string) => `${t("common.select")}${label}`;
+  const inputPlaceholder = (label: string) => ph.input(label);
+  const selectPlaceholder = (label: string) => ph.select(label);
 
   const filtered = useMemo(() => {
     if (serverSide) return rows;
@@ -190,7 +192,7 @@ export function ListPageTemplate<T extends { id: string | number }>({
       </Typography.Title>
 
       {filters.length > 0 && (
-        <Card size="small" bordered={false} className="vt-ant-filter-card shrink-0">
+        <Card size="small" variant="borderless" className="vt-ant-filter-card shrink-0">
           <Form layout="inline" className="flex w-full flex-wrap items-center gap-y-2">
             {filters.map((f) => (
               <Form.Item key={f.key} label={f.label}>
@@ -240,7 +242,7 @@ export function ListPageTemplate<T extends { id: string | number }>({
 
       <Card
         size="small"
-        bordered={false}
+        variant="borderless"
         className="flex min-h-0 flex-1 flex-col vt-ant-table-card"
         styles={{
           body: { flex: 1, display: "flex", flexDirection: "column", minHeight: 0, padding: 0 },

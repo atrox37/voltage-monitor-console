@@ -34,7 +34,9 @@
   .vt-ant-input-bridge,
   .vt-ant-select-bridge,
   .vt-page-content input:not([class*="ant-"]),
-  .vt-page-content select:not([class*="ant-"]) {
+  .vt-page-content select:not([class*="ant-"]),
+  .ant-drawer-body input:not([class*="ant-"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  .ant-drawer-body select:not([class*="ant-"]) {
     height: 32px;
     width: 100%;
     border-radius: 6px;
@@ -47,7 +49,8 @@
   }
 
   .vt-ant-input-bridge:focus,
-  .vt-page-content input:not([class*="ant-"]):focus {
+  .vt-page-content input:not([class*="ant-"]):focus,
+  .ant-drawer-body input:not([class*="ant-"]):not([type="checkbox"]):not([type="radio"]):focus {
     border-color: oklch(0.72 0.18 50 / 0.6);
   }
 

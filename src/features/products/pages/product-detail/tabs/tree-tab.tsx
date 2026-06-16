@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import { Button, Drawer, Form, Input } from "antd";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -128,7 +128,7 @@ export function TabTree() {
             label="节点名称"
             required
             layout="horizontal"
-            labelCol={{ flex: "72px" }}
+            labelCol={{ flex: "120px" }}
             wrapperCol={{ flex: 1 }}
             className="mb-3"
           >

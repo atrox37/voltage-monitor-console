@@ -67,7 +67,7 @@ export function MetadataFunctionDrawer({
         open={open}
         onClose={onClose}
         title={isNew ? t("common.addFunction") : t("common.editFunction")}
-        width={560}
+        size={560}
         mask={!argTarget}
         keyboard={!argTarget}
         footer={
@@ -87,7 +87,7 @@ export function MetadataFunctionDrawer({
               label={t("common.identifier")}
               required
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -103,7 +103,7 @@ export function MetadataFunctionDrawer({
               label={t("common.name")}
               required
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >
@@ -117,7 +117,7 @@ export function MetadataFunctionDrawer({
             <Form.Item
               label={t("common.asyncLabel")}
               layout="horizontal"
-              labelCol={{ flex: "72px" }}
+              labelCol={{ flex: "120px" }}
               wrapperCol={{ flex: 1 }}
               className="mb-3"
             >

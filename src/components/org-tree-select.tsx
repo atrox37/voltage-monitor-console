@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import { TreeSelect } from "antd";
 import type { TreeSelectProps } from "antd";
 import { useTranslation } from "@/i18n";
@@ -72,7 +72,8 @@ export function OrgTreeSelect({
   style?: React.CSSProperties;
 }) {
   const { t } = useTranslation();
-  const resolvedPlaceholder = placeholder ?? t("common.select");
+  const resolvedPlaceholder =
+    placeholder ?? t("validation.requiredSelect", { label: t("common.orgLabel") });
 
   const treeData = useMemo(() => {
     return toTreeData(nodes, matchBy);

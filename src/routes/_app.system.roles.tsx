@@ -28,6 +28,7 @@ import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { useTranslation } from "@/i18n";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import type { PageQuery, SysRolePageDto, SysRolePermissionDto } from "@/types";
 
 export const Route = createFileRoute("/_app/system/roles")({
@@ -59,6 +60,7 @@ function mapRoleRow(dto: SysRolePageDto): RoleRow {
 
 function RolesPage() {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const [rows, setRows] = useState<RoleRow[]>([]);
   const [orgNodes, setOrgNodes] = useState<OrgNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -330,7 +332,7 @@ function RolesPage() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title={t("roles.add")}
-        width={480}
+        size={480}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={drawerFooter([
@@ -346,7 +348,7 @@ function RolesPage() {
       >
         <Form.Item label={t("roles.name")} required {...drawerFormItemProps}>
           <Input
-            placeholder={t("roles.namePlaceholder")}
+            placeholder={ph.input(t("roles.name"))}
             value={draft.name}
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
           />
@@ -355,6 +357,7 @@ function RolesPage() {
           <OrgTreeSelect
             nodes={orgNodes}
             value={draft.orgId}
+            placeholder={ph.select(t("users.org"))}
             onChange={(v) => setDraft({ ...draft, orgId: v })}
           />
         </Form.Item>
@@ -367,7 +370,7 @@ function RolesPage() {
           setPermNode(null);
         }}
         title={t("roles.menuDrawer")}
-        width={permNode ? 480 : 420}
+        size={permNode ? 480 : 420}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={drawerFooter([
@@ -407,7 +410,7 @@ function RolesPage() {
           open={!!permNode}
           onClose={() => setPermNode(null)}
           title={t("roles.permDrawer")}
-          width={560}
+          size={560}
           zIndex={1100}
           mask={false}
           destroyOnHidden

@@ -272,7 +272,7 @@ export function DeviceAlarmHandlerEditor({
         open={!!varsDrawer}
         onClose={() => setVarsDrawer(null)}
         title="编辑模板变量"
-        width={480}
+        size={480}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={
@@ -308,7 +308,7 @@ export function DeviceAlarmHandlerEditor({
                 key={key}
                 label={key}
                 layout="horizontal"
-                labelCol={{ flex: "96px" }}
+                labelCol={{ flex: "120px" }}
                 wrapperCol={{ flex: 1 }}
                 className="mb-3"
               >

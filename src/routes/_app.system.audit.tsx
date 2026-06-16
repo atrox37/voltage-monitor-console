@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import {
@@ -18,6 +18,7 @@ import type { ColumnsType } from "antd/es/table";
 import { DeleteOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useTranslation } from "@/i18n";
+import { inputPlaceholderFor, selectPlaceholderFor } from "@/lib/form-placeholder";
 import { pageAuditLogs, deleteAuditLogBatch, type AuditLogDto } from "@/api/sys";
 import { showApiError, showSuccess } from "@/lib/api-message";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -260,7 +261,7 @@ function AuditLogPage() {
             <Input
               allowClear
               value={draftUsername}
-              placeholder={`${t("common.inputPlaceholder")}${t("auditLog.username")}`}
+              placeholder={inputPlaceholderFor(t, t("auditLog.username"))}
               onChange={(e) => setDraftUsername(e.target.value)}
               style={{ width: 208 }}
             />
@@ -270,7 +271,7 @@ function AuditLogPage() {
               allowClear
               className="vt-select-control"
               classNames={{ popup: { root: "vt-select-popup" } }}
-              placeholder={`${t("common.select")}${t("auditLog.method")}`}
+              placeholder={selectPlaceholderFor(t, t("auditLog.method"))}
               value={draftMethod}
               onChange={(v) => setDraftMethod(v)}
               style={{ width: 208 }}

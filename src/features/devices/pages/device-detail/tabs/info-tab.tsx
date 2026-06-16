@@ -1,8 +1,9 @@
-import { Link } from "@tanstack/react-router";
+﻿import { Link } from "@tanstack/react-router";
 
 import { Input, Select, Tag } from "antd";
 import { useTranslation } from "@/i18n";
 import { OrgTreeSelect } from "@/components/org-tree-select";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { useDeviceEdit } from "@/features/devices/contexts/device-edit-context";
 
 import { useProductTypeLabel } from "@/features/products/lib/product-type-i18n";
@@ -12,6 +13,7 @@ import { Row } from "../components/detail-row";
 
 export function TabInfo() {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const productTypeLabel = useProductTypeLabel();
   const { device, orgNodes, gateways, updateDevice, updateMetadata } = useDeviceEdit();
   if (!device) return null;
@@ -32,15 +34,24 @@ export function TabInfo() {
       {/* 基本字段区 */}
       <div className="grid grid-cols-1 gap-x-6 gap-y-1 md:grid-cols-2 xl:grid-cols-3">
         <Row label={t("common.deviceName")}>
-          <Input value={device.name} onChange={(e) => updateDevice({ name: e.target.value })} />
+          <Input
+            placeholder={ph.input(t("common.deviceName"))}
+            value={device.name}
+            onChange={(e) => updateDevice({ name: e.target.value })}
+          />
         </Row>
         <Row label={t("common.deviceSn")}>
-          <Input value={device.sn} onChange={(e) => updateDevice({ sn: e.target.value })} />
+          <Input
+            placeholder={ph.input(t("common.deviceSn"))}
+            value={device.sn}
+            onChange={(e) => updateDevice({ sn: e.target.value })}
+          />
         </Row>
         <Row label={t("common.orgBelong")}>
           <OrgTreeSelect
             nodes={orgNodes}
             value={device.orgId}
+            placeholder={ph.select(t("common.orgBelong"))}
             onChange={(v) => updateDevice({ orgId: v })}
           />
         </Row>
@@ -89,7 +100,7 @@ export function TabInfo() {
                 label: g.gatewayPo?.name ?? "—",
                 value: String(g.gatewayPo?.id ?? ""),
               }))}
-              placeholder={t("common.select")}
+              placeholder={ph.select(t("common.collectGateway"))}
             />
           )}
         </Row>

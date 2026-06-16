@@ -266,7 +266,7 @@ export function TabAlarm() {
         open={!!detail}
         onClose={() => setDetail(null)}
         title={t("devices.detail.alarm.viewTitle")}
-        width={520}
+        size={520}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
       >

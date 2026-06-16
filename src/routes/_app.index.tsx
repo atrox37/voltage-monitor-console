@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+﻿import { createFileRoute, redirect } from "@tanstack/react-router";
 import { getFirstMenuRoute } from "@/lib/app-menu";
 import { getMenuSnapshot, loadAppMenu } from "@/lib/menu-session";
 

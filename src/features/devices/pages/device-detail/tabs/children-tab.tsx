@@ -148,7 +148,7 @@ function AddChildrenDrawer({
       open={open}
       onClose={onClose}
       title={t("devices.detail.children.addDrawerTitle")}
-      width={720}
+      size={720}
       destroyOnHidden
       classNames={{ body: "vt-drawer-fill-body" }}
       styles={{ body: { paddingTop: 8 } }}
@@ -456,7 +456,7 @@ export function TabChildren() {
             label={t("devices.detail.children.nodeName")}
             required
             layout="horizontal"
-            labelCol={{ flex: "72px" }}
+            labelCol={{ flex: "120px" }}
             wrapperCol={{ flex: 1 }}
             className="mb-3"
           >

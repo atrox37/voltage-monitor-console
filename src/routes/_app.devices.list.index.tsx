@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { showError, showSuccess } from "@/lib/api-message";
 import { deleteDevice, pageDevices, pageGateways, pageProducts, saveDevice } from "@/api";
 import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
+import { deviceConnectionStatus } from "@/components/status-display";
 import {
   mapCreateFormToDevicePo,
   mapDeviceDtoToRow,
@@ -15,6 +17,7 @@ import { PRODUCT_TYPE_LABEL, PRODUCT_TYPE_OPTIONS } from "@/features/products/li
 import { ALL_PAGE_QUERY, termEq, termLike } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
+import { useTranslation } from "@/i18n";
 import type { GatewayDto, PageQuery } from "@/types";
 
 export const Route = createFileRoute("/_app/devices/list/")({
@@ -216,13 +219,7 @@ function DevicesPage() {
           { key: "creator", title: "创建人" },
           {
             key: "status", title: "状态",
-            render: (r) => (
-              <StatusBadge status={
-                r.status === "online" ? "online" :
-                r.status === "disabled" ? "disabled" :
-                "critical"
-              } />
-            ),
+            render: (r) => <StatusBadge status={deviceConnectionStatus(r.status)} />,
           },
           {
             key: "createTime",
@@ -258,7 +255,7 @@ function DevicesPage() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title="新建设备"
-        width={480}
+        size={480}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={drawerFooter([
@@ -286,6 +283,8 @@ function DeviceForm({
   products: ProductOption[];
   gateways: GatewayDto[];
 }) {
+  const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const selectedProduct = products.find((p) => p.id === value.productId);
   const showNetworkGateway = selectedProduct?.type === "device" || selectedProduct?.type === "gateway";
 
@@ -294,21 +293,23 @@ function DeviceForm({
       <Form.Item label="设备名称" required {...drawerFormItemProps}>
         <Input
           value={value.name}
-          placeholder="请输入设备名称"
+          placeholder={ph.input(t("common.deviceName"))}
           onChange={(e) => onChange({ ...value, name: e.target.value })}
         />
       </Form.Item>
       <Form.Item label="SN" required {...drawerFormItemProps}>
         <Input
           value={value.sn}
-          placeholder="请输入设备 SN"
+          placeholder={ph.input(t("common.sn"))}
           onChange={(e) => onChange({ ...value, sn: e.target.value })}
         />
       </Form.Item>
       <Form.Item label="所属产品" required {...drawerFormItemProps}>
         <Select
+          className="vt-select-control"
+          classNames={{ popup: { root: "vt-select-popup" } }}
           value={value.productId || undefined}
-          placeholder="请选择产品"
+          placeholder={ph.select(t("common.product"))}
           onChange={(productId) => onChange({ ...value, productId, gatewayId: "" })}
           options={products.map((p) => ({
             value: p.id,
@@ -319,8 +320,10 @@ function DeviceForm({
       {showNetworkGateway && (
         <Form.Item label="采集网关" required {...drawerFormItemProps}>
           <Select
+            className="vt-select-control"
+            classNames={{ popup: { root: "vt-select-popup" } }}
             value={value.gatewayId || undefined}
-            placeholder="请选择采集网关"
+            placeholder={ph.select(t("common.collectGateway"))}
             onChange={(gatewayId) => onChange({ ...value, gatewayId })}
             options={gateways.map((g) => ({
               value: String(g.gatewayPo?.id ?? ""),

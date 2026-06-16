@@ -1,4 +1,4 @@
-import { getRouteApi } from "@tanstack/react-router";
+﻿import { getRouteApi } from "@tanstack/react-router";
 import {
   DeviceEditContextProvider,
   useDeviceEditState,

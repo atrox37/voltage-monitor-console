@@ -2,6 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Drawer, Form, Input } from "antd";
 import { OptionToggle } from "@/components/option-toggle";
+import { drawerFormItemProps } from "@/components/drawer-form";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { useMemo, useState } from "react";
 import { showApiError, showSuccess } from "@/lib/api-message";
 import { deleteProduct, pageProducts, saveProduct } from "@/api";
@@ -220,7 +222,7 @@ function ProductsPage() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title={t("devices.products.list.addDrawerTitle")}
-        width={480}
+        size={480}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={
@@ -248,46 +250,26 @@ function ProductForm({
   onChange: (v: ProductCreateForm) => void;
 }) {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const productTypeOptions = useProductTypeOptions();
 
   return (
     <>
-      <Form.Item
-        label={t("common.productName")}
-        required
-        layout="horizontal"
-        labelCol={{ flex: "72px" }}
-        wrapperCol={{ flex: 1 }}
-        className="mb-3"
-      >
+      <Form.Item label={t("common.productName")} required {...drawerFormItemProps}>
         <Input
           value={value.name}
-          placeholder={t("devices.products.list.namePlaceholder")}
+          placeholder={ph.input(t("common.productName"))}
           onChange={(e) => onChange({ ...value, name: e.target.value })}
         />
       </Form.Item>
-      <Form.Item
-        label={t("common.productModel")}
-        required
-        layout="horizontal"
-        labelCol={{ flex: "72px" }}
-        wrapperCol={{ flex: 1 }}
-        className="mb-3"
-      >
+      <Form.Item label={t("common.productModel")} required {...drawerFormItemProps}>
         <Input
           value={value.sn}
-          placeholder={t("devices.products.list.modelPlaceholder")}
+          placeholder={ph.input(t("common.productModel"))}
           onChange={(e) => onChange({ ...value, sn: e.target.value })}
         />
       </Form.Item>
-      <Form.Item
-        label={t("common.productType")}
-        required
-        layout="horizontal"
-        labelCol={{ flex: "72px" }}
-        wrapperCol={{ flex: 1 }}
-        className="mb-3"
-      >
+      <Form.Item label={t("common.productType")} required {...drawerFormItemProps}>
         <OptionToggle
           value={value.type}
           onChange={(v) => onChange({ ...value, type: v })}

@@ -1,7 +1,10 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { CloseOutlined, PlusOutlined } from "@ant-design/icons";
-import { Button, Drawer, Form } from "antd";
+import { Button, Drawer, Form, Input, Select } from "antd";
+import { detailFormItemProps } from "@/components/drawer-form";
 import { OrgTreeSelect } from "@/components/org-tree-select";
+import { useTranslation } from "@/i18n";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { useProductEdit } from "@/features/products/contexts/product-edit-context";
 import { PRODUCT_TYPE_LABEL } from "@/features/products/lib/product-mappers";
 
@@ -9,7 +12,14 @@ import type { TagModel } from "@/types/api/metadata";
 
 import { DescField } from "../components/desc-field";
 
+const TAG_REQUIRED_OPTIONS = [
+  { label: "是", value: "0" },
+  { label: "否", value: "1" },
+];
+
 export function TabInfo() {
+  const ph = useFormPlaceholder();
+  const { t } = useTranslation();
   const { product, orgNodes, updateProduct, updateMetadata } = useProductEdit();
   const [tagDraft, setTagDraft] = useState<{ tag: TagModel; index: number } | null>(null);
   if (!product) return null;
@@ -40,16 +50,16 @@ export function TabInfo() {
 
       <div className="grid grid-cols-1 gap-x-6 gap-y-1 md:grid-cols-2 xl:grid-cols-3">
         <DescField label="产品名称">
-          <input
-            className="w-full"
+          <Input
             value={product.name}
+            placeholder={ph.input(t("common.productName"))}
             onChange={(e) => setField("name", e.target.value)}
           />
         </DescField>
         <DescField label="产品型号">
-          <input
-            className="w-full"
+          <Input
             value={product.sn}
+            placeholder={ph.input(t("common.productModel"))}
             onChange={(e) => setField("sn", e.target.value)}
           />
         </DescField>
@@ -73,6 +83,7 @@ export function TabInfo() {
           <OrgTreeSelect
             nodes={orgNodes}
             value={product.orgId}
+            placeholder={ph.select(t("common.orgBelong"))}
             onChange={(v) => updateProduct({ orgId: v })}
           />
         </DescField>
@@ -120,7 +131,7 @@ export function TabInfo() {
         open={!!tagDraft}
         onClose={() => setTagDraft(null)}
         title={tagDraft && tagDraft.index < 0 ? "新增标签" : "编辑标签"}
-        size={420}
+        size={480}
         footer={
           <div className="flex justify-end gap-2">
             <Button type="default" size="small" onClick={() => setTagDraft(null)}>
@@ -134,58 +145,39 @@ export function TabInfo() {
       >
         {tagDraft && (
           <>
-            <Form.Item
-              label="Key"
-              required
-              layout="horizontal"
-              labelCol={{ flex: "72px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
-            >
-              <input
-                className="w-full"
+            <Form.Item label="Key" required {...detailFormItemProps}>
+              <Input
                 value={tagDraft.tag.tagKey ?? ""}
+                placeholder={ph.input("Key")}
                 onChange={(e) =>
                   setTagDraft({ ...tagDraft, tag: { ...tagDraft.tag, tagKey: e.target.value } })
                 }
               />
             </Form.Item>
-            <Form.Item
-              label="名称"
-              required
-              layout="horizontal"
-              labelCol={{ flex: "72px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
-            >
-              <input
-                className="w-full"
+            <Form.Item label="名称" required {...detailFormItemProps}>
+              <Input
                 value={tagDraft.tag.tagName}
+                placeholder={ph.input("名称")}
                 onChange={(e) =>
                   setTagDraft({ ...tagDraft, tag: { ...tagDraft.tag, tagName: e.target.value } })
                 }
               />
             </Form.Item>
-            <Form.Item
-              label="必填"
-              layout="horizontal"
-              labelCol={{ flex: "72px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
-            >
-              <select
+            <Form.Item label="必填" {...detailFormItemProps}>
+              <Select
                 className="vt-select-control"
+                classNames={{ popup: { root: "vt-select-popup" } }}
+                style={{ width: "100%" }}
+                placeholder={ph.select("必填")}
                 value={tagDraft.tag.optional ? "1" : "0"}
-                onChange={(e) =>
+                options={TAG_REQUIRED_OPTIONS}
+                onChange={(v) =>
                   setTagDraft({
                     ...tagDraft,
-                    tag: { ...tagDraft.tag, optional: e.target.value === "1" },
+                    tag: { ...tagDraft.tag, optional: v === "1" },
                   })
                 }
-              >
-                <option value="0">是</option>
-                <option value="1">否</option>
-              </select>
+              />
             </Form.Item>
           </>
         )}

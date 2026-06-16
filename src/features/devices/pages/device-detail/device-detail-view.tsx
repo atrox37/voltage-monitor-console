@@ -32,7 +32,7 @@ export function DeviceDetailView() {
     return (
       <main className="vt-page-content vt-page-fill">
         <div className="vt-glass flex flex-1 items-center justify-center">
-          <Spin tip={t("devices.detail.loading")} />
+          <Spin description={t("devices.detail.loading")} />
         </div>
       </main>
     );

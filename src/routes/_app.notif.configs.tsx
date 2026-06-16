@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Drawer, Form, Input, InputNumber } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { showError, showSuccess } from "@/lib/api-message";
 import { deleteNotifyConfig, pageNotifyConfigs, saveNotifyConfig } from "@/api";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
@@ -213,6 +214,7 @@ function ConfigDrawer({
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const [d, setD] = useState<EmailConfigForm>(value);
+  const ph = useFormPlaceholder();
   const set = <K extends keyof EmailConfigForm>(k: K, v: EmailConfigForm[K]) =>
     setD((x) => ({ ...x, [k]: v }));
 
@@ -224,7 +226,7 @@ function ConfigDrawer({
       open
       onClose={onClose}
       title={t("notif.configs.configTitle", { type: typeTitle })}
-      width={520}
+      size={520}
       destroyOnHidden
       styles={{ body: { paddingTop: 8 } }}
       footer={drawerFooter([
@@ -263,7 +265,7 @@ function ConfigDrawer({
 
       <Form.Item label={t("notif.configs.name")} required {...drawerFormItemProps}>
         <Input
-          placeholder={t("notif.configs.name")}
+          placeholder={ph.input(t("notif.configs.name"))}
           value={d.name}
           onChange={(e) => set("name", e.target.value)}
         />
@@ -271,7 +273,7 @@ function ConfigDrawer({
 
       <Form.Item label={t("notif.configs.smtpHost")} required {...drawerFormItemProps}>
         <Input
-          placeholder={t("notif.configs.smtpHostPlaceholder")}
+          placeholder={ph.input(t("notif.configs.smtpHost"))}
           value={d.smtpHost}
           onChange={(e) => set("smtpHost", e.target.value)}
         />
@@ -290,7 +292,7 @@ function ConfigDrawer({
       {isAws && (
         <Form.Item label={t("notif.configs.smtpUser")} required {...drawerFormItemProps}>
           <Input
-            placeholder={t("notif.configs.smtpUserPlaceholder")}
+            placeholder={ph.input(t("notif.configs.smtpUser"))}
             value={d.smtpUser}
             onChange={(e) => set("smtpUser", e.target.value)}
           />
@@ -299,7 +301,7 @@ function ConfigDrawer({
 
       <Form.Item label={t("notif.configs.smtpSecret")} required {...drawerFormItemProps}>
         <Input.Password
-          placeholder={t("notif.configs.smtpSecretPlaceholder")}
+          placeholder={ph.input(t("notif.configs.smtpSecret"))}
           value={d.smtpSecret}
           onChange={(e) => set("smtpSecret", e.target.value)}
         />
@@ -307,7 +309,7 @@ function ConfigDrawer({
 
       <Form.Item label={t("notif.configs.sendEmail")} required {...drawerFormItemProps}>
         <Input
-          placeholder={t("notif.configs.sendEmailPlaceholder")}
+          placeholder={ph.input(t("notif.configs.sendEmail"))}
           value={d.sendEmail}
           onChange={(e) => set("sendEmail", e.target.value)}
         />

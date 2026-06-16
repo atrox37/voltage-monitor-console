@@ -5,7 +5,7 @@ import { Button, Checkbox, Drawer, Form, Input, InputNumber, Switch } from "antd
 import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
 import { showError, showSuccess } from "@/lib/api-message";
 import { deleteNetwork, getDimensionTree, pageNetworks, saveNetwork, uploadNetworkFile } from "@/api";
-import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
+import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
 import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
 import {
@@ -21,6 +21,7 @@ import {
 import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { useTranslation } from "@/i18n";
 import type { PageQuery } from "@/types";
 
@@ -163,6 +164,12 @@ function NetworkComponentsPage() {
         columns={[
           { key: "name", title: t("common.nameLabel") },
           { key: "type", title: t("ingest.components.type"), render: (r) => TYPE_OPTIONS.find((o) => o.value === r.type)?.label ?? r.type },
+          {
+            key: "status",
+            title: t("common.status"),
+            width: 96,
+            render: (r) => <StatusBadge status={r.enabled ? "enabled" : "disabled"} />,
+          },
           { key: "org", title: t("common.orgBelong") },
           { key: "updateTime", title: t("common.updatedAt"), render: (r) => <span className="text-text-secondary">{r.updateTime}</span> },
         ]}
@@ -211,6 +218,7 @@ function ComponentDrawer({
   onSave: (c: NetworkCompForm) => void;
 }) {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const [d, setD] = useState<NetworkCompForm>(value);
   const [topicDraft, setTopicDraft] = useState("");
   const [recruitOpen, setRecruitOpen] = useState(false);
@@ -272,7 +280,7 @@ function ComponentDrawer({
         open
         onClose={onClose}
         title={mode === "add" ? t("common.addTitle") : t("common.editTitle")}
-        width={560}
+        size={560}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={drawerFooter([
@@ -309,7 +317,11 @@ function ComponentDrawer({
         </div>
 
         <Form.Item label={t("common.nameLabel")} required {...drawerFormItemProps}>
-          <Input value={d.name} onChange={(e) => set("name", e.target.value)} />
+          <Input
+            placeholder={ph.input(t("common.nameLabel"))}
+            value={d.name}
+            onChange={(e) => set("name", e.target.value)}
+          />
         </Form.Item>
 
         <Form.Item label={t("common.status")} {...drawerFormItemProps}>
@@ -322,7 +334,11 @@ function ComponentDrawer({
         </Form.Item>
 
         <Form.Item label={t("ingest.components.ip")} required {...drawerFormItemProps}>
-          <Input value={d.ip} onChange={(e) => set("ip", e.target.value)} />
+          <Input
+            placeholder={ph.input(t("ingest.components.ip"))}
+            value={d.ip}
+            onChange={(e) => set("ip", e.target.value)}
+          />
         </Form.Item>
 
         <Form.Item label={t("ingest.components.port")} required {...drawerFormItemProps}>
@@ -343,11 +359,19 @@ function ComponentDrawer({
         </Form.Item>
 
         <Form.Item label={t("ingest.components.username")} {...drawerFormItemProps}>
-          <Input value={d.username} onChange={(e) => set("username", e.target.value)} />
+          <Input
+            placeholder={ph.input(t("ingest.components.username"))}
+            value={d.username}
+            onChange={(e) => set("username", e.target.value)}
+          />
         </Form.Item>
 
         <Form.Item label={t("ingest.components.password")} {...drawerFormItemProps}>
-          <Input.Password value={d.password} onChange={(e) => set("password", e.target.value)} />
+          <Input.Password
+            placeholder={ph.input(t("ingest.components.password"))}
+            value={d.password}
+            onChange={(e) => set("password", e.target.value)}
+          />
         </Form.Item>
 
         <Form.Item label={t("ingest.components.ssl")} {...drawerFormItemProps}>
@@ -442,6 +466,7 @@ function UploadInput({ value, uploading, onPick }: { value: string; uploading?: 
 
 function RecruitDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (r: RecruitRow) => void }) {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
   const [payload, setPayload] = useState("");
@@ -453,7 +478,7 @@ function RecruitDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (r: Rec
       open
       onClose={onClose}
       title={t("ingest.components.recruitAdd")}
-      width={480}
+      size={480}
       zIndex={1200}
       destroyOnHidden
       styles={{ body: { paddingTop: 8 } }}
@@ -468,13 +493,13 @@ function RecruitDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (r: Rec
       ])}
     >
       <Form.Item label={t("ingest.components.recruitName")} required {...drawerFormItemProps}>
-        <Input placeholder={t("common.inputPlaceholder")} value={name} onChange={(e) => setName(e.target.value)} />
+        <Input placeholder={ph.input(t("ingest.components.recruitName"))} value={name} onChange={(e) => setName(e.target.value)} />
       </Form.Item>
       <Form.Item label={t("common.topic")} required {...drawerFormItemProps}>
-        <Input placeholder={t("common.inputPlaceholder")} value={topic} onChange={(e) => setTopic(e.target.value)} />
+        <Input placeholder={ph.input(t("common.topic"))} value={topic} onChange={(e) => setTopic(e.target.value)} />
       </Form.Item>
       <Form.Item label={t("common.payload")} {...drawerFormItemProps}>
-        <Input.TextArea rows={4} placeholder={t("common.inputPlaceholder")} value={payload} onChange={(e) => setPayload(e.target.value)} />
+        <Input.TextArea rows={4} placeholder={ph.input(t("common.payload"))} value={payload} onChange={(e) => setPayload(e.target.value)} />
       </Form.Item>
       <Form.Item label={t("common.target")} {...drawerFormItemProps}>
         <div className="flex items-center gap-5 text-xs text-foreground">

@@ -1,4 +1,4 @@
-import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
+﻿import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
 import { useEffect, useState } from "react";
 import { DATA_UNITS, defaultPropertyValueType } from "@/lib/data-types";
 import type { EnumDataItem, SimpleFunctionParam } from "@/types/api/metadata";
@@ -67,7 +67,7 @@ export function ArgParamDrawer({ open, initial, dataTypes, onClose, onSave }: Ar
         label="参数标识"
         required
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >
@@ -77,7 +77,7 @@ export function ArgParamDrawer({ open, initial, dataTypes, onClose, onSave }: Ar
         label="参数名称"
         required
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >
@@ -89,7 +89,7 @@ export function ArgParamDrawer({ open, initial, dataTypes, onClose, onSave }: Ar
       <Form.Item
         label="类型"
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >
@@ -111,7 +111,7 @@ export function ArgParamDrawer({ open, initial, dataTypes, onClose, onSave }: Ar
         <Form.Item
           label="小数位"
           layout="horizontal"
-          labelCol={{ flex: "72px" }}
+          labelCol={{ flex: "120px" }}
           wrapperCol={{ flex: 1 }}
           className="mb-3"
         >
@@ -151,7 +151,7 @@ export function ArgParamDrawer({ open, initial, dataTypes, onClose, onSave }: Ar
       <Form.Item
         label="单位"
         layout="horizontal"
-        labelCol={{ flex: "72px" }}
+        labelCol={{ flex: "120px" }}
         wrapperCol={{ flex: 1 }}
         className="mb-3"
       >

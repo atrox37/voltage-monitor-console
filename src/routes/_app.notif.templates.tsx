@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Drawer, Form, Input, Select } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { showError, showSuccess } from "@/lib/api-message";
 import {
   deleteNotifyTemplate,
@@ -271,6 +272,7 @@ function AddTemplateDrawer({
   onSave: (name: string, configId: string) => void;
 }) {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const [name, setName] = useState("");
   const [configId, setConfigId] = useState("");
   const valid = name.trim() && configId;
@@ -280,7 +282,7 @@ function AddTemplateDrawer({
       open
       onClose={onCancel}
       title={t("notif.templates.addTitle")}
-      width={480}
+      size={480}
       destroyOnHidden
       styles={{ body: { paddingTop: 8 } }}
       footer={drawerFooter([
@@ -296,7 +298,7 @@ function AddTemplateDrawer({
     >
       <Form.Item label={t("notif.templates.notifyName")} required {...drawerFormItemProps}>
         <Input
-          placeholder={t("notif.templates.notifyNamePlaceholder")}
+          placeholder={ph.input(t("notif.templates.notifyName"))}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -304,7 +306,7 @@ function AddTemplateDrawer({
       <Form.Item label={t("notif.templates.notifyConfig")} required {...drawerFormItemProps}>
         <Select
           value={configId || undefined}
-          placeholder={t("common.select")}
+          placeholder={ph.select(t("notif.templates.notifyConfig"))}
           onChange={setConfigId}
           options={configs.map((c) => ({ value: c.id, label: c.name }))}
         />
@@ -368,7 +370,7 @@ function TemplateDrawer({
         open
         onClose={onClose}
         title={t("notif.templates.detailTitle")}
-        width={testOpen ? 700 : 640}
+        size={testOpen ? 700 : 640}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={drawerFooter([
@@ -517,7 +519,7 @@ function TestSendDrawer({
       open
       onClose={onClose}
       title={t("notif.templates.testTitle")}
-      width={480}
+      size={480}
       zIndex={1100}
       mask={false}
       destroyOnHidden
