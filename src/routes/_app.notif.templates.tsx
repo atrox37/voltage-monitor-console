@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Drawer, Form, Input, Select } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { drawerFooter, detailFormItemProps, selectFormItemProps } from "@/components/drawer-form";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
 import { showError, showSuccess } from "@/lib/api-message";
 import {
   deleteNotifyTemplate,
@@ -273,9 +274,9 @@ function AddTemplateDrawer({
 }) {
   const { t } = useTranslation();
   const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<{ name: string; configId: string }>();
   const [name, setName] = useState("");
   const [configId, setConfigId] = useState("");
-  const valid = name.trim() && configId;
 
   return (
     <Drawer
@@ -291,26 +292,57 @@ function AddTemplateDrawer({
           key: "save",
           label: saving ? t("common.saving") : t("common.save"),
           type: "primary",
-          disabled: !valid || saving,
-          onClick: () => valid && onSave(name.trim(), configId),
+          disabled: saving,
+          onClick: async () => {
+            try {
+              await formApi.validateFields();
+            } catch {
+              return;
+            }
+            onSave(name.trim(), configId);
+          },
         },
       ])}
     >
-      <Form.Item label={t("notif.templates.notifyName")} required {...drawerFormItemProps}>
-        <Input
-          placeholder={ph.input(t("notif.templates.notifyName"))}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </Form.Item>
-      <Form.Item label={t("notif.templates.notifyConfig")} required {...drawerFormItemProps}>
-        <Select
-          value={configId || undefined}
-          placeholder={ph.select(t("notif.templates.notifyConfig"))}
-          onChange={setConfigId}
-          options={configs.map((c) => ({ value: c.id, label: c.name }))}
-        />
-      </Form.Item>
+      <Form form={formApi} layout="horizontal">
+        <Form.Item
+          name="name"
+          label={t("notif.templates.notifyName")}
+          required
+          {...detailFormItemProps}
+          rules={[requiredInputRule(t, t("notif.templates.notifyName"))]}
+        >
+          <Input
+            placeholder={ph.input(t("notif.templates.notifyName"))}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              formApi.setFieldValue("name", e.target.value);
+            }}
+          />
+        </Form.Item>
+        <Form.Item
+          name="configId"
+          label={t("notif.templates.notifyConfig")}
+          required
+          {...detailFormItemProps}
+          {...selectFormItemProps}
+          rules={[requiredSelectRule(t, t("notif.templates.notifyConfig"))]}
+        >
+          <Select
+            className="vt-select-control"
+            classNames={{ popup: { root: "vt-select-popup" } }}
+            style={{ width: "100%" }}
+            value={configId || undefined}
+            placeholder={ph.select(t("notif.templates.notifyConfig"))}
+            onChange={(value) => {
+              setConfigId(value);
+              formApi.setFieldValue("configId", value);
+            }}
+            options={configs.map((c) => ({ value: c.id, label: c.name }))}
+          />
+        </Form.Item>
+      </Form>
     </Drawer>
   );
 }
@@ -331,11 +363,25 @@ function TemplateDrawer({
   onSave: (t: TemplateEditorForm) => void;
 }) {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<
+    Pick<TemplateEditorForm, "name" | "configId" | "contentTitle" | "contentBody">
+  >();
   const [d, setD] = useState<TemplateEditorForm>(value);
   const [testOpen, setTestOpen] = useState(false);
   const cfg = configs.find((c) => c.id === d.configId);
   const set = <K extends keyof TemplateEditorForm>(k: K, v: TemplateEditorForm[K]) =>
     setD((x) => ({ ...x, [k]: v }));
+
+  useEffect(() => {
+    setD(value);
+    formApi.setFieldsValue({
+      name: value.name,
+      configId: value.configId,
+      contentTitle: value.contentTitle,
+      contentBody: value.contentBody,
+    });
+  }, [formApi, value]);
 
   const tokens = useMemo(() => {
     const vars = new Set<string>();
@@ -381,7 +427,14 @@ function TemplateDrawer({
             label: saving ? t("common.saving") : t("notif.templates.saveTemplate"),
             type: "primary",
             disabled: saving,
-            onClick: () => onSave(d),
+            onClick: async () => {
+              try {
+                await formApi.validateFields();
+              } catch {
+                return;
+              }
+              onSave(d);
+            },
           },
         ])}
       >
@@ -389,39 +442,88 @@ function TemplateDrawer({
           <h4 className="mb-4 border-b border-panel-border pb-2 text-sm font-semibold text-foreground">
             {t("notif.templates.basicInfo")}
           </h4>
-          <Form.Item label={t("notif.templates.templateName")} required {...drawerFormItemProps}>
-            <Input value={d.name} onChange={(e) => set("name", e.target.value)} />
-          </Form.Item>
-          <Form.Item label={t("notif.templates.notifyConfig")} required {...drawerFormItemProps}>
-            <div className="flex items-center gap-2">
-              {cfg && (
-                <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] text-primary">
-                  {codeLabel(cfg.code)}
-                </span>
-              )}
-              <Select
-                className="flex-1"
-                disabled={mode === "edit"}
-                value={d.configId}
-                onChange={handleConfigChange}
-                options={configs.map((c) => ({ value: c.id, label: c.name }))}
+          <Form form={formApi} layout="horizontal">
+            <Form.Item
+              name="name"
+              label={t("notif.templates.templateName")}
+              required
+              {...detailFormItemProps}
+              rules={[requiredInputRule(t, t("notif.templates.templateName"))]}
+            >
+              <Input
+                value={d.name}
+                placeholder={ph.input(t("notif.templates.templateName"))}
+                onChange={(e) => {
+                  set("name", e.target.value);
+                  formApi.setFieldValue("name", e.target.value);
+                }}
               />
-            </div>
-          </Form.Item>
-          <Form.Item label={t("notif.templates.contentTitle")} required {...drawerFormItemProps}>
-            <Input value={d.contentTitle} onChange={(e) => set("contentTitle", e.target.value)} />
-          </Form.Item>
-          <Form.Item label={t("notif.templates.contentBody")} required {...drawerFormItemProps}>
-            <Input.TextArea
-              rows={5}
-              value={d.contentBody}
-              onChange={(e) => set("contentBody", e.target.value)}
-              placeholder={t("notif.templates.contentBodyPlaceholder")}
-            />
-            <p className="mt-1 text-[11px] text-text-muted">
-              {t("notif.templates.contentBodyHint")}
-            </p>
-          </Form.Item>
+            </Form.Item>
+            <Form.Item
+              name="configId"
+              label={t("notif.templates.notifyConfig")}
+              required
+              {...detailFormItemProps}
+              {...selectFormItemProps}
+              rules={[requiredSelectRule(t, t("notif.templates.notifyConfig"))]}
+            >
+              <div className="flex items-center gap-2">
+                {cfg && (
+                  <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[11px] text-primary">
+                    {codeLabel(cfg.code)}
+                  </span>
+                )}
+                <Select
+                  className="vt-select-control flex-1"
+                  classNames={{ popup: { root: "vt-select-popup" } }}
+                  disabled={mode === "edit"}
+                  value={d.configId || undefined}
+                  placeholder={ph.select(t("notif.templates.notifyConfig"))}
+                  onChange={(configId) => {
+                    handleConfigChange(configId);
+                    formApi.setFieldValue("configId", configId);
+                  }}
+                  options={configs.map((c) => ({ value: c.id, label: c.name }))}
+                />
+              </div>
+            </Form.Item>
+            <Form.Item
+              name="contentTitle"
+              label={t("notif.templates.contentTitle")}
+              required
+              {...detailFormItemProps}
+              rules={[requiredInputRule(t, t("notif.templates.contentTitle"))]}
+            >
+              <Input
+                value={d.contentTitle}
+                placeholder={ph.input(t("notif.templates.contentTitle"))}
+                onChange={(e) => {
+                  set("contentTitle", e.target.value);
+                  formApi.setFieldValue("contentTitle", e.target.value);
+                }}
+              />
+            </Form.Item>
+            <Form.Item
+              name="contentBody"
+              label={t("notif.templates.contentBody")}
+              required
+              {...detailFormItemProps}
+              rules={[requiredInputRule(t, t("notif.templates.contentBody"))]}
+            >
+              <Input.TextArea
+                rows={5}
+                value={d.contentBody}
+                onChange={(e) => {
+                  set("contentBody", e.target.value);
+                  formApi.setFieldValue("contentBody", e.target.value);
+                }}
+                placeholder={t("notif.templates.contentBodyPlaceholder")}
+              />
+              <p className="mt-1 text-[11px] text-text-muted">
+                {t("notif.templates.contentBodyHint")}
+              </p>
+            </Form.Item>
+          </Form>
         </section>
 
         <section className="mb-6">
@@ -432,7 +534,7 @@ function TemplateDrawer({
             <p className="text-xs text-text-muted">{t("notif.templates.noVarTokens")}</p>
           ) : (
             tokens.vars.map((v) => (
-              <Form.Item key={v} label={v} {...drawerFormItemProps}>
+              <Form.Item key={v} label={v} {...detailFormItemProps}>
                 <Input
                   value={d.variables[v] ?? ""}
                   onChange={(e) => upsertVar(v, e.target.value)}
@@ -451,7 +553,7 @@ function TemplateDrawer({
             <p className="text-xs text-text-muted">{t("notif.templates.noPointTokens")}</p>
           ) : (
             tokens.pts.map((p) => (
-              <Form.Item key={p} label={p} {...drawerFormItemProps}>
+              <Form.Item key={p} label={p} {...detailFormItemProps}>
                 <Input
                   value={d.points[p] ?? ""}
                   onChange={(e) => upsertPt(p, e.target.value)}
@@ -484,6 +586,8 @@ function TestSendDrawer({
   onSent: () => void;
 }) {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<{ recipient: string }>();
   const [users, setUsers] = useState<SysUserPageDto[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [receiver, setReceiver] = useState("");
@@ -500,7 +604,11 @@ function TestSendDrawer({
   }, [t]);
 
   const handleSend = async () => {
-    if (!receiver) return;
+    try {
+      await formApi.validateFields();
+    } catch {
+      return;
+    }
     setSending(true);
     try {
       await sendNotifyTemplateTest(buildTemplateTestPayload(form, receiver));
@@ -535,18 +643,33 @@ function TestSendDrawer({
         },
       ])}
     >
-      <Form.Item label={t("notif.templates.recipient")} required {...drawerFormItemProps}>
-        <Select
-          value={receiver || undefined}
-          disabled={loadingUsers}
-          placeholder={t("notif.templates.recipientPlaceholder")}
-          onChange={setReceiver}
-          options={users.map((u) => ({
-            value: String(u.sysUserPo.id),
-            label: u.sysUserPo.username,
-          }))}
-        />
-      </Form.Item>
+      <Form form={formApi} layout="horizontal">
+        <Form.Item
+          name="recipient"
+          label={t("notif.templates.recipient")}
+          required
+          {...detailFormItemProps}
+          {...selectFormItemProps}
+          rules={[requiredSelectRule(t, t("notif.templates.recipient"))]}
+        >
+          <Select
+            className="vt-select-control"
+            classNames={{ popup: { root: "vt-select-popup" } }}
+            style={{ width: "100%" }}
+            value={receiver || undefined}
+            disabled={loadingUsers}
+            placeholder={ph.select(t("notif.templates.recipient"))}
+            onChange={(value) => {
+              setReceiver(value);
+              formApi.setFieldValue("recipient", value);
+            }}
+            options={users.map((u) => ({
+              value: String(u.sysUserPo.id),
+              label: u.sysUserPo.username,
+            }))}
+          />
+        </Form.Item>
+      </Form>
     </Drawer>
   );
 }

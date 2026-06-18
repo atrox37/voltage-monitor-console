@@ -251,7 +251,11 @@ export function TabChildren() {
   const append = (parentId: string | null) => {
     updateMetadata((m) => {
       const nextTrees = JSON.parse(JSON.stringify(m.trees ?? [])) as SimpleTreeMetadata[];
-      const node: SimpleTreeMetadata = { id: newNodeId(), name: "节点", children: [] };
+      const node: SimpleTreeMetadata = {
+        id: newNodeId(),
+        name: t("common.defaultNodeName"),
+        children: [],
+      };
       if (parentId === null) {
         nextTrees.push(node);
         return { ...m, trees: nextTrees };

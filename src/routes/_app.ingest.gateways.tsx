@@ -11,12 +11,14 @@ import {
   pageProtocols,
   saveGateway,
 } from "@/api";
-import { DatePicker, Drawer, Form, Input, Pagination, Select, Switch, Table } from "antd";
+import { DatePicker, Drawer, Form, Input, Pagination, Select, Table } from "antd";
+import { OptionToggle } from "@/components/option-toggle";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
-import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { drawerFooter, drawerFormItemProps, selectFormItemProps } from "@/components/drawer-form";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
-import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
+import { requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
+import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
 import type { OrgNode } from "@/components/org-tree-select";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
 import {
@@ -242,13 +244,8 @@ function GatewaysPage() {
           {
             key: "enabled",
             title: t("common.status"),
-            render: (r) => (
-              <span
-                className={`rounded px-2 py-0.5 text-[11px] ${r.enabled ? "bg-status-online/15 text-status-online" : "bg-status-warning/15 text-status-warning"}`}
-              >
-                {r.enabled ? t("common.yes") : t("common.no")}
-              </span>
-            ),
+            width: 96,
+            render: (r) => <StatusBadge status={r.enabled ? "enabled" : "disabled"} />,
           },
           {
             key: "updateTime",
@@ -314,6 +311,7 @@ function GatewayDrawer({
 }) {
   const { t } = useTranslation();
   const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<GatewayForm>();
   const [d, setD] = useState<GatewayForm>(value);
   const [networks, setNetworks] = useState<NetworkConfigPo[]>([]);
   const [protocols, setProtocols] = useState<DeviceProtocolPageDto[]>([]);
@@ -321,7 +319,8 @@ function GatewayDrawer({
 
   useEffect(() => {
     setD(value);
-  }, [value]);
+    formApi.setFieldsValue(value);
+  }, [formApi, value]);
 
   useEffect(() => {
     let canceled = false;
@@ -378,7 +377,14 @@ function GatewayDrawer({
           label: saving ? t("common.saving") : t("common.save"),
           type: "primary",
           disabled: saving || optionsLoading,
-          onClick: () => onSave(d),
+          onClick: async () => {
+            try {
+              await formApi.validateFields();
+            } catch {
+              return;
+            }
+            onSave(d);
+          },
         },
       ])}
     >
@@ -388,56 +394,92 @@ function GatewayDrawer({
           {t("common.loading")}
         </div>
       )}
-      <Form.Item label={t("common.nameLabel")} required {...drawerFormItemProps}>
-        <Input
-          placeholder={ph.input(t("common.nameLabel"))}
-          value={d.name}
-          onChange={(e) => set("name", e.target.value)}
-        />
-      </Form.Item>
+      <Form form={formApi} layout="horizontal">
+        <Form.Item
+          name="name"
+          label={t("common.nameLabel")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredInputRule(t, t("common.nameLabel"))]}
+        >
+          <Input
+            placeholder={ph.input(t("common.nameLabel"))}
+            value={d.name}
+            onChange={(e) => {
+              set("name", e.target.value);
+              formApi.setFieldValue("name", e.target.value);
+            }}
+          />
+        </Form.Item>
 
-      <Form.Item label={t("ingest.gateways.networkComp")} required {...drawerFormItemProps}>
-        <Select
-          className="vt-select-control"
-          classNames={{ popup: { root: "vt-select-popup" } }}
-          value={d.networkId || undefined}
-          placeholder={ph.select(t("ingest.gateways.networkComp"))}
-          onChange={(networkId) => {
-            set("networkId", networkId);
-            set("protocolId", "");
-          }}
-          options={networks.map((n) => ({
-            value: String(n.id),
-            label: `${n.name} (${n.type})`,
-          }))}
-        />
-      </Form.Item>
+        <Form.Item
+          name="networkId"
+          label={t("ingest.gateways.networkComp")}
+          required
+          {...drawerFormItemProps}
+          {...selectFormItemProps}
+          rules={[requiredSelectRule(t, t("ingest.gateways.networkComp"))]}
+        >
+          <Select
+            className="vt-select-control"
+            classNames={{ popup: { root: "vt-select-popup" } }}
+            value={d.networkId || undefined}
+            placeholder={ph.select(t("ingest.gateways.networkComp"))}
+            onChange={(networkId) => {
+              set("networkId", networkId);
+              set("protocolId", "");
+              formApi.setFieldsValue({ networkId, protocolId: "" });
+            }}
+            options={networks.map((n) => ({
+              value: String(n.id),
+              label: `${n.name} (${n.type})`,
+            }))}
+          />
+        </Form.Item>
 
-      <Form.Item label={t("ingest.gateways.protocol")} required {...drawerFormItemProps}>
-        <Select
-          className="vt-select-control"
-          classNames={{ popup: { root: "vt-select-popup" } }}
-          value={d.protocolId || undefined}
-          placeholder={
-            d.networkId
-              ? ph.select(t("ingest.gateways.protocol"))
-              : t("ingest.gateways.selectNetworkFirst")
-          }
-          disabled={!d.networkId || optionsLoading}
-          onChange={(protocolId) => set("protocolId", protocolId)}
-          options={protocolOptions.map((p) => ({
-            value: String(p.id),
-            label: p.name ?? "",
-          }))}
-        />
-      </Form.Item>
+        <Form.Item
+          name="protocolId"
+          label={t("ingest.gateways.protocol")}
+          required
+          {...drawerFormItemProps}
+          {...selectFormItemProps}
+          rules={[requiredSelectRule(t, t("ingest.gateways.protocol"))]}
+        >
+          <Select
+            className="vt-select-control"
+            classNames={{ popup: { root: "vt-select-popup" } }}
+            value={d.protocolId || undefined}
+            placeholder={
+              d.networkId
+                ? ph.select(t("ingest.gateways.protocol"))
+                : t("ingest.gateways.selectNetworkFirst")
+            }
+            disabled={!d.networkId || optionsLoading}
+            onChange={(protocolId) => {
+              set("protocolId", protocolId);
+              formApi.setFieldValue("protocolId", protocolId);
+            }}
+            options={protocolOptions.map((p) => ({
+              value: String(p.id),
+              label: p.name ?? "",
+            }))}
+          />
+        </Form.Item>
 
-      <Form.Item label={t("common.status")} {...drawerFormItemProps}>
-        <Switch checked={d.enabled} onChange={(enabled) => set("enabled", enabled)} />
-        <span className="ml-2 text-xs text-text-secondary">
-          {d.enabled ? t("common.on") : t("common.off")}
-        </span>
-      </Form.Item>
+        <Form.Item label={t("common.status")} {...drawerFormItemProps}>
+          <OptionToggle
+            value={d.enabled ? 1 : 0}
+            onChange={(v) => {
+              const enabled = v === 1;
+              set("enabled", enabled);
+            }}
+            options={[
+              { label: t("common.disabled"), value: 0 },
+              { label: t("common.enabled"), value: 1 },
+            ]}
+          />
+        </Form.Item>
+      </Form>
     </Drawer>
   );
 }

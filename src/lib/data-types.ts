@@ -60,6 +60,30 @@ export function unitLabel(unit: string | null | undefined, _loc = getLocale()): 
   return hit.unit || "—";
 }
 
+type TFn = (key: string, params?: Record<string, string | number>) => string;
+
+/** 将历史类型 double/float/int 等归一为表单可选的 number */
+export function normalizePropertyType(type?: string) {
+  if (type === "double" || type === "float" || type === "int" || type === "long") return "number";
+  return type ?? "string";
+}
+
+/** 属性/参数类型展示文案 */
+export function propertyTypeLabel(t: TFn, type?: string) {
+  const id = normalizePropertyType(type);
+  if (id === "string") return t("common.dataTypeString");
+  if (id === "number") return t("common.dataTypeNumber");
+  if (id === "enum") return t("common.dataTypeEnum");
+  return type ?? "—";
+}
+
+export function dataTypeSelectOptions(t: TFn, types: DataTypeOption[]) {
+  return types.map((item) => ({
+    value: item.id,
+    label: propertyTypeLabel(t, item.id),
+  }));
+}
+
 export function defaultPropertyValueType(type = "string") {
   if (type === "number") {
     return { type: "number" as const, extra: { point: 1 }, unit: "" };

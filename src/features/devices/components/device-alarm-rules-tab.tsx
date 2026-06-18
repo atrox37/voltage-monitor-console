@@ -1,11 +1,32 @@
+import { useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useState } from "react";
 import { parseDeviceRule, updateDeviceRule } from "@/api";
-import { AlarmConditionBuilder } from "@/features/devices/components/alarm-condition-builder";
 import { DetailTable } from "@/components/detail-table";
+import { detailFormItemProps, selectFormItemProps } from "@/components/drawer-form";
 import { OptionToggle } from "@/components/option-toggle";
+import {
+  RowActionBtn,
+  RowActionGroup,
+  RowActionToggle,
+} from "@/components/row-action-buttons";
+import { useTranslation } from "@/i18n";
+import { showApiError, showSuccess } from "@/lib/api-message";
+import {
+  hasValidAlarmHandlers,
+  isAlarmConditionFilled,
+  requiredInputRule,
+  requiredInputError,
+  requiredSelectRule,
+} from "@/lib/form-validation";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { POLL_INTERVAL_OPTIONS, normalizeRuleCron } from "@/lib/poll-interval";
+import { isRequestCanceled } from "@/lib/request";
+import { vtActionColumn } from "@/lib/table-utils";
+import type { JSqlColumn, RuleModel } from "@/types";
+import { useDeviceEdit } from "@/features/devices/contexts/device-edit-context";
+import { AlarmConditionBuilder } from "@/features/devices/components/alarm-condition-builder";
 import { DeviceAlarmHandlerEditor } from "@/features/devices/components/device-alarm-handler-editor";
 import {
   buildHandlerRuleMeta,
@@ -13,29 +34,27 @@ import {
   type DeviceAlarmHandlerRow,
 } from "@/features/devices/lib/device-alarm-handler-mappers";
 import {
-  RowActionBtn,
-  RowActionGroup,
-  RowActionToggle,
-} from "@/components/row-action-buttons";
-import { showApiError, showSuccess } from "@/lib/api-message";
-import { useDeviceEdit } from "@/features/devices/contexts/device-edit-context";
-import {
   formatRuleCondition,
   jsqlToAlarmColumns,
   rulePollLabel,
   type AlarmCond,
 } from "@/features/devices/lib/rule-format";
-import { POLL_INTERVAL_OPTIONS, normalizeRuleCron } from "@/lib/poll-interval";
-import { isRequestCanceled } from "@/lib/request";
-import { vtActionColumn } from "@/lib/table-utils";
-import { useTranslation } from "@/i18n";
-import type { JSqlColumn, RuleModel } from "@/types";
 
 type RuleDraft = RuleModel & { columns?: AlarmCond[][] };
 
 export function DeviceAlarmRulesTab() {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const { device, updateMetadata, save, reload } = useDeviceEdit();
+  const [formApi] = Form.useForm<{
+    name: string;
+    state: number;
+    triggerMode: string;
+    pollInterval: string;
+    triggerCount: number;
+    triggerCondition: string;
+    notificationHandler: string;
+  }>();
   const [draft, setDraft] = useState<{
     rule: RuleDraft;
     handlers: DeviceAlarmHandlerRow[];
@@ -61,6 +80,31 @@ export function DeviceAlarmRulesTab() {
       })),
     );
 
+  const syncRuleFormFields = (
+    rule: RuleDraft,
+    handlers: DeviceAlarmHandlerRow[] | undefined,
+  ) => {
+    formApi.setFieldsValue({
+      name: rule.name,
+      state: rule.state ?? 0,
+      triggerMode: rule.ruleData?.type ?? "time",
+      pollInterval: normalizeRuleCron(rule.ruleData),
+      triggerCount: rule.ruleData?.count ?? 1,
+      triggerCondition: isAlarmConditionFilled(rule.columns) ? "ok" : "",
+      notificationHandler: hasValidAlarmHandlers(handlers) ? "ok" : "",
+    });
+  };
+
+  const syncRuleValidation = (
+    columns: AlarmCond[][] | undefined,
+    handlers: DeviceAlarmHandlerRow[] | undefined,
+  ) => {
+    formApi.setFieldsValue({
+      triggerCondition: isAlarmConditionFilled(columns) ? "ok" : "",
+      notificationHandler: hasValidAlarmHandlers(handlers) ? "ok" : "",
+    });
+  };
+
   const openNew = () => {
     const rule: RuleDraft = {
       id: `r${Date.now()}`,
@@ -71,6 +115,7 @@ export function DeviceAlarmRulesTab() {
       columns: [[]],
     };
     setDraft({ rule, handlers: [], deletedHandlerIds: [], isNew: true });
+    syncRuleFormFields(rule, []);
     setDrawerOpen(true);
   };
 
@@ -86,12 +131,14 @@ export function DeviceAlarmRulesTab() {
         cron: normalizeRuleCron(base.ruleData),
       };
       base.columns = detail.columns?.length ? jsqlToAlarmColumns(detail.columns) : [[]];
+      const handlers = mapNotifyDtosToRows(detail.notifyDtos);
       setDraft({
         rule: base,
-        handlers: mapNotifyDtosToRows(detail.notifyDtos),
+        handlers,
         deletedHandlerIds: [],
         isNew: false,
       });
+      syncRuleFormFields(base, handlers);
     } catch (err) {
       if (isRequestCanceled(err)) return;
       const base: RuleDraft = {
@@ -104,6 +151,7 @@ export function DeviceAlarmRulesTab() {
         },
       };
       setDraft({ rule: base, handlers: [], deletedHandlerIds: [], isNew: false });
+      syncRuleFormFields(base, []);
       showApiError(err, t("devices.detail.rules.loadFailed"));
     } finally {
       setLoading(false);
@@ -113,6 +161,7 @@ export function DeviceAlarmRulesTab() {
   const closeDrawer = () => {
     setDrawerOpen(false);
     setDraft(null);
+    formApi.resetFields();
   };
 
   const persistRuleList = async (nextRules: RuleModel[]) => {
@@ -136,9 +185,7 @@ export function DeviceAlarmRulesTab() {
     try {
       const detail = await parseDeviceRule({ ruleId: r.id, deviceId: device.id });
       const baseRule = detail.rulePo ?? r;
-      const alarmColumns = detail.columns?.length
-        ? jsqlToAlarmColumns(detail.columns)
-        : [[]];
+      const alarmColumns = detail.columns?.length ? jsqlToAlarmColumns(detail.columns) : [[]];
       const handlers = mapNotifyDtosToRows(detail.notifyDtos);
       const { ruleMeta, delMeta } = buildHandlerRuleMeta(handlers, device.id, r.id, []);
       await updateDeviceRule({
@@ -159,7 +206,13 @@ export function DeviceAlarmRulesTab() {
   };
 
   const handleSave = async () => {
-    if (!draft || !draft.rule.name.trim()) return;
+    if (!draft) return;
+    syncRuleFormFields(draft.rule, draft.handlers);
+    try {
+      await formApi.validateFields();
+    } catch {
+      return;
+    }
     setSaving(true);
     try {
       const cron = normalizeRuleCron(draft.rule.ruleData);
@@ -221,7 +274,7 @@ export function DeviceAlarmRulesTab() {
     },
     {
       key: "condition",
-      title: "触发条件",
+      title: t("common.triggerCondition"),
       render: (_, r) => (
         <span className="max-w-md text-xs text-text-secondary">
           {formatRuleCondition(r, properties)}
@@ -275,31 +328,18 @@ export function DeviceAlarmRulesTab() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="mb-2 flex shrink-0 items-center justify-end">
-        <button
-          type="button"
-          onClick={openNew}
-          className="vt-detail-action-btn px-2.5 py-1 text-xs"
-        >
+        <button type="button" onClick={openNew} className="vt-detail-action-btn px-2.5 py-1 text-xs">
           <PlusOutlined /> {t("devices.detail.rules.addRule")}
         </button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-panel-border">
-        <DetailTable<RuleModel>
-          rowKey="id"
-          columns={ruleColumns}
-          dataSource={rules}
-          locale={{ emptyText: t("common.noRules") }}
-        />
+        <DetailTable rowKey="id" columns={ruleColumns} dataSource={rules} locale={{ emptyText: t("common.noRules") }} />
       </div>
 
       <Drawer
         open={drawerOpen}
         onClose={closeDrawer}
-        title={
-          draft?.isNew
-            ? t("devices.detail.rules.addRuleDrawer")
-            : t("devices.detail.rules.editRule")
-        }
+        title={draft?.isNew ? t("devices.detail.rules.addRuleDrawer") : t("devices.detail.rules.editRule")}
         size={760}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
@@ -308,12 +348,7 @@ export function DeviceAlarmRulesTab() {
             <Button type="default" size="small" onClick={closeDrawer}>
               {t("common.cancel")}
             </Button>
-            <Button
-              type="primary"
-              size="small"
-              disabled={saving || loading}
-              onClick={() => void handleSave()}
-            >
+            <Button type="primary" size="small" disabled={saving || loading} onClick={() => void handleSave()}>
               {saving ? t("common.saving") : t("common.save")}
             </Button>
           </div>
@@ -322,32 +357,35 @@ export function DeviceAlarmRulesTab() {
         {loading ? (
           <p className="text-sm text-text-muted">{t("devices.detail.loading")}</p>
         ) : draft ? (
-          <>
+          <Form form={formApi} layout="horizontal">
             <Form.Item
+              name="name"
               label={t("common.ruleName")}
               required
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              {...detailFormItemProps}
+              rules={[requiredInputRule(t, t("common.ruleName"))]}
             >
               <Input
                 value={draft.rule.name}
-                onChange={(e) =>
-                  setDraft({ ...draft, rule: { ...draft.rule, name: e.target.value } })
-                }
+                onChange={(e) => {
+                  setDraft({ ...draft, rule: { ...draft.rule, name: e.target.value } });
+                  formApi.setFieldValue("name", e.target.value);
+                }}
               />
             </Form.Item>
             <Form.Item
+              name="state"
               label={t("common.status")}
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              required
+              {...detailFormItemProps}
+              rules={[requiredSelectRule(t, t("common.status"))]}
             >
               <OptionToggle
                 value={(draft.rule.state ?? 0) as 0 | 1}
-                onChange={(v) => setDraft({ ...draft, rule: { ...draft.rule, state: v } })}
+                onChange={(v) => {
+                  setDraft({ ...draft, rule: { ...draft.rule, state: v } });
+                  formApi.setFieldValue("state", v);
+                }}
                 options={[
                   { label: t("status.enabled"), value: 1 },
                   { label: t("status.disabled"), value: 0 },
@@ -355,85 +393,125 @@ export function DeviceAlarmRulesTab() {
               />
             </Form.Item>
             <Form.Item
+              name="triggerMode"
               label={t("devices.detail.rules.triggerTime")}
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              required
+              {...detailFormItemProps}
+              rules={[requiredSelectRule(t, t("common.triggerMode"))]}
             >
               <span className="inline-flex items-center rounded bg-primary/10 px-2 py-1 text-xs text-primary">
                 {t("devices.detail.rules.triggerTime")}
               </span>
             </Form.Item>
             <Form.Item
+              name="pollInterval"
               label={t("common.pollInterval")}
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              required
+              {...detailFormItemProps}
+              {...selectFormItemProps}
+              rules={[requiredSelectRule(t, t("common.pollInterval"))]}
             >
               <Select
                 className="vt-select-control"
                 classNames={{ popup: { root: "vt-select-popup" } }}
                 style={{ width: "100%" }}
+                placeholder={ph.select(t("common.pollInterval"))}
                 value={normalizeRuleCron(draft.rule.ruleData)}
-                onChange={(v) =>
+                onChange={(v) => {
                   setDraft({
                     ...draft,
-                    rule: {
-                      ...draft.rule,
-                      ruleData: { ...(draft.rule.ruleData ?? { type: "time" }), cron: v },
-                    },
-                  })
-                }
+                    rule: { ...draft.rule, ruleData: { ...(draft.rule.ruleData ?? { type: "time" }), cron: v } },
+                  });
+                  formApi.setFieldValue("pollInterval", v);
+                }}
                 options={POLL_INTERVAL_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
               />
             </Form.Item>
             <Form.Item
+              name="triggerCount"
               label={t("common.thresholdCount")}
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              required
+              {...detailFormItemProps}
+              rules={[
+                {
+                  validator: async (_, val) => {
+                    if (!val || Number(val) < 1) {
+                      return Promise.reject(requiredInputError(t, t("common.triggerThreshold")));
+                    }
+                  },
+                },
+              ]}
             >
               <InputNumber
                 className="w-full"
                 min={1}
                 value={draft.rule.ruleData?.count ?? 1}
-                onChange={(v) =>
+                onChange={(v) => {
+                  const count = Number(v) || 1;
                   setDraft({
                     ...draft,
-                    rule: {
-                      ...draft.rule,
-                      ruleData: {
-                        ...(draft.rule.ruleData ?? { type: "time" }),
-                        count: Number(v) || 1,
-                      },
-                    },
-                  })
-                }
+                    rule: { ...draft.rule, ruleData: { ...(draft.rule.ruleData ?? { type: "time" }), count } },
+                  });
+                  formApi.setFieldValue("triggerCount", count);
+                }}
               />
             </Form.Item>
-            <Form.Item label="触发条件" layout="vertical" className="mb-3">
+            <Form.Item
+              name="triggerCondition"
+              label={t("common.triggerCondition")}
+              required
+              layout="vertical"
+              className="mb-3"
+              rules={[
+                {
+                  validator: async () => {
+                    if (!isAlarmConditionFilled(draft.rule.columns)) {
+                      return Promise.reject(t("validation.triggerConditionRequired"));
+                    }
+                  },
+                },
+              ]}
+            >
               <AlarmConditionBuilder
                 groups={draft.rule.columns ?? [[]]}
                 properties={properties}
-                onChange={(columns) => setDraft({ ...draft, rule: { ...draft.rule, columns } })}
+                onChange={(columns) => {
+                  setDraft({ ...draft, rule: { ...draft.rule, columns } });
+                  syncRuleValidation(columns, draft.handlers);
+                }}
                 noPropertiesHint={t("devices.detail.meta.noMetadata")}
               />
             </Form.Item>
-            <Form.Item label="处理方式" layout="vertical" className="mb-0">
+            <Form.Item
+              name="notificationHandler"
+              label={t("common.notificationHandling")}
+              required
+              layout="vertical"
+              className="mb-0"
+              rules={[
+                {
+                  validator: async () => {
+                    if (!hasValidAlarmHandlers(draft.handlers)) {
+                      return Promise.reject(t("validation.notificationHandlerRequired"));
+                    }
+                  },
+                },
+              ]}
+            >
               <DeviceAlarmHandlerEditor
                 rows={draft.handlers}
                 deletedIds={draft.deletedHandlerIds}
                 properties={properties}
-                onChange={(handlers) => setDraft({ ...draft, handlers })}
+                onChange={(handlers) => {
+                  setDraft({ ...draft, handlers });
+                  syncRuleValidation(draft.rule.columns, handlers);
+                }}
                 onDeletedIdsChange={(deletedHandlerIds) =>
                   setDraft({ ...draft, deletedHandlerIds })
                 }
               />
             </Form.Item>
-          </>
+          </Form>
         ) : null}
       </Drawer>
     </div>

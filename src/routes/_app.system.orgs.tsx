@@ -13,7 +13,7 @@ import {
 } from "@ant-design/icons";
 import { Button, Drawer, Empty, Form, Input, Spin, Table } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
-import { type ComponentType, useMemo, useState } from "react";
+import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { showSuccess } from "@/lib/api-message";
 import { deleteDimension, getDimensionOne, saveDimension } from "@/api/sys";
 import { OrgTreeSelect, type OrgNode, flattenOrgs } from "@/components/org-tree-select";
@@ -24,6 +24,9 @@ import { useDimensionTreeQuery } from "@/hooks/use-dimension-tree-query";
 import { queryKeys } from "@/lib/query-keys";
 import { toDbId } from "@/lib/query-terms";
 import { useTranslation } from "@/i18n";
+import { detailFormItemProps } from "@/components/drawer-form";
+import { requiredInputRule } from "@/lib/form-validation";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 
 export const Route = createFileRoute("/_app/system/orgs")({
   component: OrgsPage,
@@ -48,6 +51,8 @@ function filterTree(tree: OrgNode[], kw: string): { tree: OrgNode[]; matched: Se
 
 function OrgsPage() {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<{ name: string }>();
   const queryClient = useQueryClient();
   const { data: tree = [], isLoading: loading } = useDimensionTreeQuery();
   const [editing, setEditing] = useState<{
@@ -80,6 +85,10 @@ function OrgsPage() {
     const baseTree = focusedNode ? [focusedNode] : tree;
     return filterTree(baseTree, keyword);
   }, [focusedNode, tree, keyword]);
+
+  useEffect(() => {
+    formApi.setFieldsValue({ name: editing?.name ?? "" });
+  }, [editing, formApi]);
 
   const handleAction = async (
     cmd: "edit" | "members" | "add" | "delete" | "toggle" | "focus",
@@ -120,7 +129,12 @@ function OrgsPage() {
   };
 
   const saveEditing = async () => {
-    if (!editing || !editing.name.trim()) return;
+    if (!editing) return;
+    try {
+      await formApi.validateFields();
+    } catch {
+      return;
+    }
     setSaving(true);
     try {
       if (editing.mode === "edit" && editing.id) {
@@ -133,6 +147,7 @@ function OrgsPage() {
       }
       showSuccess(t("common.saveSuccess"));
       setEditing(null);
+      formApi.resetFields();
       invalidateTree();
     } finally {
       setSaving(false);
@@ -212,7 +227,10 @@ function OrgsPage() {
 
       <Drawer
         open={!!editing}
-        onClose={() => setEditing(null)}
+        onClose={() => {
+          setEditing(null);
+          formApi.resetFields();
+        }}
         title={editing?.mode === "add" ? t("orgs.add") : t("orgs.edit")}
         size={480}
         destroyOnHidden
@@ -234,14 +252,11 @@ function OrgsPage() {
         }
       >
         {editing && (
-          <>
+          <Form form={formApi} layout="horizontal">
             {editing.mode === "edit" && editing.id && (
               <Form.Item
                 label={t("orgs.orgId")}
-                layout="horizontal"
-                labelCol={{ flex: "120px" }}
-                wrapperCol={{ flex: 1 }}
-                className="mb-3"
+                {...detailFormItemProps}
               >
                 <Input value={editing.id} disabled />
               </Form.Item>
@@ -249,10 +264,7 @@ function OrgsPage() {
             {editing.mode === "add" && editing.parentId && (
               <Form.Item
                 label={t("orgs.parentOrg")}
-                layout="horizontal"
-                labelCol={{ flex: "120px" }}
-                wrapperCol={{ flex: 1 }}
-                className="mb-3"
+                {...detailFormItemProps}
               >
                 <Input
                   value={allOrgs.find((n) => n.id === editing.parentId)?.label ?? editing.parentId}
@@ -261,21 +273,23 @@ function OrgsPage() {
               </Form.Item>
             )}
             <Form.Item
+              name="name"
               label={t("orgs.orgName")}
               required
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              {...detailFormItemProps}
+              rules={[requiredInputRule(t, t("orgs.orgName"))]}
             >
               <Input
                 value={editing.name}
-                placeholder={t("orgs.orgNamePlaceholder")}
-                onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                placeholder={ph.input(t("orgs.orgName"))}
+                onChange={(e) => {
+                  setEditing({ ...editing, name: e.target.value });
+                  formApi.setFieldValue("name", e.target.value);
+                }}
                 autoFocus
               />
             </Form.Item>
-          </>
+          </Form>
         )}
       </Drawer>
 

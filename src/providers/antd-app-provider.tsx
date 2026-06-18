@@ -1,10 +1,12 @@
-﻿import { App, ConfigProvider, theme } from "antd";
+import { App, ConfigProvider, theme } from "antd";
+import enUS from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 import dayjs from "dayjs";
+import "dayjs/locale/en";
 import "dayjs/locale/zh-cn";
 import type { ReactNode } from "react";
-
-dayjs.locale("zh-cn");
+import { useEffect } from "react";
+import { useTranslation } from "@/i18n";
 
 /** Voltage EMS 深色工业风 — 对齐 styles.css token */
 export const antdTheme = {
@@ -89,8 +91,14 @@ export const antdTheme = {
 } as const;
 
 export function AntdAppProvider({ children }: { children: ReactNode }) {
+  const { locale } = useTranslation();
+
+  useEffect(() => {
+    dayjs.locale(locale === "zh-CN" ? "zh-cn" : "en");
+  }, [locale]);
+
   return (
-    <ConfigProvider locale={zhCN} theme={antdTheme}>
+    <ConfigProvider locale={locale === "zh-CN" ? zhCN : enUS} theme={antdTheme}>
       <App>{children}</App>
     </ConfigProvider>
   );

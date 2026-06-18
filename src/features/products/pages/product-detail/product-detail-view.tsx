@@ -1,9 +1,10 @@
-﻿import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeftOutlined, SaveOutlined, SyncOutlined } from "@ant-design/icons";
 import { Button, Spin, Tabs, Tag } from "antd";
+import { useTranslation } from "@/i18n";
 import { useProductEdit } from "@/features/products/contexts/product-edit-context";
-import { PRODUCT_TYPE_LABEL } from "@/features/products/lib/product-mappers";
+import { useProductTypeLabel } from "@/features/products/lib/product-type-i18n";
 import { TabInfo } from "./tabs/info-tab";
 import { TabMeta } from "./tabs/meta-tab";
 import { TabTree } from "./tabs/tree-tab";
@@ -14,6 +15,8 @@ type TabKey = ProductDetailTabKey;
 
 export function ProductDetailView() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const getProductTypeLabel = useProductTypeLabel();
   const { product, loading, saving, syncing, save, syncEdge } = useProductEdit();
   const [tab, setTab] = useState<TabKey>("info");
 
@@ -21,7 +24,7 @@ export function ProductDetailView() {
     return (
       <main className="vt-page-content vt-page-fill">
         <div className="vt-glass flex flex-1 items-center justify-center">
-          <Spin description="加载中…" />
+          <Spin description={t("devices.detail.loading")} />
         </div>
       </main>
     );
@@ -31,9 +34,9 @@ export function ProductDetailView() {
     return (
       <main className="vt-page-content vt-page-fill">
         <div className="vt-glass flex flex-1 items-center justify-center text-sm text-text-muted">
-          产品不存在或已被删除。
+          {t("devices.products.detail.notFound")}
           <Link to="/devices/products" className="ml-2 text-primary hover:underline">
-            返回列表
+            {t("common.backToList")}
           </Link>
         </div>
       </main>
@@ -41,12 +44,12 @@ export function ProductDetailView() {
   }
 
   const tabs: { key: TabKey; label: string; hidden?: boolean }[] = [
-    { key: "info", label: "基础信息" },
-    { key: "meta", label: "物模型" },
-    { key: "tree", label: "网关分路", hidden: product.type !== "gateway" },
-    { key: "rule", label: "告警规则" },
+    { key: "info", label: t("devices.products.detail.tabs.info") },
+    { key: "meta", label: t("devices.products.detail.tabs.meta") },
+    { key: "tree", label: t("devices.products.detail.tabs.tree"), hidden: product.type !== "gateway" },
+    { key: "rule", label: t("devices.products.detail.tabs.rule") },
   ];
-  const visible = tabs.filter((t) => !t.hidden);
+  const visible = tabs.filter((item) => !item.hidden);
 
   const typeColor =
     product.type === "gateway" ? "processing" : product.type === "device" ? "success" : "warning";
@@ -60,10 +63,10 @@ export function ProductDetailView() {
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate({ to: "/devices/products" })}
           >
-            返回
+            {t("common.back")}
           </Button>
           <h2 className="vt-section-title text-base">{product.name}</h2>
-          <Tag color={typeColor}>{PRODUCT_TYPE_LABEL[product.type]}</Tag>
+          <Tag color={typeColor}>{getProductTypeLabel(product.type)}</Tag>
           <span className="text-[11px] text-text-muted">ID</span>
           <span className="text-xs text-text-secondary">{product.id}</span>
         </div>
@@ -74,7 +77,7 @@ export function ProductDetailView() {
             disabled={syncing}
             onClick={() => void syncEdge()}
           >
-            边缘同步
+            {t("common.edgeSync")}
           </Button>
           <Button
             type="primary"
@@ -84,7 +87,7 @@ export function ProductDetailView() {
             loading={saving}
             onClick={() => void save()}
           >
-            {saving ? "保存中…" : "保存"}
+            {saving ? t("common.saving") : t("common.save")}
           </Button>
         </div>
       </div>
@@ -92,6 +95,7 @@ export function ProductDetailView() {
       <Tabs
         activeKey={tab}
         onChange={(key) => setTab(key as TabKey)}
+        destroyInactiveTabPane
         size="small"
         className="vt-detail-tabs min-h-0 flex-1"
         items={visible.map((tabItem) => ({

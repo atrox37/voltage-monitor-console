@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import {
   DeleteOutlined,
   DownOutlined,
@@ -6,9 +6,8 @@ import {
   PlusOutlined,
   RightOutlined,
 } from "@ant-design/icons";
-
+import { useTranslation } from "@/i18n";
 import type { SimpleTreeMetadata } from "@/types/api/metadata";
-
 import { IconAction } from "./icon-action";
 
 export function TreeNode({
@@ -26,6 +25,7 @@ export function TreeNode({
   selectedId?: string | null;
   onSelect?: (n: SimpleTreeMetadata) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(true);
   const hasChildren = !!node.children?.length;
   const selected = selectedId === node.id;
@@ -55,21 +55,18 @@ export function TreeNode({
           )}
           <span className="text-foreground">{node.name}</span>
         </div>
-        <div
-          className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <IconAction icon={EditOutlined} label="重命名" onClick={() => onRename(node)} />
-          <IconAction icon={PlusOutlined} label="新增子节点" onClick={() => onAppend(node.id)} />
-          <IconAction icon={DeleteOutlined} label="删除" danger onClick={() => onDelete(node)} />
+        <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+          <IconAction icon={EditOutlined} label={t("common.rename")} onClick={() => onRename(node)} />
+          <IconAction icon={PlusOutlined} label={t("common.addChildNode")} onClick={() => onAppend(node.id)} />
+          <IconAction icon={DeleteOutlined} label={t("common.delete")} danger onClick={() => onDelete(node)} />
         </div>
       </div>
       {hasChildren && open && (
         <ul>
-          {node.children!.map((c) => (
+          {node.children!.map((child) => (
             <TreeNode
-              key={c.id}
-              node={c}
+              key={child.id}
+              node={child}
               onAppend={onAppend}
               onRename={onRename}
               onDelete={onDelete}

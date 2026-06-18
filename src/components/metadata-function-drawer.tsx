@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Button, Checkbox, Drawer, Form, Input } from "antd";
+import { detailFormItemProps } from "@/components/drawer-form";
 import { ArgParamDrawer } from "@/features/products/components/arg-param-drawer";
 import { ArgSection } from "@/features/products/pages/product-detail/components/arg-section";
-import { showError } from "@/lib/api-message";
 import { useTranslation } from "@/i18n";
+import { requiredInputRule } from "@/lib/form-validation";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import type { SimpleFunctionMetadata, SimpleFunctionParam } from "@/types/api/metadata";
 
 export type MetadataFunctionDraft = {
@@ -27,6 +29,8 @@ export function MetadataFunctionDrawer({
   onSave,
 }: MetadataFunctionDrawerProps) {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<{ id: string; name: string }>();
   const [local, setLocal] = useState<MetadataFunctionDraft | null>(draft);
   const [argTarget, setArgTarget] = useState<{
     kind: "inputs" | "outputs";
@@ -36,8 +40,13 @@ export function MetadataFunctionDrawer({
 
   useEffect(() => {
     setLocal(draft);
-    if (!draft) setArgTarget(null);
-  }, [draft]);
+    if (!draft) {
+      setArgTarget(null);
+      formApi.resetFields();
+      return;
+    }
+    formApi.setFieldsValue({ id: draft.data.id, name: draft.data.name });
+  }, [draft, formApi]);
 
   const saveArgParam = (param: SimpleFunctionParam) => {
     if (!local || !argTarget) return;
@@ -48,10 +57,16 @@ export function MetadataFunctionDrawer({
     setArgTarget(null);
   };
 
-  const handleSave = () => {
+  const handleClose = () => {
+    setArgTarget(null);
+    onClose();
+  };
+
+  const handleSave = async () => {
     if (!local) return;
-    if (!local.data.id.trim() || !local.data.name.trim()) {
-      showError(t("common.requiredHint"));
+    try {
+      await formApi.validateFields();
+    } catch {
       return;
     }
     onSave(local);
@@ -65,53 +80,56 @@ export function MetadataFunctionDrawer({
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         open={open}
-        onClose={onClose}
+        onClose={handleClose}
         title={isNew ? t("common.addFunction") : t("common.editFunction")}
         size={560}
-        mask={!argTarget}
+        mask
+        maskClosable={!argTarget}
         keyboard={!argTarget}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={onClose}>
+            <Button type="default" size="small" onClick={handleClose}>
               {t("common.cancel")}
             </Button>
-            <Button type="primary" size="small" onClick={handleSave}>
+            <Button type="primary" size="small" onClick={() => void handleSave()}>
               {t("common.save")}
             </Button>
           </div>
         }
       >
         {local && (
-          <>
+          <Form form={formApi} layout="horizontal">
             <Form.Item
+              name="id"
               label={t("common.identifier")}
               required
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              {...detailFormItemProps}
+              rules={[requiredInputRule(t, t("common.identifier"))]}
             >
               <Input
                 value={local.data.id}
+                placeholder={ph.input(t("common.identifier"))}
                 disabled={!isNew && !local.data.create}
-                onChange={(e) =>
-                  setLocal({ ...local, data: { ...local.data, id: e.target.value } })
-                }
+                onChange={(e) => {
+                  setLocal({ ...local, data: { ...local.data, id: e.target.value } });
+                  formApi.setFieldValue("id", e.target.value);
+                }}
               />
             </Form.Item>
             <Form.Item
+              name="name"
               label={t("common.name")}
               required
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              {...detailFormItemProps}
+              rules={[requiredInputRule(t, t("common.name"))]}
             >
               <Input
                 value={local.data.name}
-                onChange={(e) =>
-                  setLocal({ ...local, data: { ...local.data, name: e.target.value } })
-                }
+                placeholder={ph.input(t("common.name"))}
+                onChange={(e) => {
+                  setLocal({ ...local, data: { ...local.data, name: e.target.value } });
+                  formApi.setFieldValue("name", e.target.value);
+                }}
               />
             </Form.Item>
             <Form.Item
@@ -162,7 +180,7 @@ export function MetadataFunctionDrawer({
                 setLocal({ ...local, data: { ...local.data, outputs: list } });
               }}
             />
-          </>
+          </Form>
         )}
       </Drawer>
 

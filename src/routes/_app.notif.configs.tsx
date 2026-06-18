@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Drawer, Form, Input, InputNumber } from "antd";
 import { useCallback, useEffect, useState } from "react";
+import { DrawerSegmentTabs } from "@/components/drawer-segment-tabs";
 import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { requiredInputRule } from "@/lib/form-validation";
 import { showError, showSuccess } from "@/lib/api-message";
 import { deleteNotifyConfig, pageNotifyConfigs, saveNotifyConfig } from "@/api";
 import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
@@ -213,6 +215,7 @@ function ConfigDrawer({
   onSave: (c: EmailConfigForm) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
 }) {
+  const [formApi] = Form.useForm<EmailConfigForm>();
   const [d, setD] = useState<EmailConfigForm>(value);
   const ph = useFormPlaceholder();
   const set = <K extends keyof EmailConfigForm>(k: K, v: EmailConfigForm[K]) =>
@@ -220,6 +223,10 @@ function ConfigDrawer({
 
   const isAws = d.code === "aws-email";
   const typeTitle = options.find((o) => o.value === d.code)?.label ?? d.code;
+  useEffect(() => {
+    setD(value);
+    formApi.setFieldsValue(value);
+  }, [formApi, value]);
 
   return (
     <Drawer
@@ -236,84 +243,134 @@ function ConfigDrawer({
           label: saving ? t("common.saving") : t("common.save"),
           type: "primary",
           disabled: saving,
-          onClick: () => onSave(d),
+          onClick: async () => {
+            try {
+              await formApi.validateFields();
+            } catch {
+              return;
+            }
+            onSave(d);
+          },
         },
       ])}
     >
-      <div className="mb-5">
-        <div className="inline-flex overflow-hidden rounded-md border border-panel-border">
-          {options.map((opt) => {
-            const active = d.code === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                disabled={mode === "edit"}
-                onClick={() => set("code", opt.value)}
-                className={`px-4 py-1.5 text-xs transition ${
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-panel text-text-secondary hover:text-foreground"
-                } ${mode === "edit" ? "cursor-not-allowed opacity-70" : ""}`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <Form.Item label={t("notif.configs.name")} required {...drawerFormItemProps}>
-        <Input
-          placeholder={ph.input(t("notif.configs.name"))}
-          value={d.name}
-          onChange={(e) => set("name", e.target.value)}
+      <Form form={formApi} layout="horizontal">
+        <DrawerSegmentTabs
+          options={options}
+          value={d.code}
+          disabled={mode === "edit"}
+          allTextWhite
+          onChange={(code) => set("code", code)}
         />
-      </Form.Item>
 
-      <Form.Item label={t("notif.configs.smtpHost")} required {...drawerFormItemProps}>
-        <Input
-          placeholder={ph.input(t("notif.configs.smtpHost"))}
-          value={d.smtpHost}
-          onChange={(e) => set("smtpHost", e.target.value)}
-        />
-      </Form.Item>
-
-      {!isAws && (
-        <Form.Item label={t("notif.configs.smtpPort")} required {...drawerFormItemProps}>
-          <InputNumber
-            className="w-full"
-            value={d.smtpPort}
-            onChange={(v) => set("smtpPort", Number(v) || 0)}
-          />
-        </Form.Item>
-      )}
-
-      {isAws && (
-        <Form.Item label={t("notif.configs.smtpUser")} required {...drawerFormItemProps}>
+        <Form.Item
+          name="name"
+          label={t("notif.configs.name")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredInputRule(t, t("notif.configs.name"))]}
+        >
           <Input
-            placeholder={ph.input(t("notif.configs.smtpUser"))}
-            value={d.smtpUser}
-            onChange={(e) => set("smtpUser", e.target.value)}
+            placeholder={ph.input(t("notif.configs.name"))}
+            value={d.name}
+            onChange={(e) => {
+              set("name", e.target.value);
+              formApi.setFieldValue("name", e.target.value);
+            }}
           />
         </Form.Item>
-      )}
 
-      <Form.Item label={t("notif.configs.smtpSecret")} required {...drawerFormItemProps}>
-        <Input.Password
-          placeholder={ph.input(t("notif.configs.smtpSecret"))}
-          value={d.smtpSecret}
-          onChange={(e) => set("smtpSecret", e.target.value)}
-        />
-      </Form.Item>
+        <Form.Item
+          name="smtpHost"
+          label={t("notif.configs.smtpHost")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredInputRule(t, t("notif.configs.smtpHost"))]}
+        >
+          <Input
+            placeholder={ph.input(t("notif.configs.smtpHost"))}
+            value={d.smtpHost}
+            onChange={(e) => {
+              set("smtpHost", e.target.value);
+              formApi.setFieldValue("smtpHost", e.target.value);
+            }}
+          />
+        </Form.Item>
 
-      <Form.Item label={t("notif.configs.sendEmail")} required {...drawerFormItemProps}>
-        <Input
-          placeholder={ph.input(t("notif.configs.sendEmail"))}
-          value={d.sendEmail}
-          onChange={(e) => set("sendEmail", e.target.value)}
-        />
-      </Form.Item>
+        {!isAws && (
+          <Form.Item
+            name="smtpPort"
+            label={t("notif.configs.smtpPort")}
+            required
+            {...drawerFormItemProps}
+            rules={[requiredInputRule(t, t("notif.configs.smtpPort"))]}
+          >
+            <InputNumber
+              className="w-full"
+              placeholder={ph.input(t("notif.configs.smtpPort"))}
+              value={d.smtpPort}
+              onChange={(v) => {
+                const next = Number(v) || 0;
+                set("smtpPort", next);
+                formApi.setFieldValue("smtpPort", next);
+              }}
+            />
+          </Form.Item>
+        )}
+
+        {isAws && (
+          <Form.Item
+            name="smtpUser"
+            label={t("notif.configs.smtpUser")}
+            required
+            {...drawerFormItemProps}
+            rules={[requiredInputRule(t, t("notif.configs.smtpUser"))]}
+          >
+            <Input
+              placeholder={ph.input(t("notif.configs.smtpUser"))}
+              value={d.smtpUser}
+              onChange={(e) => {
+                set("smtpUser", e.target.value);
+                formApi.setFieldValue("smtpUser", e.target.value);
+              }}
+            />
+          </Form.Item>
+        )}
+
+        <Form.Item
+          name="smtpSecret"
+          label={t("notif.configs.smtpSecret")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredInputRule(t, t("notif.configs.smtpSecret"))]}
+        >
+          <Input.Password
+            placeholder={ph.input(t("notif.configs.smtpSecret"))}
+            value={d.smtpSecret}
+            onChange={(e) => {
+              set("smtpSecret", e.target.value);
+              formApi.setFieldValue("smtpSecret", e.target.value);
+            }}
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="sendEmail"
+          label={t("notif.configs.sendEmail")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredInputRule(t, t("notif.configs.sendEmail"))]}
+        >
+          <Input
+            placeholder={ph.input(t("notif.configs.sendEmail"))}
+            value={d.sendEmail}
+            onChange={(e) => {
+              set("sendEmail", e.target.value);
+              formApi.setFieldValue("sendEmail", e.target.value);
+            }}
+          />
+        </Form.Item>
+      </Form>
     </Drawer>
   );
 }

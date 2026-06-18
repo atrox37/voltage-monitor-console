@@ -9,6 +9,7 @@ import { LineChart } from "echarts/charts";
 import { GridComponent, TooltipComponent, DataZoomComponent } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
 import { pageDevicePropertyData } from "@/api";
+import { useTranslation } from "@/i18n";
 import { termEq, toDbId } from "@/lib/query-terms";
 import { useTableScrollSync } from "@/lib/table-utils";
 import { useAdaptiveTableScrollY } from "@/lib/use-table-height";
@@ -35,6 +36,7 @@ export function DevicePropertyHistoryDialog({
   property: SimplePropertyMetadata | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("data");
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
@@ -125,7 +127,7 @@ export function DevicePropertyHistoryDialog({
     () => [
       {
         key: "ts",
-        title: "\u65f6\u95f4",
+        title: t("common.time"),
         dataIndex: "ts",
         width: 200,
         sorter: (a, b) => String(a.ts ?? "").localeCompare(String(b.ts ?? "")),
@@ -133,7 +135,7 @@ export function DevicePropertyHistoryDialog({
       },
       {
         key: "value",
-        title: "\u503c",
+        title: t("common.value"),
         render: (_: unknown, r: DevicePropertyRecord) => {
           if (property?.valueType?.type === "enum") {
             return enumData.find((d) => d.key === r.rawValue)?.value ?? r.rawValue ?? "-";
@@ -143,7 +145,7 @@ export function DevicePropertyHistoryDialog({
         },
       },
     ],
-    [enumData, isNumber, property?.valueType?.type],
+    [enumData, isNumber, property?.valueType?.type, t],
   );
   const historyTableRef = useTableScrollSync([rows, columns, page, pageSize, loading]);
   const historyTableScroll = useAdaptiveTableScrollY(historyTableRef, 360, [
@@ -192,7 +194,6 @@ export function DevicePropertyHistoryDialog({
         name: unit,
         nameTextStyle: { color: "#8b9bb8", fontSize: 11 },
         axisLabel: { color: "#8b9bb8", fontSize: 11 },
-        axisLine: { show: false },
         splitLine: { lineStyle: { color: "rgba(166, 182, 210, 0.1)" } },
       },
       dataZoom: [
@@ -233,7 +234,7 @@ export function DevicePropertyHistoryDialog({
   return (
     <Drawer
       open={open}
-      title={`\u5c5e\u6027\u8bb0\u5f55 - ${property.name}`}
+      title={t("devices.detail.runtime.propertyRecordTitle", { name: property.name })}
       onClose={onClose}
       size={560}
       styles={{ body: { minHeight: 420 } }}
@@ -259,7 +260,7 @@ export function DevicePropertyHistoryDialog({
         items={[
           {
             key: "data",
-            label: "\u6570\u636e",
+            label: t("common.dataTab"),
             children: (
               <div ref={historyTableRef}>
                 <Table<DevicePropertyRecord>
@@ -292,14 +293,14 @@ export function DevicePropertyHistoryDialog({
             ? [
                 {
                   key: "chart",
-                  label: "\u56fe\u8868",
+                  label: t("common.chart"),
                   children: chartLoading ? (
                     <div className="flex h-[360px] items-center justify-center">
                       <Spin />
                     </div>
                   ) : chartRows.length === 0 ? (
                     <div className="flex h-[360px] items-center justify-center text-sm text-text-muted">
-                      {"\u65e0\u6570\u636e"}
+                      {t("common.noData")}
                     </div>
                   ) : (
                     <ReactEChartsCore

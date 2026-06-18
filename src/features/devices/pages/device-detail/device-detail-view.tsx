@@ -120,6 +120,7 @@ export function DeviceDetailView() {
       <Tabs
         activeKey={tab}
         onChange={(key) => setTab(key as TabKey)}
+        destroyInactiveTabPane
         size="small"
         className="vt-detail-tabs min-h-0 flex-1"
         items={tabs.map((tabItem) => ({

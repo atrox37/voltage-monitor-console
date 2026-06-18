@@ -1,8 +1,9 @@
-﻿import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import { Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { useTranslation } from "@/i18n";
+import { propertyTypeLabel } from "@/lib/data-types";
 import { vtActionColumn } from "@/lib/table-utils";
-
 import type { SimpleFunctionParam } from "@/types/api/metadata";
 
 export function ArgSection({
@@ -18,23 +19,27 @@ export function ArgSection({
   onEdit: (i: number) => void;
   onDelete: (i: number) => void;
 }) {
+  const { t } = useTranslation();
+
   type ArgRow = SimpleFunctionParam & { index: number };
   const rows: ArgRow[] = items.map((item, index) => ({ ...item, index }));
   const columns: ColumnsType<ArgRow> = [
     {
       key: "id",
-      title: "标识",
+      title: t("common.identifier"),
       dataIndex: "id",
       render: (v) => <span className="font-mono text-[11px] text-text-secondary">{v}</span>,
     },
-    { key: "name", title: "名称", dataIndex: "name" },
+    { key: "name", title: t("common.name"), dataIndex: "name" },
     {
       key: "type",
-      title: "类型",
-      render: (_, row) => <span className="text-text-muted">{row.valueType?.type ?? "—"}</span>,
+      title: t("common.type"),
+      render: (_, row) => (
+        <span className="text-text-muted">{propertyTypeLabel(t, row.valueType?.type)}</span>
+      ),
     },
     vtActionColumn<ArgRow>(
-      "操作",
+      t("common.actions"),
       (row) => (
         <>
           <button
@@ -56,6 +61,7 @@ export function ArgSection({
       100,
     ),
   ];
+
   return (
     <div className="mt-4">
       <div className="mb-1.5 flex items-center justify-between">
@@ -65,18 +71,18 @@ export function ArgSection({
           onClick={onAdd}
           className="inline-flex items-center gap-1 rounded border border-panel-border px-2 py-0.5 text-[11px] text-text-secondary hover:border-primary/40 hover:text-primary"
         >
-          <PlusOutlined className="h-3 w-3" /> 添加
+          <PlusOutlined className="h-3 w-3" /> {t("common.add")}
         </button>
       </div>
       <div className="overflow-hidden rounded border border-panel-border">
-        <Table<ArgRow>
+        <Table
           rowKey="index"
           size="small"
           pagination={false}
           className="vt-ant-data-table"
           columns={columns}
           dataSource={rows}
-          locale={{ emptyText: "暂无参数" }}
+          locale={{ emptyText: t("common.noParams") }}
         />
       </div>
     </div>

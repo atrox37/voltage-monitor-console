@@ -1,15 +1,19 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { CopyOutlined } from "@ant-design/icons";
 import { Tooltip } from "antd";
+import { useTranslation } from "@/i18n";
 
 export function CopyableCell({ text, maxWidth = 560 }: { text: string; maxWidth?: number }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+
   const handleCopy = () => {
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
   };
+
   return (
     <Tooltip
       placement="topLeft"
@@ -23,7 +27,7 @@ export function CopyableCell({ text, maxWidth = 560 }: { text: string; maxWidth?
             onClick={handleCopy}
             className="inline-flex items-center gap-1 rounded bg-white/20 px-2 py-0.5 text-xs hover:bg-white/30"
           >
-            <CopyOutlined /> {copied ? "已复制" : "复制"}
+            <CopyOutlined /> {copied ? t("common.copied") : t("common.copy")}
           </button>
         </div>
       }

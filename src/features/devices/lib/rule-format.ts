@@ -1,6 +1,7 @@
-import type { RuleMeta, RuleModel, SimplePropertyMetadata } from "@/types/api/metadata";
-import type { JSqlColumn } from "@/types";
+import { getLocale, translate } from "@/i18n";
 import { cronLabel } from "@/lib/poll-interval";
+import type { JSqlColumn } from "@/types";
+import type { RuleMeta, RuleModel, SimplePropertyMetadata } from "@/types/api/metadata";
 
 export type AlarmCond = {
   column: string;
@@ -9,43 +10,50 @@ export type AlarmCond = {
   valueType?: string;
 };
 
-export const OPERATIONS_NUM = [
-  { value: ">", label: "大于" },
-  { value: "<", label: "小于" },
-  { value: "=", label: "等于" },
-  { value: ">=", label: "大于等于" },
-  { value: "<=", label: "小于等于" },
-  { value: "!=", label: "不等于" },
-] as const;
-
-export const OPERATIONS_ENUM = [{ value: "=", label: "等于" }] as const;
-
-export const OPERATIONS_STR = [
-  { value: "=", label: "等于" },
-  { value: "IS NOT NULL", label: "不为空" },
-] as const;
-
-export function operationsFor(type: string | undefined) {
-  if (type === "enum") return OPERATIONS_ENUM;
-  if (["int", "long", "float", "double", "number"].includes(type ?? "")) return OPERATIONS_NUM;
-  return OPERATIONS_STR;
+function opLabelMap() {
+  return {
+    ">": translate(getLocale(), "devices.products.detail.rule.opGt"),
+    "<": translate(getLocale(), "devices.products.detail.rule.opLt"),
+    "=": translate(getLocale(), "devices.products.detail.rule.opEq"),
+    ">=": translate(getLocale(), "devices.products.detail.rule.opGte"),
+    "<=": translate(getLocale(), "devices.products.detail.rule.opLte"),
+    "!=": translate(getLocale(), "devices.products.detail.rule.opNe"),
+    "IS NOT NULL": translate(getLocale(), "devices.products.detail.rule.opNotNull"),
+  } as const;
 }
 
-/** 列表展示轮询周期 — 对齐 TabProductRule.handlerCroe */
+export function operationsFor(type: string | undefined) {
+  const labels = opLabelMap();
+  if (type === "enum") return [{ value: "=", label: labels["="] }] as const;
+  if (["int", "long", "float", "double", "number"].includes(type ?? "")) {
+    return [
+      { value: ">", label: labels[">"] },
+      { value: "<", label: labels["<"] },
+      { value: "=", label: labels["="] },
+      { value: ">=", label: labels[">="] },
+      { value: "<=", label: labels["<="] },
+      { value: "!=", label: labels["!="] },
+    ] as const;
+  }
+  return [
+    { value: "=", label: labels["="] },
+    { value: "IS NOT NULL", label: labels["IS NOT NULL"] },
+  ] as const;
+}
+
 export function rulePollLabel(rule: RuleModel): string {
   const cron = rule.ruleData?.cron ?? (rule.ruleData as { cronNum?: string } | undefined)?.cronNum;
   return cronLabel(cron);
 }
 
-/** 列表展示触发条件 — 对齐 TabProductRule.formatSql */
 export function formatRuleCondition(rule: RuleModel, properties: SimplePropertyMetadata[]): string {
+  const empty = "—";
   try {
-    if (!rule.ruleMeta) return "—";
+    if (!rule.ruleMeta) return empty;
     let sql = String(rule.ruleMeta.sql || "");
     const param = rule.ruleMeta.param || {};
 
     const idNameMap = Object.fromEntries(properties.map((p) => [p.id, p.name || p.id]));
-
     const buckets: Record<string, unknown[]> = {};
     Object.keys(param).forEach((k) => {
       const v = param[k];
@@ -71,14 +79,12 @@ export function formatRuleCondition(rule: RuleModel, properties: SimplePropertyM
       sql = sql.replace(re, idNameMap[id]);
     });
 
-    return (
-      sql
-        .replace(/\band\b/gi, " 且 ")
-        .replace(/\bor\b/gi, " 或 ")
-        .trim() || "—"
-    );
+    const andWord = getLocale() === "zh-CN" ? " 且 " : " AND ";
+    const orWord = getLocale() === "zh-CN" ? " 或 " : " OR ";
+
+    return sql.replace(/\band\b/gi, andWord).replace(/\bor\b/gi, orWord).trim() || empty;
   } catch {
-    return "—";
+    return empty;
   }
 }
 

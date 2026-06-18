@@ -4,7 +4,7 @@ import CryptoJS from "crypto-js";
 import { LockOutlined } from "@ant-design/icons";
 import { Drawer, Form, Input, Select } from "antd";
 import { OptionToggle } from "@/components/option-toggle";
-import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { drawerFooter, drawerFormItemProps, selectFormItemProps } from "@/components/drawer-form";
 import { showError, showSuccess } from "@/lib/api-message";
 import { getDimensionTree, pageRoles, pageUsers, saveUser } from "@/api/sys";
 import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
@@ -15,6 +15,7 @@ import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { useTranslation } from "@/i18n";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
 import type { PageQuery, SysRolePo, SysUserPageDto, SysUserPo } from "@/types";
 
 export const Route = createFileRoute("/_app/system/users")({
@@ -81,6 +82,8 @@ function emptyForm(): UserForm {
 function UsersPage() {
   const { t } = useTranslation();
   const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<UserForm>();
+  const [passFormApi] = Form.useForm<{ password: string }>();
   const [rows, setRows] = useState<UserRow[]>([]);
   const [roles, setRoles] = useState<SysRolePo[]>([]);
   const [orgNodes, setOrgNodes] = useState<OrgNode[]>([]);
@@ -150,8 +153,10 @@ function UsersPage() {
   }, [fetchUsers]);
 
   const openAdd = () => {
-    setEditing(emptyForm());
+    const next = emptyForm();
+    setEditing(next);
     setIsAdd(true);
+    formApi.setFieldsValue(next);
   };
 
   const openEdit = (row: UserRow) => {
@@ -167,16 +172,23 @@ function UsersPage() {
       status: po.state === 0 ? "disabled" : "enabled",
     });
     setIsAdd(false);
+    formApi.setFieldsValue({
+      id: String(po.id ?? ""),
+      username: po.username,
+      roleId: String(po.roleId ?? ""),
+      orgId: String(po.orgId ?? ""),
+      email: po.email ?? "",
+      phone: po.phone ?? "",
+      password: "",
+      status: po.state === 0 ? "disabled" : "enabled",
+    });
   };
 
   const save = async () => {
     if (!editing) return;
-    if (!editing.username.trim() || !editing.roleId || !editing.orgId || !editing.email.trim()) {
-      showError(t("common.requiredHint"));
-      return;
-    }
-    if (isAdd && !editing.password.trim()) {
-      showError(t("users.passwordPlaceholder"));
+    try {
+      await formApi.validateFields();
+    } catch {
       return;
     }
 
@@ -205,7 +217,12 @@ function UsersPage() {
   };
 
   const savePass = async () => {
-    if (!passUser?.id || !newPass.trim()) return;
+    if (!passUser?.id) return;
+    try {
+      await passFormApi.validateFields();
+    } catch {
+      return;
+    }
     setSaving(true);
     try {
       await saveUser({
@@ -221,6 +238,7 @@ function UsersPage() {
       showSuccess(t("users.passwordUpdated"));
       setPassUser(null);
       setNewPass("");
+      passFormApi.resetFields();
       await fetchUsers();
     } finally {
       setSaving(false);
@@ -302,7 +320,10 @@ function UsersPage() {
 
       <Drawer
         open={!!editing}
-        onClose={() => setEditing(null)}
+        onClose={() => {
+          setEditing(null);
+          formApi.resetFields();
+        }}
         title={isAdd ? t("users.create") : t("users.edit")}
         size={480}
         destroyOnHidden
@@ -319,69 +340,136 @@ function UsersPage() {
         ])}
       >
         {editing && (
-          <>
-            <Form.Item label={t("users.username")} required {...drawerFormItemProps}>
+          <Form form={formApi} layout="horizontal">
+            <Form.Item
+              name="username"
+              label={t("users.username")}
+              required
+              {...drawerFormItemProps}
+              rules={[requiredInputRule(t, t("users.username"))]}
+            >
               <Input
                 value={editing.username}
                 placeholder={ph.input(t("users.username"))}
-                onChange={(e) => setEditing({ ...editing, username: e.target.value })}
+                onChange={(e) => {
+                  setEditing({ ...editing, username: e.target.value });
+                  formApi.setFieldValue("username", e.target.value);
+                }}
               />
             </Form.Item>
-            <Form.Item label={t("users.role")} required {...drawerFormItemProps}>
+            <Form.Item
+              name="roleId"
+              label={t("users.role")}
+              required
+              {...drawerFormItemProps}
+              {...selectFormItemProps}
+              rules={[requiredSelectRule(t, t("users.role"))]}
+            >
               <Select
+                className="vt-select-control"
+                classNames={{ popup: { root: "vt-select-popup" } }}
+                style={{ width: "100%" }}
                 value={editing.roleId || undefined}
                 placeholder={ph.select(t("users.role"))}
-                onChange={(roleId) => setEditing({ ...editing, roleId })}
+                onChange={(roleId) => {
+                  setEditing({ ...editing, roleId });
+                  formApi.setFieldValue("roleId", roleId);
+                }}
                 options={roles.map((r) => ({
                   value: String(r.id),
                   label: r.roleName ?? "",
                 }))}
               />
             </Form.Item>
-            <Form.Item label={t("users.org")} required {...drawerFormItemProps}>
+            <Form.Item
+              name="orgId"
+              label={t("users.org")}
+              required
+              {...drawerFormItemProps}
+              rules={[requiredSelectRule(t, t("users.org"))]}
+            >
               <OrgTreeSelect
                 nodes={orgNodes}
                 value={editing.orgId}
                 placeholder={ph.select(t("users.org"))}
-                onChange={(v) => setEditing({ ...editing, orgId: v })}
+                onChange={(v) => {
+                  setEditing({ ...editing, orgId: v });
+                  formApi.setFieldValue("orgId", v);
+                }}
               />
             </Form.Item>
-            <Form.Item label={t("users.email")} required {...drawerFormItemProps}>
+            <Form.Item
+              name="email"
+              label={t("users.email")}
+              required
+              {...drawerFormItemProps}
+              rules={[requiredInputRule(t, t("users.email"))]}
+            >
               <Input
                 type="email"
                 value={editing.email}
                 placeholder={ph.input(t("users.email"))}
-                onChange={(e) => setEditing({ ...editing, email: e.target.value })}
+                onChange={(e) => {
+                  setEditing({ ...editing, email: e.target.value });
+                  formApi.setFieldValue("email", e.target.value);
+                }}
               />
             </Form.Item>
-            <Form.Item label={t("users.phone")} {...drawerFormItemProps}>
+            <Form.Item
+              name="phone"
+              label={t("users.phone")}
+              required
+              {...drawerFormItemProps}
+              rules={[requiredInputRule(t, t("users.phone"))]}
+            >
               <Input
                 value={editing.phone}
                 placeholder={ph.input(t("users.phone"))}
-                onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
+                onChange={(e) => {
+                  setEditing({ ...editing, phone: e.target.value });
+                  formApi.setFieldValue("phone", e.target.value);
+                }}
               />
             </Form.Item>
             {isAdd && (
-              <Form.Item label={t("users.password")} required {...drawerFormItemProps}>
+              <Form.Item
+                name="password"
+                label={t("users.password")}
+                required
+                {...drawerFormItemProps}
+                rules={[requiredInputRule(t, t("users.password"))]}
+              >
                 <Input.Password
                   autoComplete="new-password"
                   value={editing.password}
                   placeholder={ph.input(t("users.password"))}
-                  onChange={(e) => setEditing({ ...editing, password: e.target.value })}
+                  onChange={(e) => {
+                    setEditing({ ...editing, password: e.target.value });
+                    formApi.setFieldValue("password", e.target.value);
+                  }}
                 />
               </Form.Item>
             )}
-            <Form.Item label={t("common.status")} {...drawerFormItemProps}>
+            <Form.Item
+              name="status"
+              label={t("common.status")}
+              required
+              {...drawerFormItemProps}
+              rules={[requiredSelectRule(t, t("common.status"))]}
+            >
               <OptionToggle<UserForm["status"]>
                 value={editing.status}
-                onChange={(v) => setEditing({ ...editing, status: v })}
+                onChange={(v) => {
+                  setEditing({ ...editing, status: v });
+                  formApi.setFieldValue("status", v);
+                }}
                 options={[
                   { label: t("common.disabled"), value: "disabled" },
                   { label: t("common.enabled"), value: "enabled" },
                 ]}
               />
             </Form.Item>
-          </>
+          </Form>
         )}
       </Drawer>
 
@@ -390,6 +478,7 @@ function UsersPage() {
         onClose={() => {
           setPassUser(null);
           setNewPass("");
+          passFormApi.resetFields();
         }}
         title={t("users.changePasswordTitle", { name: passUser?.username ?? "" })}
         size={400}
@@ -414,15 +503,26 @@ function UsersPage() {
           },
         ])}
       >
-        <Form.Item label={t("users.password")} required {...drawerFormItemProps}>
-          <Input.Password
-            autoComplete="new-password"
-            placeholder={ph.input(t("users.password"))}
-            value={newPass}
-            onChange={(e) => setNewPass(e.target.value)}
-            autoFocus
-          />
-        </Form.Item>
+        <Form form={passFormApi} layout="horizontal">
+          <Form.Item
+            name="password"
+            label={t("users.password")}
+            required
+            {...drawerFormItemProps}
+            rules={[requiredInputRule(t, t("users.password"))]}
+          >
+            <Input.Password
+              autoComplete="new-password"
+              placeholder={ph.input(t("users.password"))}
+              value={newPass}
+              onChange={(e) => {
+                setNewPass(e.target.value);
+                passFormApi.setFieldValue("password", e.target.value);
+              }}
+              autoFocus
+            />
+          </Form.Item>
+        </Form>
       </Drawer>
     </>
   );

@@ -34,7 +34,7 @@ export function OptionToggle<T extends string | number | boolean>({
             onClick={() => !disabled && onChange(opt.value)}
             className={`px-3 py-1.5 transition ${
               active
-                ? "bg-primary text-primary-foreground"
+                ? "bg-primary text-white"
                 : "bg-panel text-text-secondary hover:text-foreground"
             } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
           >

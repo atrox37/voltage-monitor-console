@@ -1,7 +1,8 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button, Drawer, Form, Input, Select, Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "@/i18n";
 import { pageNotifyTemplates } from "@/api";
 import { pageUsers } from "@/api/sys";
 import { isRequestCanceled } from "@/lib/request";
@@ -84,12 +85,12 @@ export function DeviceAlarmHandlerEditor({
   onDeletedIdsChange: (ids: (number | string)[]) => void;
   properties: SimplePropertyMetadata[];
 }) {
+  const { t } = useTranslation();
   const [templates, setTemplates] = useState<NotifyTemplatePageDto[]>([]);
   const [users, setUsers] = useState<{ id: string; label: string }[]>([]);
   const [varsDrawer, setVarsDrawer] = useState<VarsDrawerState | null>(null);
 
   const propertyIdSet = useMemo(() => new Set(properties.map((p) => String(p.id))), [properties]);
-
   const propertyNameMap = useMemo(
     () => Object.fromEntries(properties.map((p) => [String(p.id), p.name || p.id])),
     [properties],
@@ -120,11 +121,11 @@ export function DeviceAlarmHandlerEditor({
 
   const templateOptions = useMemo(
     () =>
-      templates.map((t) => ({
-        value: String(t.templatePo.id ?? ""),
-        label: t.templatePo.name ?? "",
-        configId: String(t.configPo?.id ?? t.templatePo.configId ?? ""),
-        template: t.templatePo,
+      templates.map((item) => ({
+        value: String(item.templatePo.id ?? ""),
+        label: item.templatePo.name ?? "",
+        configId: String(item.configPo?.id ?? item.templatePo.configId ?? ""),
+        template: item.templatePo,
       })),
     [templates],
   );
@@ -176,8 +177,8 @@ export function DeviceAlarmHandlerEditor({
     const pointKeys = parsePropertyPointKeys(hit.template);
     const existing = row.handlerData?.variables ?? {};
     const draft: Record<string, string> = {};
-    for (const k of [...templateKeys, ...pointKeys]) {
-      draft[k] = existing[k] != null ? String(existing[k]) : "";
+    for (const key of [...templateKeys, ...pointKeys]) {
+      draft[key] = existing[key] != null ? String(existing[key]) : "";
     }
     setVarsDrawer({ index, templateKeys, pointKeys, draft });
   };
@@ -192,11 +193,11 @@ export function DeviceAlarmHandlerEditor({
   const columns: ColumnsType<DeviceAlarmHandlerRow & { index: number }> = [
     {
       key: "user",
-      title: "通知用户",
+      title: t("common.notificationUser"),
       render: (_, r) => (
         <Select
           {...selectProps}
-          placeholder="选择用户"
+          placeholder={t("validation.requiredSelect", { label: t("common.notificationUser") })}
           value={r.userId || undefined}
           onChange={(v) => patchRow(r.index, { userId: v })}
           options={users.map((u) => ({ label: u.label, value: u.id }))}
@@ -205,11 +206,11 @@ export function DeviceAlarmHandlerEditor({
     },
     {
       key: "template",
-      title: "通知模板",
+      title: t("common.notificationTemplate"),
       render: (_, r) => (
         <Select
           {...selectProps}
-          placeholder="选择模板"
+          placeholder={t("validation.requiredSelect", { label: t("common.notificationTemplate") })}
           value={r.templateId || undefined}
           onChange={(v) => onTemplateChange(r.index, v)}
           options={templateOptions.map((o) => ({ label: o.label, value: o.value }))}
@@ -218,16 +219,11 @@ export function DeviceAlarmHandlerEditor({
     },
     {
       key: "vars",
-      title: "模板变量",
-      width: 100,
+      title: t("common.templateVariables"),
+      width: 120,
       render: (_, r) => (
-        <Button
-          type="default"
-          size="small"
-          disabled={!r.templateId}
-          onClick={() => openVarsDrawer(r.index)}
-        >
-          编辑
+        <Button type="default" size="small" disabled={!r.templateId} onClick={() => openVarsDrawer(r.index)}>
+          {t("common.edit")}
         </Button>
       ),
     },
@@ -250,13 +246,15 @@ export function DeviceAlarmHandlerEditor({
   return (
     <>
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-text-secondary">处理方式 · 通知</span>
+        <span className="text-xs font-medium text-text-secondary">
+          {t("common.notificationHandling")} · {t("common.notify")}
+        </span>
         <button
           type="button"
           onClick={addRow}
           className="inline-flex items-center gap-1 rounded border border-panel-border px-2 py-1 text-xs text-text-secondary hover:border-primary/40 hover:text-primary"
         >
-          <PlusOutlined className="h-3 w-3" /> 添加
+          <PlusOutlined className="h-3 w-3" /> {t("common.add")}
         </button>
       </div>
       <Table
@@ -265,20 +263,20 @@ export function DeviceAlarmHandlerEditor({
         pagination={false}
         columns={columns}
         dataSource={rows.map((row, index) => ({ ...row, index }))}
-        locale={{ emptyText: "尚未配置通知处理" }}
+        locale={{ emptyText: t("common.noNotificationHandlers") }}
       />
 
       <Drawer
         open={!!varsDrawer}
         onClose={() => setVarsDrawer(null)}
-        title="编辑模板变量"
+        title={t("common.editTemplateVariables")}
         size={480}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={
           <div className="flex justify-end gap-2">
             <Button type="default" size="small" onClick={() => setVarsDrawer(null)}>
-              取消
+              {t("common.cancel")}
             </Button>
             <Button
               type="primary"
@@ -296,7 +294,7 @@ export function DeviceAlarmHandlerEditor({
                 setVarsDrawer(null);
               }}
             >
-              确定
+              {t("common.confirm")}
             </Button>
           </div>
         }
@@ -313,7 +311,7 @@ export function DeviceAlarmHandlerEditor({
                 className="mb-3"
               >
                 <Input
-                  placeholder="无"
+                  placeholder={t("common.none")}
                   value={varsDrawer.draft[key] ?? ""}
                   onChange={(e) =>
                     setVarsDrawer({
@@ -325,13 +323,13 @@ export function DeviceAlarmHandlerEditor({
               </Form.Item>
             ))}
             {varsDrawer.templateKeys.length === 0 && varsDrawer.pointKeys.length === 0 && (
-              <p className="text-xs text-text-muted">该模板没有可编辑的变量占位符。</p>
+              <p className="text-xs text-text-muted">{t("common.noEditablePlaceholders")}</p>
             )}
 
             {varsDrawer.pointKeys.length > 0 && (
               <>
                 <h4 className="mb-2 mt-4 border-t border-panel-border pt-4 text-sm font-semibold text-foreground">
-                  涉及点位
+                  {t("common.involvedPoints")}
                 </h4>
                 <div className="mb-4 flex flex-wrap gap-1.5">
                   {matchedPointIds.length > 0 ? (
@@ -341,11 +339,11 @@ export function DeviceAlarmHandlerEditor({
                       </Tag>
                     ))
                   ) : (
-                    <span className="text-xs text-text-muted">无</span>
+                    <span className="text-xs text-text-muted">{t("common.none")}</span>
                   )}
                 </div>
 
-                <h4 className="mb-2 text-sm font-semibold text-foreground">未涉及点位</h4>
+                <h4 className="mb-2 text-sm font-semibold text-foreground">{t("common.uninvolvedPoints")}</h4>
                 <div className="flex flex-wrap gap-1.5">
                   {unmatchedPointIds.length > 0 ? (
                     unmatchedPointIds.map((id) => (
@@ -354,7 +352,7 @@ export function DeviceAlarmHandlerEditor({
                       </Tag>
                     ))
                   ) : (
-                    <span className="text-xs text-text-muted">无</span>
+                    <span className="text-xs text-text-muted">{t("common.none")}</span>
                   )}
                 </div>
               </>

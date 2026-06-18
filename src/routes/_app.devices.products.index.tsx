@@ -4,6 +4,7 @@ import { Button, Drawer, Form, Input } from "antd";
 import { OptionToggle } from "@/components/option-toggle";
 import { drawerFormItemProps } from "@/components/drawer-form";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
 import { useMemo, useState } from "react";
 import { showApiError, showSuccess } from "@/lib/api-message";
 import { deleteProduct, pageProducts, saveProduct } from "@/api";
@@ -48,6 +49,7 @@ function ProductsPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<ProductCreateForm>(emptyDraft());
+  const [formApi] = Form.useForm<ProductCreateForm>();
 
   const goDetail = (id: string) => navigate({ to: "/devices/products/$id", params: { id } });
 
@@ -79,6 +81,7 @@ function ProductsPage() {
       showSuccess(t("common.saveSuccess"));
       setAddOpen(false);
       setDraft(emptyDraft());
+      formApi.resetFields();
       invalidateList();
     },
     onError: (err) => {
@@ -100,8 +103,10 @@ function ProductsPage() {
   });
 
   const saveAdd = () => {
-    if (!draft.name.trim() || !draft.sn.trim()) return;
-    saveMutation.mutate(draft);
+    void formApi
+      .validateFields()
+      .then(() => saveMutation.mutate(draft))
+      .catch(() => undefined);
   };
 
   const handleDelete = (row: ProductListRow) => {
@@ -196,7 +201,9 @@ function ProductsPage() {
           setPage(1);
         }}
         onAdd={() => {
-          setDraft(emptyDraft());
+          const next = emptyDraft();
+          setDraft(next);
+          formApi.setFieldsValue(next);
           setAddOpen(true);
         }}
         rowActions={(r) => (
@@ -224,6 +231,9 @@ function ProductsPage() {
         title={t("devices.products.list.addDrawerTitle")}
         size={480}
         destroyOnHidden
+        afterOpenChange={(open) => {
+          if (open) formApi.setFieldsValue(draft);
+        }}
         styles={{ body: { paddingTop: 8 } }}
         footer={
           <div className="flex justify-end gap-2">
@@ -236,16 +246,22 @@ function ProductsPage() {
           </div>
         }
       >
-        <ProductForm value={draft} onChange={setDraft} />
+        <ProductForm
+          form={formApi}
+          value={draft}
+          onChange={setDraft}
+        />
       </Drawer>
     </>
   );
 }
 
 function ProductForm({
+  form,
   value,
   onChange,
 }: {
+  form: ReturnType<typeof Form.useForm<ProductCreateForm>>[0];
   value: ProductCreateForm;
   onChange: (v: ProductCreateForm) => void;
 }) {
@@ -254,28 +270,55 @@ function ProductForm({
   const productTypeOptions = useProductTypeOptions();
 
   return (
-    <>
-      <Form.Item label={t("common.productName")} required {...drawerFormItemProps}>
+    <Form form={form} layout="horizontal">
+      <Form.Item
+        name="name"
+        label={t("common.productName")}
+        required
+        {...drawerFormItemProps}
+        rules={[requiredInputRule(t, t("common.productName"))]}
+      >
         <Input
           value={value.name}
           placeholder={ph.input(t("common.productName"))}
-          onChange={(e) => onChange({ ...value, name: e.target.value })}
+          onChange={(e) => {
+            onChange({ ...value, name: e.target.value });
+            form.setFieldValue("name", e.target.value);
+          }}
         />
       </Form.Item>
-      <Form.Item label={t("common.productModel")} required {...drawerFormItemProps}>
+      <Form.Item
+        name="sn"
+        label={t("common.productModel")}
+        required
+        {...drawerFormItemProps}
+        rules={[requiredInputRule(t, t("common.productModel"))]}
+      >
         <Input
           value={value.sn}
           placeholder={ph.input(t("common.productModel"))}
-          onChange={(e) => onChange({ ...value, sn: e.target.value })}
+          onChange={(e) => {
+            onChange({ ...value, sn: e.target.value });
+            form.setFieldValue("sn", e.target.value);
+          }}
         />
       </Form.Item>
-      <Form.Item label={t("common.productType")} required {...drawerFormItemProps}>
+      <Form.Item
+        name="type"
+        label={t("common.productType")}
+        required
+        {...drawerFormItemProps}
+        rules={[requiredSelectRule(t, t("common.productType"))]}
+      >
         <OptionToggle
           value={value.type}
-          onChange={(v) => onChange({ ...value, type: v })}
+          onChange={(v) => {
+            onChange({ ...value, type: v });
+            form.setFieldValue("type", v);
+          }}
           options={productTypeOptions.map((opt) => ({ label: opt.label, value: opt.value }))}
         />
       </Form.Item>
-    </>
+    </Form>
   );
 }

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Drawer, Form, Input } from "antd";
 import { OptionToggle } from "@/components/option-toggle";
+import { drawerFormItemProps } from "@/components/drawer-form";
 import { LoadingOutlined, UploadOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons";
@@ -29,6 +30,7 @@ import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { useTranslation } from "@/i18n";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { requiredInputError, requiredInputRule } from "@/lib/form-validation";
 import type { DeviceProtocolPageDto, PageQuery } from "@/types";
 
 export const Route = createFileRoute("/_app/ingest/protocols")({
@@ -303,13 +305,15 @@ function ProtocolDrawer({
 }) {
   const { t } = useTranslation();
   const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<ProtocolForm>();
   const [draft, setDraft] = useState<ProtocolForm>(value);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     setDraft(value);
-  }, [value]);
+    formApi.setFieldsValue(value);
+  }, [formApi, value]);
 
   const set = <K extends keyof ProtocolForm>(k: K, v: ProtocolForm[K]) =>
     setDraft((d) => ({ ...d, [k]: v }));
@@ -317,7 +321,12 @@ function ProtocolDrawer({
   const onUpload = async (file: File | undefined) => {
     if (!file) return;
     if (!draft.provider.trim()) {
-      showError(t("common.requiredHint"));
+      formApi.setFields([
+        {
+          name: "provider",
+          errors: [requiredInputError(t, t("ingest.protocols.pkg"))],
+        },
+      ]);
       return;
     }
     setUploading(true);
@@ -330,6 +339,11 @@ function ProtocolDrawer({
       const res = await uploadProtocol(fd);
       set("location", res.url ?? "");
       set("support", res.support ?? []);
+      formApi.setFieldsValue({
+        location: res.url ?? "",
+        support: res.support ?? [],
+      });
+      await formApi.validateFields(["location"], { validateOnly: true });
     } catch (err) {
       if (isRequestCanceled(err)) return;
       showApiError(err, t("ingest.protocols.uploadFailed"));
@@ -364,119 +378,124 @@ function ProtocolDrawer({
               type="primary"
               size="small"
               disabled={saving || uploading}
-              onClick={() => onSave(draft)}
+              onClick={async () => {
+                try {
+                  await formApi.validateFields();
+                } catch {
+                  return;
+                }
+                onSave(draft);
+              }}
             >
               {saving ? t("common.saving") : t("common.save")}
             </Button>
           </div>
         }
       >
-        <Form.Item
-          label={t("common.nameLabel")}
-          required
-          layout="horizontal"
-          labelCol={{ flex: "120px" }}
-          wrapperCol={{ flex: 1 }}
-          className="mb-3"
-        >
+        <Form form={formApi} layout="horizontal">
+          <Form.Item
+            name="name"
+            label={t("common.nameLabel")}
+            required
+            {...drawerFormItemProps}
+            rules={[requiredInputRule(t, t("common.nameLabel"))]}
+          >
           <Input
             placeholder={ph.input(t("common.nameLabel"))}
             value={draft.name}
-            onChange={(e) => set("name", e.target.value)}
+            onChange={(e) => {
+              set("name", e.target.value);
+              formApi.setFieldValue("name", e.target.value);
+            }}
           />
-        </Form.Item>
-
-        {mode === "edit" && draft.support.length > 0 && (
-          <Form.Item
-            label={t("ingest.protocols.supportProtocol")}
-            layout="horizontal"
-            labelCol={{ flex: "120px" }}
-            wrapperCol={{ flex: 1 }}
-            className="mb-3"
-          >
-            <span className="inline-flex flex-wrap gap-1">
-              {draft.support.map((s) => (
-                <span
-                  key={s}
-                  className="rounded bg-status-online/15 px-2 py-1 text-xs text-status-online"
-                >
-                  {supportLabel(s, t)}
-                </span>
-              ))}
-            </span>
           </Form.Item>
-        )}
 
-        <Form.Item
-          label={t("ingest.protocols.storage")}
-          required
-          layout="horizontal"
-          labelCol={{ flex: "120px" }}
-          wrapperCol={{ flex: 1 }}
-          className="mb-3"
-        >
-          <OptionToggle
-            value={draft.storage}
-            onChange={(v) => set("storage", v)}
-            disabled={mode === "edit"}
-            options={[
-              { label: "S3", value: "S3" },
-              { label: "Minio", value: "Minio" },
-            ]}
-          />
-        </Form.Item>
+          {mode === "edit" && draft.support.length > 0 && (
+            <Form.Item label={t("ingest.protocols.supportProtocol")} {...drawerFormItemProps}>
+              <span className="inline-flex flex-wrap gap-1">
+                {draft.support.map((s) => (
+                  <span
+                    key={s}
+                    className="rounded bg-status-online/15 px-2 py-1 text-xs text-status-online"
+                  >
+                    {supportLabel(s, t)}
+                  </span>
+                ))}
+              </span>
+            </Form.Item>
+          )}
 
-        <Form.Item
-          label={t("ingest.protocols.pkg")}
-          required
-          layout="horizontal"
-          labelCol={{ flex: "120px" }}
-          wrapperCol={{ flex: 1 }}
-          className="mb-3"
-        >
-          <Input
-            placeholder={ph.input(t("ingest.protocols.pkg"))}
-            value={draft.provider}
-            onChange={(e) => set("provider", e.target.value)}
-          />
-        </Form.Item>
+          <Form.Item
+            name="storage"
+            label={t("ingest.protocols.storage")}
+            required
+            {...drawerFormItemProps}
+            rules={[requiredInputRule(t, t("ingest.protocols.storage"))]}
+          >
+            <OptionToggle
+              value={draft.storage}
+              onChange={(v) => {
+                set("storage", v);
+                formApi.setFieldValue("storage", v);
+              }}
+              disabled={mode === "edit"}
+              options={[
+                { label: "S3", value: "S3" },
+                { label: "Minio", value: "Minio" },
+              ]}
+            />
+          </Form.Item>
 
-        <Form.Item
-          label={t("ingest.protocols.upload")}
-          required
-          layout="horizontal"
-          labelCol={{ flex: "120px" }}
-          wrapperCol={{ flex: 1 }}
-          className="mb-3"
-        >
-          <div className="flex gap-2">
+          <Form.Item
+            name="provider"
+            label={t("ingest.protocols.pkg")}
+            required
+            {...drawerFormItemProps}
+            rules={[requiredInputRule(t, t("ingest.protocols.pkg"))]}
+          >
             <Input
-              readOnly
-              placeholder={ph.select(t("ingest.protocols.upload"))}
-              value={draft.location ? (draft.location.split("/").pop() ?? "") : ""}
+              placeholder={ph.input(t("ingest.protocols.pkg"))}
+              value={draft.provider}
+              onChange={(e) => {
+                set("provider", e.target.value);
+                formApi.setFieldValue("provider", e.target.value);
+              }}
             />
-            <Button
-              icon={uploading ? <LoadingOutlined spin /> : <UploadOutlined />}
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              title={t("common.selectFile")}
-            />
-          </div>
-        </Form.Item>
+          </Form.Item>
 
-        <Form.Item
-          label={t("ingest.protocols.description")}
-          layout="horizontal"
-          labelCol={{ flex: "120px" }}
-          wrapperCol={{ flex: 1 }}
-          className="mb-3"
-        >
-          <Input
-            placeholder={ph.input(t("ingest.protocols.description"))}
-            value={draft.description}
-            onChange={(e) => set("description", e.target.value)}
-          />
-        </Form.Item>
+          <Form.Item
+            name="location"
+            label={t("ingest.protocols.upload")}
+            required
+            {...drawerFormItemProps}
+            rules={[requiredInputRule(t, t("ingest.protocols.upload"))]}
+          >
+            <div className="flex gap-2">
+              <Input
+                readOnly
+                placeholder={ph.select(t("ingest.protocols.upload"))}
+                value={draft.location ? (draft.location.split("/").pop() ?? "") : ""}
+              />
+              <Button
+                icon={uploading ? <LoadingOutlined spin /> : <UploadOutlined />}
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                title={t("common.selectFile")}
+              />
+            </div>
+          </Form.Item>
+
+          <Form.Item name="description" label={t("ingest.protocols.description")} {...drawerFormItemProps}>
+            <Input
+              placeholder={ph.input(t("ingest.protocols.description"))}
+              value={draft.description}
+              onChange={(e) => {
+                set("description", e.target.value);
+                formApi.setFieldValue("description", e.target.value);
+              }}
+            />
+          </Form.Item>
+        </Form>
       </Drawer>
     </>
   );
@@ -490,6 +509,8 @@ function ProtocolTestDrawer({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<{ topic: string; clientId: string; payload: string }>();
   const [topic, setTopic] = useState("");
   const [clientId, setClientId] = useState("");
   const [payload, setPayload] = useState("");
@@ -501,6 +522,11 @@ function ProtocolTestDrawer({
 
   const runTest = async () => {
     if (!protocol.id) return;
+    try {
+      await formApi.validateFields();
+    } catch {
+      return;
+    }
     setTesting(true);
     try {
       const body: Record<string, unknown> = {
@@ -536,29 +562,60 @@ function ProtocolTestDrawer({
         </div>
       }
     >
-      <Form.Item
-        label={t("common.topic")}
-        layout="horizontal"
-        labelCol={{ flex: "120px" }}
-        wrapperCol={{ flex: 1 }}
-        className="mb-3"
-      >
-        <Input value={topic} onChange={(e) => setTopic(e.target.value)} />
-      </Form.Item>
-      {testType === "mqtt" && (
+      <Form form={formApi} layout="horizontal">
         <Form.Item
-          label="clientId"
-          layout="horizontal"
-          labelCol={{ flex: "120px" }}
-          wrapperCol={{ flex: 1 }}
-          className="mb-3"
+          name="topic"
+          label={t("common.topic")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredInputRule(t, t("common.topic"))]}
         >
-          <Input value={clientId} onChange={(e) => setClientId(e.target.value)} />
+          <Input
+            value={topic}
+            placeholder={ph.input(t("common.topic"))}
+            onChange={(e) => {
+              setTopic(e.target.value);
+              formApi.setFieldValue("topic", e.target.value);
+            }}
+          />
         </Form.Item>
-      )}
-      <Form.Item label={t("ingest.protocols.sendPayload")} layout="vertical" className="mb-3">
-        <Input.TextArea rows={4} value={payload} onChange={(e) => setPayload(e.target.value)} />
-      </Form.Item>
+        {testType === "mqtt" && (
+          <Form.Item
+            name="clientId"
+            label="clientId"
+            required
+            {...drawerFormItemProps}
+            rules={[requiredInputRule(t, "clientId")]}
+          >
+            <Input
+              value={clientId}
+              placeholder={ph.input("clientId")}
+              onChange={(e) => {
+                setClientId(e.target.value);
+                formApi.setFieldValue("clientId", e.target.value);
+              }}
+            />
+          </Form.Item>
+        )}
+        <Form.Item
+          name="payload"
+          label={t("ingest.protocols.sendPayload")}
+          required
+          layout="vertical"
+          className="mb-3"
+          rules={[requiredInputRule(t, t("ingest.protocols.sendPayload"))]}
+        >
+          <Input.TextArea
+            rows={4}
+            value={payload}
+            placeholder={ph.input(t("ingest.protocols.sendPayload"))}
+            onChange={(e) => {
+              setPayload(e.target.value);
+              formApi.setFieldValue("payload", e.target.value);
+            }}
+          />
+        </Form.Item>
+      </Form>
       {result && (
         <div className="rounded-md border border-status-online/40 bg-status-online/10 px-3 py-2 text-xs text-status-online whitespace-pre-wrap break-all">
           {result}

@@ -197,7 +197,7 @@ export function TabRuntime() {
                   {isWritable(r.id) && (
                     <button
                       type="button"
-                      title="写入"
+                      title={t("common.write")}
                       className="vt-detail-icon-btn p-0.5"
                       onClick={() => setWriteProp(findProp(r.id))}
                     >

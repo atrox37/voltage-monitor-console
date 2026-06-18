@@ -1,3 +1,4 @@
+import { toDbId } from "@/lib/query-terms";
 import type {
   DeviceProductDetailDto,
   DeviceProductPageDto,
@@ -5,14 +6,13 @@ import type {
   ProductType,
   SimpleMetadata,
 } from "@/types";
-import { toDbId } from "@/lib/query-terms";
 
 export type { ProductType };
 
 export const PRODUCT_TYPE_LABEL: Record<ProductType, string> = {
-  gateway: "网关设备",
-  device: "直连设备",
-  children: "子设备",
+  gateway: "Gateway device",
+  device: "Direct device",
+  children: "Sub-device",
 };
 
 export const PRODUCT_TYPE_OPTIONS: { value: ProductType; label: string }[] = [
@@ -32,7 +32,6 @@ export type ProductListRow = {
   raw: DeviceProductPageDto;
 };
 
-/** 详情页编辑模型 — 对齐旧项目 editData (productPo + 展示字段) */
 export type ProductEditModel = {
   id: string;
   name: string;

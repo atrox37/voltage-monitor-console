@@ -70,6 +70,21 @@ export function enabledStatusKind(enabled: boolean): "enabled" | "disabled" {
   return enabled ? "enabled" : "disabled";
 }
 
+/** 网络组件连接状态（分页行 t2：SUCCESS / FAIL / LOADING） */
+export function NetworkConnectStatusBadge({ status }: { status?: string }) {
+  const { t } = useTranslation();
+  if (status === "SUCCESS") {
+    return <Tag color="success">{t("ingest.components.connected")}</Tag>;
+  }
+  if (status === "FAIL") {
+    return <Tag color="warning">{t("ingest.components.notConnected")}</Tag>;
+  }
+  if (status === "LOADING") {
+    return <Tag color="processing">{t("ingest.components.connecting")}</Tag>;
+  }
+  return <span className="text-text-muted">—</span>;
+}
+
 export function deviceConnectionStatus(status: string | undefined): StatusKind {
   if (status === "online") return "online";
   if (status === "disabled") return "disabled";

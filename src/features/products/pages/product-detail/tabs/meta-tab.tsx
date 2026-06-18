@@ -1,67 +1,139 @@
-﻿import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
-import { OptionToggle } from "@/components/option-toggle";
-import { DetailTable } from "@/components/detail-table";
 import type { ColumnsType } from "antd/es/table";
-import { RowActionBtn, RowActionGroup } from "@/components/row-action-buttons";
-import { vtActionColumn } from "@/lib/table-utils";
-import { useConfirm } from "@/components/confirm-dialog";
-import { showError } from "@/lib/api-message";
-import { useProductEdit } from "@/features/products/contexts/product-edit-context";
-import {
-  DATA_UNITS,
-  PROPERTY_RW,
-  defaultPropertyValueType,
-  unitLabel,
-} from "@/lib/data-types";
-import { EnumEditor } from "@/features/products/components/enum-editor";
-
-import type {
-  SimplePropertyMetadata,
-  SimpleFunctionMetadata,
-  PropertyTagMetadata,
-  EnumDataItem,
-} from "@/types/api/metadata";
-
+import { DetailTable } from "@/components/detail-table";
 import {
   MetadataFunctionDrawer,
   type MetadataFunctionDraft,
 } from "@/components/metadata-function-drawer";
+import { OptionToggle } from "@/components/option-toggle";
+import { RowActionBtn, RowActionGroup } from "@/components/row-action-buttons";
+import { useTranslation } from "@/i18n";
+import {
+  DATA_UNITS,
+  dataTypeSelectOptions,
+  defaultPropertyValueType,
+  normalizePropertyType,
+  propertyTypeLabel,
+  unitLabel,
+} from "@/lib/data-types";
+import { detailFormItemProps, selectFormItemProps } from "@/components/drawer-form";
+import { requiredInputRule, requiredSelectRule, validateEnumData } from "@/lib/form-validation";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { vtActionColumn } from "@/lib/table-utils";
+import { useProductEdit } from "@/features/products/contexts/product-edit-context";
+import { EnumEditor } from "@/features/products/components/enum-editor";
+import type {
+  EnumDataItem,
+  PropertyTagMetadata,
+  SimpleFunctionMetadata,
+  SimplePropertyMetadata,
+} from "@/types/api/metadata";
 
 export function TabMeta() {
+  const { t, locale } = useTranslation();
+  const ph = useFormPlaceholder();
   const { product, updateMetadata, dataTypes } = useProductEdit();
-  const { confirm, confirmNode } = useConfirm();
+  const [propFormApi] = Form.useForm<{ id: string; name: string; tagId: string; dataType: string }>();
+  const [renameFormApi] = Form.useForm<{ name: string }>();
+  const [newTagFormApi] = Form.useForm<{ name: string }>();
+  const [newTagOpen, setNewTagOpen] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
   const [sub, setSub] = useState<"prop" | "func">("prop");
-
-  /* —— 属性分组(propertyTags) 过滤 —— */
-  const [selectedTagId, setSelectedTagId] = useState<string>("-1"); // -1 = 全部
+  const [selectedTagId, setSelectedTagId] = useState<string>("-1");
   const [renameTag, setRenameTag] = useState<{ index: number; name: string } | null>(null);
+  const [propDraft, setPropDraft] = useState<{ data: SimplePropertyMetadata; index: number } | null>(
+    null,
+  );
+  const [funcDraft, setFuncDraft] = useState<MetadataFunctionDraft | null>(null);
 
-  const propertyTags: PropertyTagMetadata[] = product?.metadata.propertyTags ?? [];
+  useEffect(() => {
+    if (!propDraft) {
+      propFormApi.resetFields();
+      return;
+    }
+    propFormApi.setFieldsValue({
+      id: propDraft.data.id,
+      name: propDraft.data.name,
+      tagId: propDraft.data.tagId ?? "",
+      dataType: normalizePropertyType(propDraft.data.valueType?.type),
+    });
+  }, [propDraft, propFormApi]);
+
+  useEffect(() => {
+    if (!renameTag) {
+      renameFormApi.resetFields();
+      return;
+    }
+    renameFormApi.setFieldsValue({ name: renameTag.name });
+  }, [renameTag, renameFormApi]);
+
+  if (!product) return null;
+
+  const propertyTags: PropertyTagMetadata[] = product.metadata.propertyTags ?? [];
   const filteredProps = useMemo(() => {
-    const all = product?.metadata.properties ?? [];
+    const all = product.metadata.properties ?? [];
     if (selectedTagId === "-1") return all;
     return all.filter((p) => p.tagId === selectedTagId);
-  }, [product?.metadata.properties, selectedTagId]);
+  }, [product.metadata.properties, selectedTagId]);
 
-  const addPropertyTag = () => {
+  const propertyRwOptions = [
+    { label: t("devices.thingModel.propertyRw.read"), value: "read" },
+    { label: t("devices.thingModel.propertyRw.write"), value: "write" },
+    { label: t("devices.thingModel.propertyRw.readwrite"), value: "readwrite" },
+    { label: t("devices.thingModel.propertyRw.none"), value: "none" },
+  ];
+
+  const closeMetaDrawers = () => {
+    setPropDraft(null);
+    setFuncDraft(null);
+    setRenameTag(null);
+    setNewTagOpen(false);
+    setNewTagName("");
+    propFormApi.resetFields();
+    renameFormApi.resetFields();
+    newTagFormApi.resetFields();
+  };
+
+  const switchSubTab = (key: "prop" | "func") => {
+    if (sub === key) return;
+    closeMetaDrawers();
+    setSub(key);
+  };
+
+  const addPropertyTag = (name: string) => {
     const id = `t${Date.now()}`;
     updateMetadata((m) => ({
       ...m,
-      propertyTags: [...(m.propertyTags ?? []), { id, name: "新分组" }],
+      propertyTags: [...(m.propertyTags ?? []), { id, name: name.trim() }],
     }));
+    setSelectedTagId(id);
+    setNewTagOpen(false);
+    setNewTagOpen(false);
+    setNewTagName("");
+    newTagFormApi.resetFields();
   };
 
-  /* —— 属性 / 功能 抽屉草稿 —— */
-  const [propDraft, setPropDraft] = useState<{
-    data: SimplePropertyMetadata;
-    index: number;
-  } | null>(null);
-  const [funcDraft, setFuncDraft] = useState<MetadataFunctionDraft | null>(null);
-
-  const saveProp = () => {
-    if (!propDraft || !propDraft.data.name.trim() || !propDraft.data.id.trim()) return;
+  const saveProp = async () => {
+    if (!propDraft) return;
+    propFormApi.setFields([{ name: "enumData", errors: [] }]);
+    try {
+      await propFormApi.validateFields(["id", "name", "tagId", "dataType"]);
+    } catch {
+      return;
+    }
+    const currentPropType = normalizePropertyType(propDraft.data.valueType?.type);
+    if (currentPropType === "enum") {
+      const enumErr = validateEnumData(
+        t,
+        (propDraft.data.valueType?.extra?.enumData as EnumDataItem[]) ?? [],
+      );
+      if (enumErr) {
+        propFormApi.setFields([{ name: "enumData", errors: [enumErr] }]);
+        return;
+      }
+    }
     updateMetadata((m) => {
       const props = [...(m.properties ?? [])];
       if (propDraft.index < 0) props.push(propDraft.data);
@@ -70,11 +142,8 @@ export function TabMeta() {
     });
     setPropDraft(null);
   };
+
   const saveFunc = (draft: MetadataFunctionDraft) => {
-    if (!draft.data.name.trim() || !draft.data.id.trim()) {
-      showError("请填写标识和名称");
-      return;
-    }
     updateMetadata((m) => {
       const fns = [...(m.functions ?? [])];
       if (draft.index < 0) fns.push(draft.data);
@@ -84,9 +153,7 @@ export function TabMeta() {
     setFuncDraft(null);
   };
 
-  const propType = propDraft?.data.valueType?.type ?? "string";
-
-  if (!product) return null;
+  const propType = normalizePropertyType(propDraft?.data.valueType?.type);
 
   const newPropertyDraft = (): SimplePropertyMetadata => ({
     id: "",
@@ -98,23 +165,25 @@ export function TabMeta() {
   });
 
   const propColumns: ColumnsType<SimplePropertyMetadata> = [
-    { key: "name", title: "名称", dataIndex: "name" },
+    { key: "name", title: t("common.name"), dataIndex: "name" },
     {
       key: "id",
-      title: "标识",
+      title: t("common.identifier"),
       dataIndex: "id",
       width: 160,
       render: (v) => <span className="text-text-secondary">{v}</span>,
     },
     {
       key: "type",
-      title: "类型",
+      title: t("common.type"),
       width: 128,
-      render: (_, p) => <span className="text-text-secondary">{p.valueType?.type ?? "—"}</span>,
+      render: (_, p) => (
+        <span className="text-text-secondary">{propertyTypeLabel(t, p.valueType?.type)}</span>
+      ),
     },
     {
       key: "unit",
-      title: "单位",
+      title: t("common.unit"),
       width: 120,
       render: (_, p) => (
         <span className="whitespace-nowrap text-text-secondary">
@@ -124,32 +193,27 @@ export function TabMeta() {
     },
     {
       key: "tag",
-      title: "分组",
+      title: t("common.group"),
       width: 128,
       render: (_, p) => (
         <span className="text-text-secondary">
-          {propertyTags.find((tag) => tag.id === p.tagId)?.name ?? "—"}
+          {propertyTags.find((tag) => tag.id === p.tagId)?.name ?? t("common.none")}
         </span>
       ),
     },
     vtActionColumn<SimplePropertyMetadata>(
-      "操作",
+      t("common.actions"),
       (p) => {
         const original = product.metadata.properties!.findIndex((x) => x.id === p.id);
         return (
           <RowActionGroup>
             <RowActionBtn onClick={() => setPropDraft({ data: { ...p }, index: original })}>
-              编辑
+              {t("common.edit")}
             </RowActionBtn>
             <RowActionBtn
               danger
               confirm={{
-                description: (
-                  <>
-                    确定删除属性{" "}
-                    <span className="font-semibold text-foreground">「{p.name}」</span> 吗？
-                  </>
-                ),
+                description: t("devices.products.detail.meta.confirmDeleteProperty", { name: p.name }),
               }}
               onClick={() =>
                 updateMetadata((m) => ({
@@ -158,7 +222,7 @@ export function TabMeta() {
                 }))
               }
             >
-              删除
+              {t("common.delete")}
             </RowActionBtn>
           </RowActionGroup>
         );
@@ -168,59 +232,59 @@ export function TabMeta() {
   ];
 
   const fnColumns: ColumnsType<SimpleFunctionMetadata> = [
-    { key: "name", title: "名称", dataIndex: "name" },
+    { key: "name", title: t("common.name"), dataIndex: "name" },
     {
       key: "id",
-      title: "标识",
+      title: t("common.identifier"),
       dataIndex: "id",
       width: 160,
       render: (v) => <span className="text-text-secondary">{v}</span>,
     },
     {
       key: "async",
-      title: "异步",
+      title: t("common.asyncLabel"),
       width: 96,
-      render: (_, f) => <span className="text-text-secondary">{f.async ? "是" : "否"}</span>,
+      render: (_, f) => <span className="text-text-secondary">{f.async ? t("common.yes") : t("common.no")}</span>,
     },
     {
       key: "io",
-      title: "入参/出参",
+      title: t("common.inOutParams"),
       width: 128,
       render: (_, f) => (
         <span className="text-text-secondary">
-          {f.inputs?.length ?? 0} / {f.outputs?.length ?? 0}
+          {t("devices.thingModel.paramInOut", {
+            in: f.inputs?.length ?? 0,
+            out: f.outputs?.length ?? 0,
+          })}
         </span>
       ),
     },
     vtActionColumn<SimpleFunctionMetadata>(
-      "操作",
+      t("common.actions"),
       (f) => {
-        const i = product.metadata.functions!.findIndex((x) => x.id === f.id);
+        const index = product.metadata.functions!.findIndex((x) => x.id === f.id);
         return (
           <RowActionGroup>
             <RowActionBtn
-              onClick={() => setFuncDraft({ data: JSON.parse(JSON.stringify(f)), index: i })}
+              onClick={() => setFuncDraft({ data: JSON.parse(JSON.stringify(f)), index })}
             >
-              编辑
+              {t("common.edit")}
             </RowActionBtn>
             <RowActionBtn
               danger
               confirm={{
-                description: (
-                  <>
-                    确定删除功能{" "}
-                    <span className="font-semibold text-foreground">「{f.name}」</span> 吗？
-                  </>
-                ),
+                description: t("devices.products.detail.meta.confirmDeleteFunction", {
+                  name: f.name,
+                }),
               }}
               onClick={() =>
                 updateMetadata((m) => ({
                   ...m,
-                  functions: (m.functions ?? []).filter((_, idx) => idx !== i),
+                  functions: (m.functions ?? []).filter((_, idx) => idx !== index),
                 }))
               }
             >
-              删除
+              {t("common.delete")}
             </RowActionBtn>
           </RowActionGroup>
         );
@@ -235,19 +299,19 @@ export function TabMeta() {
         <div className="flex gap-1">
           {(
             [
-              ["prop", "属性"],
-              ["func", "功能"],
+              ["prop", t("devices.products.detail.meta.subTabProperty")],
+              ["func", t("devices.products.detail.meta.subTabFunction")],
             ] as const
-          ).map(([k, l]) => {
-            const active = sub === k;
+          ).map(([key, label]) => {
+            const active = sub === key;
             return (
               <button
-                key={k}
+                key={key}
                 type="button"
-                onClick={() => setSub(k)}
+                onClick={() => switchSubTab(key)}
                 className={`relative px-4 py-1.5 text-xs ${active ? "text-primary" : "text-text-secondary"}`}
               >
-                {l}
+                {label}
                 {active && <span className="absolute inset-x-2 -bottom-px h-0.5 bg-primary" />}
               </button>
             );
@@ -265,24 +329,22 @@ export function TabMeta() {
           }
           className="vt-detail-action-btn mb-1 px-2.5 py-1 text-xs"
         >
-          <PlusOutlined /> 新增{sub === "prop" ? "属性" : "功能"}
+          <PlusOutlined />{" "}
+          {sub === "prop"
+            ? t("devices.products.detail.meta.addProperty")
+            : t("devices.products.detail.meta.addFunction")}
         </button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-panel-border">
         {sub === "prop" ? (
-          <DetailTable<SimplePropertyMetadata>
-            rowKey="id"
-            columns={propColumns}
-            dataSource={filteredProps}
-            locale={{ emptyText: "暂无数据" }}
-          />
+          <DetailTable rowKey="id" columns={propColumns} dataSource={filteredProps} locale={{ emptyText: t("common.noData") }} />
         ) : (
-          <DetailTable<SimpleFunctionMetadata>
+          <DetailTable
             rowKey="id"
             columns={fnColumns}
             dataSource={product.metadata.functions ?? []}
-            locale={{ emptyText: "暂无数据" }}
+            locale={{ emptyText: t("common.noData") }}
           />
         )}
       </div>
@@ -298,120 +360,127 @@ export function TabMeta() {
                 : "border-panel-border text-text-secondary hover:border-primary/40"
             }`}
           >
-            全部
+            {t("common.all")}
           </button>
-          {propertyTags.map((t, i) => (
+          {propertyTags.map((tag, i) => (
             <button
-              key={t.id}
+              key={tag.id}
               type="button"
               onClick={() =>
-                selectedTagId === t.id
-                  ? setRenameTag({ index: i, name: t.name })
-                  : setSelectedTagId(t.id)
+                selectedTagId === tag.id
+                  ? setRenameTag({ index: i, name: tag.name })
+                  : setSelectedTagId(tag.id)
               }
               className={`rounded border px-2 py-0.5 text-xs ${
-                selectedTagId === t.id
+                selectedTagId === tag.id
                   ? "border-primary/60 bg-primary/15 text-primary"
                   : "border-panel-border text-text-secondary hover:border-primary/40"
               }`}
             >
-              {t.name}
+              {tag.name}
             </button>
           ))}
           <button
             type="button"
-            onClick={addPropertyTag}
+            onClick={() => {
+              setNewTagName("");
+              newTagFormApi.setFieldsValue({ name: "" });
+              setNewTagOpen(true);
+            }}
             className="vt-detail-outline-btn border-dashed px-2 py-0.5 text-xs"
           >
-            <PlusOutlined className="h-3 w-3" /> 新建分组
+            <PlusOutlined className="h-3 w-3" /> {t("common.newGroup")}
           </button>
         </div>
       )}
 
-      {/* ===== 属性抽屉 ===== */}
       <Drawer
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         open={!!propDraft}
-        onClose={() => setPropDraft(null)}
-        title={propDraft && propDraft.index < 0 ? "新增属性" : "编辑属性"}
+        onClose={() => {
+          setPropDraft(null);
+          propFormApi.resetFields();
+        }}
+        title={propDraft && propDraft.index < 0 ? t("common.addProperty") : t("common.editProperty")}
         size={520}
         footer={
           <div className="flex justify-end gap-2">
             <Button type="default" size="small" onClick={() => setPropDraft(null)}>
-              取消
+              {t("common.cancel")}
             </Button>
-            <Button type="primary" size="small" onClick={saveProp}>
-              保存
+            <Button type="primary" size="small" onClick={() => void saveProp()}>
+              {t("common.save")}
             </Button>
           </div>
         }
       >
         {propDraft && (
-          <>
+          <Form form={propFormApi} layout="horizontal">
             <Form.Item
-              label="属性标识"
+              name="id"
+              label={t("common.propertyId")}
               required
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              {...detailFormItemProps}
+              rules={[requiredInputRule(t, t("common.propertyId"))]}
             >
               <Input
                 value={propDraft.data.id}
+                placeholder={ph.input(t("common.propertyId"))}
                 disabled={!propDraft.data.create}
-                onChange={(e) =>
-                  setPropDraft({ ...propDraft, data: { ...propDraft.data, id: e.target.value } })
-                }
+                onChange={(e) => {
+                  setPropDraft({ ...propDraft, data: { ...propDraft.data, id: e.target.value } });
+                  propFormApi.setFieldValue("id", e.target.value);
+                }}
               />
             </Form.Item>
             <Form.Item
-              label="属性名称"
+              name="name"
+              label={t("common.propertyName")}
               required
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              {...detailFormItemProps}
+              rules={[requiredInputRule(t, t("common.propertyName"))]}
             >
               <Input
                 value={propDraft.data.name}
-                onChange={(e) =>
-                  setPropDraft({ ...propDraft, data: { ...propDraft.data, name: e.target.value } })
-                }
+                placeholder={ph.input(t("common.propertyName"))}
+                onChange={(e) => {
+                  setPropDraft({ ...propDraft, data: { ...propDraft.data, name: e.target.value } });
+                  propFormApi.setFieldValue("name", e.target.value);
+                }}
               />
             </Form.Item>
             <Form.Item
-              label="数据类型"
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              name="dataType"
+              label={t("common.dataType")}
+              required
+              {...detailFormItemProps}
+              {...selectFormItemProps}
+              rules={[requiredSelectRule(t, t("common.dataType"))]}
             >
               <Select
                 className="vt-select-control"
                 classNames={{ popup: { root: "vt-select-popup" } }}
                 style={{ width: "100%" }}
+                placeholder={ph.select(t("common.dataType"))}
                 value={propType}
-                onChange={(v) =>
+                onChange={(v) => {
+                  propFormApi.setFields([{ name: "enumData", errors: [] }]);
+                  const dataType = String(v ?? "string");
                   setPropDraft({
                     ...propDraft,
                     data: {
                       ...propDraft.data,
-                      valueType: defaultPropertyValueType(String(v ?? "string")),
+                      valueType: defaultPropertyValueType(dataType),
                     },
-                  })
-                }
-                options={dataTypes.map((t) => ({ label: t.name, value: t.id }))}
+                  });
+                  propFormApi.setFieldValue("dataType", dataType);
+                }}
+                options={dataTypeSelectOptions(t, dataTypes)}
               />
             </Form.Item>
             {propType === "number" && (
-              <Form.Item
-                label="小数位"
-                layout="horizontal"
-                labelCol={{ flex: "120px" }}
-                wrapperCol={{ flex: 1 }}
-                className="mb-3"
-              >
+              <Form.Item label={t("common.decimalPlaces")} {...detailFormItemProps}>
                 <InputNumber
                   className="w-full"
                   min={0}
@@ -424,10 +493,7 @@ export function TabMeta() {
                         ...propDraft.data,
                         valueType: {
                           ...(propDraft.data.valueType ?? defaultPropertyValueType("number")),
-                          extra: {
-                            ...(propDraft.data.valueType?.extra ?? {}),
-                            point: Number(v) || 0,
-                          },
+                          extra: { ...(propDraft.data.valueType?.extra ?? {}), point: Number(v) || 0 },
                         },
                       },
                     })
@@ -436,10 +502,11 @@ export function TabMeta() {
               </Form.Item>
             )}
             {propType === "enum" && (
-              <Form.Item label="枚举值" layout="vertical" className="mb-3">
+              <Form.Item name="enumData" label={t("common.enumValues")} layout="vertical" className="mb-3">
                 <EnumEditor
                   data={(propDraft.data.valueType?.extra?.enumData as EnumDataItem[]) ?? []}
-                  onChange={(enumData) =>
+                  onChange={(enumData) => {
+                    propFormApi.setFields([{ name: "enumData", errors: [] }]);
                     setPropDraft({
                       ...propDraft,
                       data: {
@@ -449,18 +516,12 @@ export function TabMeta() {
                           extra: { ...(propDraft.data.valueType?.extra ?? {}), enumData },
                         },
                       },
-                    })
-                  }
+                    });
+                  }}
                 />
               </Form.Item>
             )}
-            <Form.Item
-              label="单位"
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
-            >
+            <Form.Item label={t("common.unit")} {...detailFormItemProps}>
               <Select
                 className="vt-select-control"
                 classNames={{ popup: { root: "vt-select-popup" } }}
@@ -480,49 +541,45 @@ export function TabMeta() {
                   })
                 }
                 options={DATA_UNITS.filter((u) => u.unit).map((u) => ({
-                  label: `${u.zh ?? u.en}${u.unit ? ` (${u.unit})` : ""}`,
+                  label: `${locale === "zh-CN" ? u.zh ?? u.en : u.en}${u.unit ? ` (${u.unit})` : ""}`,
                   value: u.unit,
                 }))}
-                placeholder="无"
+                placeholder={ph.select(t("common.unit"))}
               />
             </Form.Item>
-            <Form.Item
-              label="读写"
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
-            >
+            <Form.Item label={t("common.readWrite")} {...detailFormItemProps}>
               <OptionToggle
                 value={propDraft.data.rw ?? "readwrite"}
                 onChange={(v) => setPropDraft({ ...propDraft, data: { ...propDraft.data, rw: v } })}
-                options={PROPERTY_RW.map((rw) => ({ label: rw.label, value: rw.value }))}
+                options={propertyRwOptions}
               />
             </Form.Item>
             <Form.Item
-              label="所属分组"
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              name="tagId"
+              label={t("common.belongGroup")}
+              required
+              {...detailFormItemProps}
+              {...selectFormItemProps}
+              rules={[requiredSelectRule(t, t("common.belongGroup"))]}
             >
               <Select
                 className="vt-select-control"
                 classNames={{ popup: { root: "vt-select-popup" } }}
                 style={{ width: "100%" }}
-                allowClear
                 value={propDraft.data.tagId || undefined}
-                onChange={(v) =>
+                placeholder={ph.select(t("common.belongGroup"))}
+                onChange={(v) => {
+                  const tagId = String(v ?? "");
                   setPropDraft({
                     ...propDraft,
-                    data: { ...propDraft.data, tagId: String(v ?? "") || undefined },
-                  })
-                }
-                options={propertyTags.map((t) => ({ label: t.name, value: t.id }))}
-                placeholder="无"
+                    data: { ...propDraft.data, tagId },
+                  });
+                  propFormApi.setFieldValue("tagId", tagId);
+                }}
+                options={propertyTags.map((tag) => ({ label: tag.name, value: tag.id }))}
               />
             </Form.Item>
-          </>
+          </Form>
         )}
       </Drawer>
 
@@ -534,13 +591,15 @@ export function TabMeta() {
         onSave={saveFunc}
       />
 
-      {/* 分组重命名 */}
       <Drawer
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         open={!!renameTag}
-        onClose={() => setRenameTag(null)}
-        title="编辑分组"
+        onClose={() => {
+          setRenameTag(null);
+          renameFormApi.resetFields();
+        }}
+        title={t("common.editGroup")}
         size={400}
         footer={
           <div className="flex justify-end gap-2">
@@ -549,75 +608,130 @@ export function TabMeta() {
               size="small"
               onClick={() => {
                 if (!renameTag) return;
-                confirm({
-                  description: (
-                    <>
-                      确定删除分组{" "}
-                      <span className="font-semibold text-foreground">
-                        「{propertyTags[renameTag.index]?.name}」
-                      </span>{" "}
-                      吗？该分组下的属性会被设为未分组。
-                    </>
-                  ),
-                  onConfirm: () => {
-                    updateMetadata((m) => {
-                      const tagId = (m.propertyTags ?? [])[renameTag.index]?.id;
-                      return {
-                        ...m,
-                        propertyTags: (m.propertyTags ?? []).filter(
-                          (_, i) => i !== renameTag.index,
-                        ),
-                        properties: (m.properties ?? []).map((p) =>
-                          p.tagId === tagId ? { ...p, tagId: undefined } : p,
-                        ),
-                      };
-                    });
-                    setSelectedTagId("-1");
-                    setRenameTag(null);
-                  },
+                updateMetadata((m) => {
+                  const tagId = (m.propertyTags ?? [])[renameTag.index]?.id;
+                  return {
+                    ...m,
+                    propertyTags: (m.propertyTags ?? []).filter((_, i) => i !== renameTag.index),
+                    properties: (m.properties ?? []).map((p) =>
+                      p.tagId === tagId ? { ...p, tagId: undefined } : p,
+                    ),
+                  };
                 });
+                setSelectedTagId("-1");
+                setRenameTag(null);
               }}
             >
-              删除分组
+              {t("common.deleteGroup")}
             </Button>
             <Button
               type="primary"
               size="small"
-              onClick={() => {
-                if (!renameTag || !renameTag.name.trim()) return;
+              onClick={async () => {
+                if (!renameTag) return;
+                try {
+                  await renameFormApi.validateFields();
+                } catch {
+                  return;
+                }
                 updateMetadata((m) => ({
                   ...m,
-                  propertyTags: (m.propertyTags ?? []).map((t, i) =>
-                    i === renameTag.index ? { ...t, name: renameTag.name } : t,
+                  propertyTags: (m.propertyTags ?? []).map((tag, i) =>
+                    i === renameTag.index ? { ...tag, name: renameTag.name } : tag,
                   ),
                 }));
                 setRenameTag(null);
               }}
             >
-              保存
+              {t("common.save")}
             </Button>
           </div>
         }
       >
         {renameTag && (
-          <Form.Item
-            label="分组名称"
-            required
-            layout="horizontal"
-            labelCol={{ flex: "120px" }}
-            wrapperCol={{ flex: 1 }}
-            className="mb-3"
-          >
-            <Input
-              autoFocus
-              value={renameTag.name}
-              onChange={(e) => setRenameTag({ ...renameTag, name: e.target.value })}
-            />
-          </Form.Item>
+          <Form form={renameFormApi} layout="horizontal">
+            <Form.Item
+              name="name"
+              label={t("common.groupName")}
+              required
+              {...detailFormItemProps}
+              rules={[requiredInputRule(t, t("common.groupName"))]}
+            >
+              <Input
+                autoFocus
+                value={renameTag.name}
+                placeholder={ph.input(t("common.groupName"))}
+                onChange={(e) => {
+                  setRenameTag({ ...renameTag, name: e.target.value });
+                  renameFormApi.setFieldValue("name", e.target.value);
+                }}
+              />
+            </Form.Item>
+          </Form>
         )}
       </Drawer>
 
-      {confirmNode}
+      <Drawer
+        destroyOnHidden
+        styles={{ body: { paddingTop: 8 } }}
+        open={newTagOpen}
+        onClose={() => {
+          setNewTagOpen(false);
+          setNewTagName("");
+          newTagFormApi.resetFields();
+        }}
+        title={t("common.newGroup")}
+        size={400}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              type="default"
+              size="small"
+              onClick={() => {
+                setNewTagOpen(false);
+                setNewTagName("");
+                newTagFormApi.resetFields();
+              }}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="primary"
+              size="small"
+              onClick={async () => {
+                try {
+                  const values = await newTagFormApi.validateFields();
+                  addPropertyTag(values.name);
+                } catch {
+                  // validation errors shown on fields
+                }
+              }}
+            >
+              {t("common.save")}
+            </Button>
+          </div>
+        }
+      >
+        <Form form={newTagFormApi} layout="horizontal">
+          <Form.Item
+            name="name"
+            label={t("common.groupName")}
+            required
+            {...detailFormItemProps}
+            rules={[requiredInputRule(t, t("common.groupName"))]}
+          >
+            <Input
+              autoFocus
+              placeholder={ph.input(t("common.groupName"))}
+              value={newTagName}
+              onChange={(e) => {
+                setNewTagName(e.target.value);
+                newTagFormApi.setFieldValue("name", e.target.value);
+              }}
+            />
+          </Form.Item>
+        </Form>
+      </Drawer>
     </div>
   );
 }

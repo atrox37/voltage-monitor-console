@@ -1,14 +1,13 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
-import { OptionToggle } from "@/components/option-toggle";
-import { DetailTable } from "@/components/detail-table";
 import type { ColumnsType } from "antd/es/table";
+import { DetailTable } from "@/components/detail-table";
+import { detailFormItemProps, selectFormItemProps } from "@/components/drawer-form";
+import { OptionToggle } from "@/components/option-toggle";
+import { useTranslation } from "@/i18n";
 import { vtActionColumn } from "@/lib/table-utils";
-import { useConfirm } from "@/components/confirm-dialog";
 import { useProductEdit } from "@/features/products/contexts/product-edit-context";
-import { POLL_INTERVAL_OPTIONS, normalizeRuleCron } from "@/lib/poll-interval";
-
 import { AlarmConditionBuilder } from "@/features/devices/components/alarm-condition-builder";
 import {
   formatRuleCondition,
@@ -17,19 +16,33 @@ import {
   type AlarmCond,
 } from "@/features/devices/lib/rule-format";
 import { parseProductRule } from "@/api";
+import { POLL_INTERVAL_OPTIONS, normalizeRuleCron } from "@/lib/poll-interval";
+import { isAlarmConditionFilled, requiredInputError, requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
 import type { JSqlColumn } from "@/types";
 import type { RuleModel } from "@/types/api/metadata";
 
 type RuleDraft = RuleModel & { columns?: AlarmCond[][] };
 
 export function TabRule() {
+  const { t } = useTranslation();
+  const ph = useFormPlaceholder();
   const { product, updateMetadata, serializeRule } = useProductEdit();
-  const { confirm, confirmNode } = useConfirm();
+  const [formApi] = Form.useForm<{
+    name: string;
+    state: number;
+    triggerMode: string;
+    pollInterval: string;
+    triggerCount: number;
+    triggerCondition: string;
+  }>();
   const [draft, setDraft] = useState<{ rule: RuleDraft; index: number } | null>(null);
   const [ruleSaving, setRuleSaving] = useState(false);
   const [ruleLoading, setRuleLoading] = useState(false);
 
-  const properties = product?.metadata.properties ?? [];
+  if (!product) return null;
+
+  const properties = product.metadata.properties ?? [];
 
   const toJsqlColumns = (groups: AlarmCond[][]): JSqlColumn[][] =>
     groups.map((grp) =>
@@ -40,6 +53,17 @@ export function TabRule() {
         valueType: c.valueType,
       })),
     );
+
+  const syncRuleFormFields = (rule: RuleDraft) => {
+    formApi.setFieldsValue({
+      name: rule.name,
+      state: rule.state ?? 0,
+      triggerMode: rule.ruleData?.type ?? "time",
+      pollInterval: normalizeRuleCron(rule.ruleData),
+      triggerCount: rule.ruleData?.count ?? 1,
+      triggerCondition: isAlarmConditionFilled(rule.columns) ? "ok" : "",
+    });
+  };
 
   const openRuleEdit = async (row: RuleModel, index: number) => {
     setRuleLoading(true);
@@ -57,26 +81,32 @@ export function TabRule() {
         base.columns = base.columns ?? [[]];
       }
       setDraft({ rule: base, index });
+      syncRuleFormFields(base);
     } catch {
-      setDraft({
-        rule: {
-          ...JSON.parse(JSON.stringify(row)),
-          columns: [[]],
-          ruleData: {
-            type: "time",
-            count: row.ruleData?.count ?? 1,
-            cron: normalizeRuleCron(row.ruleData),
-          },
+      const fallback: RuleDraft = {
+        ...JSON.parse(JSON.stringify(row)),
+        columns: [[]],
+        ruleData: {
+          type: "time",
+          count: row.ruleData?.count ?? 1,
+          cron: normalizeRuleCron(row.ruleData),
         },
-        index,
-      });
+      };
+      setDraft({ rule: fallback, index });
+      syncRuleFormFields(fallback);
     } finally {
       setRuleLoading(false);
     }
   };
 
   const saveRule = async () => {
-    if (!draft || !draft.rule.name.trim()) return;
+    if (!draft) return;
+    syncRuleFormFields(draft.rule);
+    try {
+      await formApi.validateFields();
+    } catch {
+      return;
+    }
     setRuleSaving(true);
     try {
       const { columns, ...rulePo } = draft.rule;
@@ -90,37 +120,36 @@ export function TabRule() {
         toJsqlColumns(columns ?? [[]]),
       );
       setDraft(null);
-    } catch {
-      // toast handled in context
     } finally {
       setRuleSaving(false);
     }
   };
-
-  if (!product) return null;
 
   type RuleRow = RuleDraft & { index: number };
   const ruleRows: RuleRow[] = ((product.metadata.rules as RuleDraft[]) ?? []).map((r, index) => ({
     ...r,
     index,
   }));
+
   const ruleColumns: ColumnsType<RuleRow> = [
-    { key: "name", title: "规则名称", dataIndex: "name" },
+    { key: "name", title: t("common.ruleName"), dataIndex: "name" },
     {
       key: "poll",
-      title: "轮询周期",
+      title: t("common.pollInterval"),
       render: (_, r) => <span className="text-xs text-text-secondary">{rulePollLabel(r)}</span>,
     },
     {
       key: "count",
-      title: "触发阈值",
+      title: t("common.thresholdCount"),
       render: (_, r) => (
-        <span className="text-xs text-text-secondary">连续 {r.ruleData?.count ?? 1} 次</span>
+        <span className="text-xs text-text-secondary">
+          {t("devices.products.detail.rule.consecutiveCount", { count: r.ruleData?.count ?? 1 })}
+        </span>
       ),
     },
     {
       key: "condition",
-      title: "触发条件",
+      title: t("common.triggerCondition"),
       render: (_, r) => (
         <span className="max-w-md text-xs text-text-secondary">
           {formatRuleCondition(r, properties)}
@@ -129,7 +158,7 @@ export function TabRule() {
     },
     {
       key: "state",
-      title: "状态",
+      title: t("common.status"),
       render: (_, r) => (
         <span
           className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] ${
@@ -139,12 +168,12 @@ export function TabRule() {
           }`}
         >
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          {r.state === 1 ? "已启用" : "已禁用"}
+          {r.state === 1 ? t("common.enabledState") : t("common.disabledState")}
         </span>
       ),
     },
     vtActionColumn<RuleRow>(
-      "操作",
+      t("common.actions"),
       (r) => (
         <>
           <button
@@ -152,27 +181,18 @@ export function TabRule() {
             onClick={() => void openRuleEdit(r, r.index)}
             className="mx-0.5 inline-flex cursor-pointer items-center gap-1 rounded border border-panel-border px-2 py-1 text-xs text-text-secondary hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <EditOutlined className="h-3 w-3" /> 编辑
+            <EditOutlined className="h-3 w-3" /> {t("common.edit")}
           </button>
           <button
             onClick={() =>
-              confirm({
-                description: (
-                  <>
-                    确定删除规则 <span className="font-semibold text-foreground">「{r.name}」</span>{" "}
-                    吗？
-                  </>
-                ),
-                onConfirm: () =>
-                  updateMetadata((m) => ({
-                    ...m,
-                    rules: (m.rules ?? []).filter((_, idx) => idx !== r.index),
-                  })),
-              })
+              updateMetadata((m) => ({
+                ...m,
+                rules: (m.rules ?? []).filter((_, idx) => idx !== r.index),
+              }))
             }
             className="mx-0.5 inline-flex items-center gap-1 rounded border border-status-critical/40 px-2 py-1 text-xs text-status-critical hover:bg-status-critical/10"
           >
-            <DeleteOutlined className="h-3 w-3" /> 删除
+            <DeleteOutlined className="h-3 w-3" /> {t("common.delete")}
           </button>
         </>
       ),
@@ -185,166 +205,187 @@ export function TabRule() {
       <div className="mb-2 flex shrink-0 items-center justify-end">
         <button
           type="button"
-          onClick={() =>
-            setDraft({
-              rule: {
-                id: `r${Date.now()}`,
-                name: "",
-                state: 1,
-                ruleData: { type: "time", cron: POLL_INTERVAL_OPTIONS[0].value, count: 1 },
-                ruleMeta: { sql: "", param: {} },
-                columns: [[]],
-              },
-              index: -1,
-            })
-          }
+          onClick={() => {
+            const rule: RuleDraft = {
+              id: `r${Date.now()}`,
+              name: "",
+              state: 1,
+              ruleData: { type: "time", cron: POLL_INTERVAL_OPTIONS[0].value, count: 1 },
+              ruleMeta: { sql: "", param: {} },
+              columns: [[]],
+            };
+            setDraft({ rule, index: -1 });
+            syncRuleFormFields(rule);
+          }}
           className="vt-detail-action-btn px-2.5 py-1 text-xs"
         >
-          <PlusOutlined /> 新增规则
+          <PlusOutlined /> {t("devices.products.detail.rule.addRule")}
         </button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-panel-border">
-        <DetailTable<RuleRow>
-          rowKey="id"
-          columns={ruleColumns}
-          dataSource={ruleRows}
-          locale={{ emptyText: "暂无规则" }}
-        />
+        <DetailTable rowKey="id" columns={ruleColumns} dataSource={ruleRows} locale={{ emptyText: t("common.noRules") }} />
       </div>
 
       <Drawer
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         open={!!draft}
-        onClose={() => setDraft(null)}
-        title={draft && draft.index < 0 ? "新增告警规则" : "编辑告警规则"}
+        onClose={() => {
+          setDraft(null);
+          formApi.resetFields();
+        }}
+        title={draft && draft.index < 0 ? t("devices.products.detail.rule.addAlarmRule") : t("devices.products.detail.rule.editRule")}
         size={720}
         footer={
           <div className="flex justify-end gap-2">
             <Button type="default" size="small" onClick={() => setDraft(null)}>
-              取消
+              {t("common.cancel")}
             </Button>
-            <Button
-              type="primary"
-              size="small"
-              disabled={ruleSaving}
-              onClick={() => void saveRule()}
-            >
-              {ruleSaving ? "保存中…" : "保存"}
+            <Button type="primary" size="small" disabled={ruleSaving} onClick={() => void saveRule()}>
+              {ruleSaving ? t("common.saving") : t("common.save")}
             </Button>
           </div>
         }
       >
         {draft && (
-          <>
+          <Form form={formApi} layout="horizontal">
             <Form.Item
-              label="规则名称"
+              name="name"
+              label={t("common.ruleName")}
               required
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              {...detailFormItemProps}
+              rules={[requiredInputRule(t, t("common.ruleName"))]}
             >
               <Input
                 value={draft.rule.name}
-                onChange={(e) =>
-                  setDraft({ ...draft, rule: { ...draft.rule, name: e.target.value } })
-                }
+                onChange={(e) => {
+                  setDraft({ ...draft, rule: { ...draft.rule, name: e.target.value } });
+                  formApi.setFieldValue("name", e.target.value);
+                }}
               />
             </Form.Item>
             <Form.Item
-              label="工作状态"
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              name="state"
+              label={t("common.workState")}
+              required
+              {...detailFormItemProps}
+              rules={[requiredSelectRule(t, t("common.workState"))]}
             >
               <OptionToggle
                 value={(draft.rule.state ?? 0) as 0 | 1}
-                onChange={(v) => setDraft({ ...draft, rule: { ...draft.rule, state: v } })}
+                onChange={(v) => {
+                  setDraft({ ...draft, rule: { ...draft.rule, state: v } });
+                  formApi.setFieldValue("state", v);
+                }}
                 options={[
-                  { label: "启用", value: 1 },
-                  { label: "关闭", value: 0 },
+                  { label: t("common.enable"), value: 1 },
+                  { label: t("common.off"), value: 0 },
                 ]}
               />
             </Form.Item>
             <Form.Item
-              label="触发方式"
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              name="triggerMode"
+              label={t("common.triggerMode")}
+              required
+              {...detailFormItemProps}
+              rules={[requiredSelectRule(t, t("common.triggerMode"))]}
             >
               <span className="inline-flex items-center rounded bg-primary/10 px-2 py-1 text-xs text-primary">
-                定时轮询
+                {t("devices.products.detail.rule.timedPollLabel")}
               </span>
             </Form.Item>
             <Form.Item
-              label="轮询周期"
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              name="pollInterval"
+              label={t("common.pollInterval")}
+              required
+              {...detailFormItemProps}
+              {...selectFormItemProps}
+              rules={[requiredSelectRule(t, t("common.pollInterval"))]}
             >
               <Select
                 className="vt-select-control"
                 classNames={{ popup: { root: "vt-select-popup" } }}
                 style={{ width: "100%" }}
+                placeholder={ph.select(t("common.pollInterval"))}
                 value={normalizeRuleCron(draft.rule.ruleData)}
-                onChange={(v) =>
+                onChange={(v) => {
                   setDraft({
                     ...draft,
-                    rule: {
-                      ...draft.rule,
-                      ruleData: { ...(draft.rule.ruleData ?? { type: "time" }), cron: v },
-                    },
-                  })
-                }
+                    rule: { ...draft.rule, ruleData: { ...(draft.rule.ruleData ?? { type: "time" }), cron: v } },
+                  });
+                  formApi.setFieldValue("pollInterval", v);
+                }}
                 options={POLL_INTERVAL_OPTIONS.map((o) => ({ label: o.label, value: o.value }))}
               />
             </Form.Item>
             <Form.Item
-              label="触发阈值"
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
+              name="triggerCount"
+              label={t("common.triggerThreshold")}
+              required
+              {...detailFormItemProps}
+              rules={[
+                {
+                  validator: async (_, val) => {
+                    if (!val || Number(val) < 1) {
+                      return Promise.reject(requiredInputError(t, t("common.triggerThreshold")));
+                    }
+                  },
+                },
+              ]}
             >
               <div className="flex items-center gap-1">
-                <span className="text-xs text-text-muted">连续</span>
+                <span className="text-xs text-text-muted">{t("common.consecutive")}</span>
                 <InputNumber
                   min={1}
                   className="w-20"
                   value={draft.rule.ruleData?.count ?? 1}
-                  onChange={(v) =>
+                  onChange={(v) => {
+                    const count = Number(v) || 1;
                     setDraft({
                       ...draft,
                       rule: {
                         ...draft.rule,
-                        ruleData: {
-                          ...(draft.rule.ruleData ?? { type: "time" }),
-                          count: Number(v) || 1,
-                        },
+                        ruleData: { ...(draft.rule.ruleData ?? { type: "time" }), count },
                       },
-                    })
-                  }
+                    });
+                    formApi.setFieldValue("triggerCount", count);
+                  }}
                 />
-                <span className="text-xs text-text-muted">次满足条件后触发</span>
+                <span className="text-xs text-text-muted">{t("common.consecutiveSuffix")}</span>
               </div>
             </Form.Item>
-            <Form.Item label="触发条件" layout="vertical" className="mb-3">
+            <Form.Item
+              name="triggerCondition"
+              label={t("common.triggerCondition")}
+              required
+              layout="vertical"
+              className="mb-3"
+              rules={[
+                {
+                  validator: async () => {
+                    if (!isAlarmConditionFilled(draft.rule.columns)) {
+                      return Promise.reject(t("validation.triggerConditionRequired"));
+                    }
+                  },
+                },
+              ]}
+            >
               <AlarmConditionBuilder
                 groups={draft.rule.columns ?? [[]]}
                 properties={properties}
-                onChange={(columns) => setDraft({ ...draft, rule: { ...draft.rule, columns } })}
+                onChange={(columns) => {
+                  setDraft({ ...draft, rule: { ...draft.rule, columns } });
+                  formApi.setFieldValue(
+                    "triggerCondition",
+                    isAlarmConditionFilled(columns) ? "ok" : "",
+                  );
+                }}
               />
             </Form.Item>
-          </>
+          </Form>
         )}
       </Drawer>
-
-      {confirmNode}
     </div>
   );
 }

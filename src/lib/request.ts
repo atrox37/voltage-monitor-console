@@ -1,8 +1,9 @@
 import axios from "axios";
 import type { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from "axios";
+import { getLocale, translate } from "@/i18n";
 import { getApiMessage, showError } from "@/lib/api-message";
-import type { ApiResponse } from "@/types";
 import { getAuthToken } from "@/lib/auth-token";
+import type { ApiResponse } from "@/types";
 
 const NO_AUTH_URLS = ["/api/sys-app/login", "/api/sys-app/common/captcha64"];
 const REFRESH_URL = "/api/sys-app/token/refresh";
@@ -66,13 +67,13 @@ class RequestService {
         config.headers = config.headers ?? {};
 
         if (config.url && NO_AUTH_URLS.includes(config.url)) {
-          config.headers["LOGINTYPE"] = "PASS";
+          config.headers.LOGINTYPE = "PASS";
           return config;
         }
 
         const token = getAuthToken();
         if (token) {
-          config.headers["Authorization"] = token;
+          config.headers.Authorization = token;
         }
 
         return config;
@@ -88,7 +89,7 @@ class RequestService {
         const data = response.data as ApiResponse<unknown>;
 
         if (data.code !== 200) {
-          const errMsg = data.msg || data.message || "请求失败";
+          const errMsg = data.msg || data.message || translate(getLocale(), "common.requestFailed");
           showError(errMsg);
           return Promise.reject(new Error(errMsg));
         }
@@ -117,27 +118,24 @@ class RequestService {
 
         const status = axiosError.response?.status;
 
-        if (
-          axiosError.code === "ECONNABORTED" ||
-          axiosError.message?.includes("timeout")
-        ) {
-          showError(getApiMessage(null, "请求超时"));
+        if (axiosError.code === "ECONNABORTED" || axiosError.message?.includes("timeout")) {
+          showError(getApiMessage(null, translate(getLocale(), "common.requestTimeout")));
           return Promise.reject(error);
         }
 
         if (status === 401) {
           const isRefreshEndpoint = axiosError.config?.url === REFRESH_URL;
 
-      if (isRefreshEndpoint) {
-        await this.handleAuthFailure();
-        return Promise.reject(error);
-      }
+          if (isRefreshEndpoint) {
+            await this.handleAuthFailure();
+            return Promise.reject(error);
+          }
 
-      if (!this.isRefreshing) {
-        this.isRefreshing = true;
-        try {
-          const { authActions } = await import("@/lib/auth-session");
-          authActions.clearSession();
+          if (!this.isRefreshing) {
+            this.isRefreshing = true;
+            try {
+              const { authActions } = await import("@/lib/auth-session");
+              authActions.clearSession();
               this.isRefreshing = false;
               this.onRefreshFailed();
               await this.handleAuthFailure();
@@ -163,9 +161,9 @@ class RequestService {
           });
         }
 
-        if (status === 403) showError("无权限访问");
-        else if (status === 404) showError("资源不存在");
-        else if (status === 500) showError("服务器内部错误");
+        if (status === 403) showError(translate(getLocale(), "common.forbidden"));
+        else if (status === 404) showError(translate(getLocale(), "common.resourceNotFound"));
+        else if (status === 500) showError(translate(getLocale(), "common.serverError"));
 
         return Promise.reject(error);
       },
@@ -192,7 +190,7 @@ class RequestService {
   ): Promise<unknown> {
     if (!config) return Promise.reject(new Error("No config to retry"));
     config.headers = config.headers ?? {};
-    config.headers["Authorization"] = token;
+    config.headers.Authorization = token;
     delete config.signal;
     return this.instance(config);
   }
@@ -239,7 +237,6 @@ export function isRequestCanceled(err: unknown): boolean {
   return axios.isCancel(err);
 }
 
-/** 所有方法返回已解包的 ApiResponse.data */
 export class Request {
   static get<T>(url: string, params?: unknown): Promise<T> {
     return requestService.get<T>(url, params);

@@ -1,10 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Button, Drawer, Form, Input, Select } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { showError, showSuccess } from "@/lib/api-message";
+import { Drawer, Form, Input, Select } from "antd";
 import { deleteDevice, pageDevices, pageGateways, pageProducts, saveDevice } from "@/api";
-import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
-import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { drawerFooter, drawerFormItemProps, selectFormItemProps } from "@/components/drawer-form";
 import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
 import { deviceConnectionStatus } from "@/components/status-display";
 import {
@@ -13,11 +11,14 @@ import {
   type DeviceCreateForm,
   type DeviceListRow,
 } from "@/features/devices/lib/device-mappers";
-import { PRODUCT_TYPE_LABEL, PRODUCT_TYPE_OPTIONS } from "@/features/products/lib/product-mappers";
+import { useProductTypeLabel, useProductTypeOptions } from "@/features/products/lib/product-type-i18n";
+import { useTranslation } from "@/i18n";
+import { showError, showSuccess } from "@/lib/api-message";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
+import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { ALL_PAGE_QUERY, termEq, termLike } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
-import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
-import { useTranslation } from "@/i18n";
 import type { GatewayDto, PageQuery } from "@/types";
 
 export const Route = createFileRoute("/_app/devices/list/")({
@@ -31,6 +32,10 @@ type ProductOption = { id: string; name: string; type: string };
 
 function DevicesPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const [formApi] = Form.useForm<DeviceCreateForm>();
+  const getProductTypeLabel = useProductTypeLabel();
+  const productTypeOptions = useProductTypeOptions();
   const [rows, setRows] = useState<DeviceListRow[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [gateways, setGateways] = useState<GatewayDto[]>([]);
@@ -39,10 +44,8 @@ function DevicesPage() {
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sorts, setSorts] = useState<PageQuery["sorts"]>(DEFAULT_SORTS);
-
   const [filterDraft, setFilterDraft] = useState({ name: "", sn: "", productType: "", status: "" });
   const [filterApplied, setFilterApplied] = useState({ name: "", sn: "", productType: "", status: "" });
-
   const [addOpen, setAddOpen] = useState(false);
   const [draft, setDraft] = useState<DeviceCreateForm>(emptyDraft());
   const [saving, setSaving] = useState(false);
@@ -60,12 +63,7 @@ function DevicesPage() {
       if (filterApplied.productType) terms.push(termEq("t2.type", filterApplied.productType));
       if (filterApplied.status) terms.push(termEq("t.status", filterApplied.status));
 
-      const result = await pageDevices({
-        current: page,
-        size: pageSize,
-        terms,
-        sorts,
-      });
+      const result = await pageDevices({ current: page, size: pageSize, terms, sorts });
       const list = result.records ?? result.data ?? [];
       setRows(list.map(mapDeviceDtoToRow));
       setTotal(result.total ?? list.length);
@@ -73,11 +71,11 @@ function DevicesPage() {
       if (isRequestCanceled(err)) return;
       setRows([]);
       setTotal(0);
-      showError(err instanceof Error ? err.message : "加载设备列表失败");
+      showError(err instanceof Error ? err.message : t("devices.list.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [filterApplied.name, filterApplied.sn, filterApplied.productType, filterApplied.status, page, pageSize, sorts]);
+  }, [filterApplied.name, filterApplied.sn, filterApplied.productType, filterApplied.status, page, pageSize, sorts, t]);
 
   useEffect(() => {
     void pageProducts(ALL_PAGE_QUERY)
@@ -106,20 +104,24 @@ function DevicesPage() {
   }, [fetchRows]);
 
   const saveAdd = async () => {
-    if (!draft.name.trim() || !draft.sn.trim() || !draft.productId) return;
+    try {
+      await formApi.validateFields();
+    } catch {
+      return;
+    }
     const product = products.find((p) => p.id === draft.productId);
     if (!product) return;
-    if ((product.type === "device" || product.type === "gateway") && !draft.gatewayId) return;
     setSaving(true);
     try {
       await saveDevice(mapCreateFormToDevicePo(draft));
-      showSuccess("创建设备成功");
+      showSuccess(t("devices.list.createSuccess"));
       setAddOpen(false);
       setDraft(emptyDraft());
+      formApi.resetFields();
       await fetchRows();
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      showError(err instanceof Error ? err.message : "创建设备失败");
+      showError(err instanceof Error ? err.message : t("devices.list.createFailed"));
     } finally {
       setSaving(false);
     }
@@ -128,18 +130,18 @@ function DevicesPage() {
   const handleDelete = async (row: DeviceListRow) => {
     try {
       await deleteDevice(row.id);
-      showSuccess("删除成功");
+      showSuccess(t("common.deleteSuccess"));
       await fetchRows();
     } catch (err) {
       if (isRequestCanceled(err)) return;
-      showError(err instanceof Error ? err.message : "删除设备失败");
+      showError(err instanceof Error ? err.message : t("devices.list.deleteFailed"));
     }
   };
 
   return (
     <>
-      <ListPageTemplate<DeviceListRow>
-        title="设备列表"
+      <ListPageTemplate
+        title={t("devices.list.title")}
         serverSide
         loading={loading}
         page={page}
@@ -155,7 +157,10 @@ function DevicesPage() {
           setSorts(next.length ? next : DEFAULT_SORTS);
           setPage(1);
         }}
-        onSearch={() => { setPage(1); setFilterApplied({ ...filterDraft }); }}
+        onSearch={() => {
+          setPage(1);
+          setFilterApplied({ ...filterDraft });
+        }}
         onReset={() => {
           const empty = { name: "", sn: "", productType: "", status: "" };
           setFilterDraft(empty);
@@ -172,23 +177,28 @@ function DevicesPage() {
           })
         }
         filters={[
-          { type: "text", key: "name", label: "设备名称" },
+          { type: "text", key: "name", label: t("common.deviceName") },
           { type: "text", key: "sn", label: "SN" },
           {
-            type: "select", key: "productType", label: "产品类型",
-            options: PRODUCT_TYPE_OPTIONS.map((o) => ({ label: o.label, value: o.value })),
+            type: "select",
+            key: "productType",
+            label: t("common.productType"),
+            options: productTypeOptions.map((o) => ({ label: o.label, value: o.value })),
           },
           {
-            type: "select", key: "status", label: "状态",
+            type: "select",
+            key: "status",
+            label: t("common.status"),
             options: [
-              { label: "在线", value: "online" },
-              { label: "离线", value: "offline" },
+              { label: t("status.online"), value: "online" },
+              { label: t("status.offline"), value: "offline" },
             ],
           },
         ]}
         columns={[
           {
-            key: "name", title: "设备名称",
+            key: "name",
+            title: t("common.deviceName"),
             render: (r) => (
               <button onClick={() => goDetail(r.id)} className="text-foreground transition hover:text-primary">
                 {r.name}
@@ -197,55 +207,64 @@ function DevicesPage() {
           },
           { key: "sn", title: "SN", render: (r) => <span className="font-mono text-xs text-text-secondary">{r.sn}</span> },
           {
-            key: "productName", title: "产品",
+            key: "productName",
+            title: t("common.product"),
             render: (r) => (
               <span className="text-text-secondary">
                 {r.productName}
                 <span className={`ml-1.5 rounded px-1 py-0.5 text-[10px] ${
-                  r.productType === "gateway" ? "bg-primary/15 text-primary" :
-                  r.productType === "device" ? "bg-status-online/15 text-status-online" :
-                  "bg-status-warning/15 text-status-warning"
-                }`}>{PRODUCT_TYPE_LABEL[r.productType] ?? r.productType}</span>
+                  r.productType === "gateway"
+                    ? "bg-primary/15 text-primary"
+                    : r.productType === "device"
+                      ? "bg-status-online/15 text-status-online"
+                      : "bg-status-warning/15 text-status-warning"
+                }`}>
+                  {getProductTypeLabel(r.productType)}
+                </span>
               </span>
             ),
           },
           {
-            key: "gatewayName", title: "关联网关",
-            render: (r) => r.gatewayName
-              ? <span className="text-text-secondary">{r.gatewayName}</span>
-              : <span className="text-text-muted">—</span>,
+            key: "gatewayName",
+            title: t("common.linkedGateway"),
+            render: (r) =>
+              r.gatewayName ? (
+                <span className="text-text-secondary">{r.gatewayName}</span>
+              ) : (
+                <span className="text-text-muted">—</span>
+              ),
           },
-          { key: "org", title: "所属机构" },
-          { key: "creator", title: "创建人" },
+          { key: "org", title: t("common.orgBelong") },
+          { key: "creator", title: t("common.creator") },
           {
-            key: "status", title: "状态",
+            key: "status",
+            title: t("common.status"),
             render: (r) => <StatusBadge status={deviceConnectionStatus(r.status)} />,
           },
           {
             key: "createTime",
-            title: "创建时间",
+            title: t("common.createTime"),
             sortable: true,
             sortKey: "t.create_time",
             render: (r) => <span className="font-mono text-xs text-text-secondary">{r.createTime}</span>,
           },
         ]}
         rows={rows}
-        onAdd={() => { setDraft(emptyDraft()); setAddOpen(true); }}
+        onAdd={() => {
+          const next = emptyDraft();
+          setDraft(next);
+          formApi.setFieldsValue(next);
+          setAddOpen(true);
+        }}
         rowActions={(r) => (
           <>
-            <RowBtn onClick={() => goDetail(r.id)}>详情</RowBtn>
+            <RowBtn onClick={() => goDetail(r.id)}>{t("common.details")}</RowBtn>
             <RowBtn
               danger
-              confirm={{
-                description: (
-                  <>
-                    确定要删除设备 <span className="font-semibold text-foreground">「{r.name}」</span> 吗？该操作不可恢复。
-                  </>
-                ),
-              }}
+              confirm={{ description: t("devices.list.deleteConfirmDesc", { name: r.name }) }}
               onClick={() => void handleDelete(r)}
             >
-              删除
+              {t("common.delete")}
             </RowBtn>
           </>
         )}
@@ -253,31 +272,39 @@ function DevicesPage() {
 
       <Drawer
         open={addOpen}
-        onClose={() => setAddOpen(false)}
-        title="新建设备"
+        onClose={() => {
+          setAddOpen(false);
+          formApi.resetFields();
+        }}
+        title={t("devices.list.addDrawerTitle")}
         size={480}
         destroyOnHidden
         styles={{ body: { paddingTop: 8 } }}
         footer={drawerFooter([
-          { key: "close", label: "关闭", onClick: () => setAddOpen(false) },
+          { key: "close", label: t("common.close"), onClick: () => setAddOpen(false) },
           {
             key: "save",
-            label: saving ? "提交中…" : "保存提交",
+            label: saving ? t("common.submitting") : t("common.saveSubmit"),
             type: "primary",
             disabled: saving,
             onClick: () => void saveAdd(),
           },
         ])}
       >
-        <DeviceForm value={draft} onChange={setDraft} products={products} gateways={gateways} />
+        <DeviceForm formApi={formApi} value={draft} onChange={setDraft} products={products} gateways={gateways} />
       </Drawer>
     </>
   );
 }
 
 function DeviceForm({
-  value, onChange, products, gateways,
+  formApi,
+  value,
+  onChange,
+  products,
+  gateways,
 }: {
+  formApi: ReturnType<typeof Form.useForm<DeviceCreateForm>>[0];
   value: DeviceCreateForm;
   onChange: (v: DeviceCreateForm) => void;
   products: ProductOption[];
@@ -285,46 +312,86 @@ function DeviceForm({
 }) {
   const { t } = useTranslation();
   const ph = useFormPlaceholder();
+  const getProductTypeLabel = useProductTypeLabel();
   const selectedProduct = products.find((p) => p.id === value.productId);
   const showNetworkGateway = selectedProduct?.type === "device" || selectedProduct?.type === "gateway";
 
   return (
-    <>
-      <Form.Item label="设备名称" required {...drawerFormItemProps}>
+    <Form form={formApi} layout="horizontal">
+      <Form.Item
+        name="name"
+        label={t("common.deviceName")}
+        required
+        {...drawerFormItemProps}
+        rules={[requiredInputRule(t, t("common.deviceName"))]}
+      >
         <Input
           value={value.name}
           placeholder={ph.input(t("common.deviceName"))}
-          onChange={(e) => onChange({ ...value, name: e.target.value })}
+          onChange={(e) => {
+            onChange({ ...value, name: e.target.value });
+            formApi.setFieldValue("name", e.target.value);
+          }}
         />
       </Form.Item>
-      <Form.Item label="SN" required {...drawerFormItemProps}>
+      <Form.Item
+        name="sn"
+        label="SN"
+        required
+        {...drawerFormItemProps}
+        rules={[requiredInputRule(t, "SN")]}
+      >
         <Input
           value={value.sn}
-          placeholder={ph.input(t("common.sn"))}
-          onChange={(e) => onChange({ ...value, sn: e.target.value })}
+          placeholder={ph.input("SN")}
+          onChange={(e) => {
+            onChange({ ...value, sn: e.target.value });
+            formApi.setFieldValue("sn", e.target.value);
+          }}
         />
       </Form.Item>
-      <Form.Item label="所属产品" required {...drawerFormItemProps}>
+      <Form.Item
+        name="productId"
+        label={t("common.linkedProduct")}
+        required
+        {...drawerFormItemProps}
+        {...selectFormItemProps}
+        rules={[requiredSelectRule(t, t("common.linkedProduct"))]}
+      >
         <Select
           className="vt-select-control"
           classNames={{ popup: { root: "vt-select-popup" } }}
           value={value.productId || undefined}
-          placeholder={ph.select(t("common.product"))}
-          onChange={(productId) => onChange({ ...value, productId, gatewayId: "" })}
+          placeholder={ph.select(t("common.linkedProduct"))}
+          onChange={(productId) => {
+            const next = { ...value, productId, gatewayId: "" };
+            onChange(next);
+            formApi.setFieldsValue({ productId, gatewayId: "" });
+          }}
           options={products.map((p) => ({
             value: p.id,
-            label: `${p.name} (${PRODUCT_TYPE_LABEL[p.type as keyof typeof PRODUCT_TYPE_LABEL] ?? p.type})`,
+            label: `${p.name} (${getProductTypeLabel(p.type)})`,
           }))}
         />
       </Form.Item>
       {showNetworkGateway && (
-        <Form.Item label="采集网关" required {...drawerFormItemProps}>
+        <Form.Item
+          name="gatewayId"
+          label={t("common.collectGateway")}
+          required
+          {...drawerFormItemProps}
+          {...selectFormItemProps}
+          rules={[requiredSelectRule(t, t("common.collectGateway"))]}
+        >
           <Select
             className="vt-select-control"
             classNames={{ popup: { root: "vt-select-popup" } }}
             value={value.gatewayId || undefined}
             placeholder={ph.select(t("common.collectGateway"))}
-            onChange={(gatewayId) => onChange({ ...value, gatewayId })}
+            onChange={(gatewayId) => {
+              onChange({ ...value, gatewayId });
+              formApi.setFieldValue("gatewayId", gatewayId);
+            }}
             options={gateways.map((g) => ({
               value: String(g.gatewayPo?.id ?? ""),
               label: g.gatewayPo?.name ?? "—",
@@ -332,6 +399,6 @@ function DeviceForm({
           />
         </Form.Item>
       )}
-    </>
+    </Form>
   );
 }

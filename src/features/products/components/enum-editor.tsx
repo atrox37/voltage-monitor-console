@@ -1,6 +1,7 @@
-﻿import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { Input, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { useTranslation } from "@/i18n";
 import type { EnumDataItem } from "@/types/api/metadata";
 
 export function EnumEditor({
@@ -10,6 +11,8 @@ export function EnumEditor({
   data: EnumDataItem[];
   onChange: (d: EnumDataItem[]) => void;
 }) {
+  const { t } = useTranslation();
+
   const update = (i: number, patch: Partial<EnumDataItem>) =>
     onChange(data.map((d, idx) => (idx === i ? { ...d, ...patch } : d)));
 
@@ -18,24 +21,16 @@ export function EnumEditor({
   const columns: ColumnsType<EnumRow> = [
     {
       key: "enumKey",
-      title: "Key (数值)",
+      title: t("common.enumKey"),
       render: (_, row) => (
-        <Input
-          size="small"
-          value={row.item.key}
-          onChange={(e) => update(row.index, { key: e.target.value })}
-        />
+        <Input size="small" value={row.item.key} onChange={(e) => update(row.index, { key: e.target.value })} />
       ),
     },
     {
       key: "enumValue",
-      title: "显示文本",
+      title: t("common.enumLabel"),
       render: (_, row) => (
-        <Input
-          size="small"
-          value={row.item.value}
-          onChange={(e) => update(row.index, { value: e.target.value })}
-        />
+        <Input size="small" value={row.item.value} onChange={(e) => update(row.index, { value: e.target.value })} />
       ),
     },
     {
@@ -65,14 +60,14 @@ export function EnumEditor({
 
   return (
     <div className="overflow-hidden rounded border border-panel-border">
-      <Table<EnumRow>
+      <Table
         rowKey="index"
         size="small"
         pagination={false}
         className="vt-ant-data-table"
         columns={columns}
         dataSource={rows}
-        locale={{ emptyText: "暂无枚举值" }}
+        locale={{ emptyText: t("common.noEnumValues") }}
       />
     </div>
   );

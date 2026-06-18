@@ -29,6 +29,7 @@ import { isRequestCanceled } from "@/lib/request";
 import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { useTranslation } from "@/i18n";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
 import type { PageQuery, SysRolePageDto, SysRolePermissionDto } from "@/types";
 
 export const Route = createFileRoute("/_app/system/roles")({
@@ -61,6 +62,7 @@ function mapRoleRow(dto: SysRolePageDto): RoleRow {
 function RolesPage() {
   const { t } = useTranslation();
   const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<{ name: string; orgId: string }>();
   const [rows, setRows] = useState<RoleRow[]>([]);
   const [orgNodes, setOrgNodes] = useState<OrgNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -225,8 +227,9 @@ function RolesPage() {
   };
 
   const saveAdd = async () => {
-    if (!draft.name.trim() || !draft.orgId) {
-      showError(t("common.requiredHint"));
+    try {
+      await formApi.validateFields();
+    } catch {
       return;
     }
     setSaving(true);
@@ -235,6 +238,7 @@ function RolesPage() {
       showSuccess(t("roles.addSuccess"));
       setAddOpen(false);
       setDraft({ name: "", orgId: "" });
+      formApi.resetFields();
       setPage(1);
       await fetchRoles();
     } finally {
@@ -307,7 +311,12 @@ function RolesPage() {
             ),
           },
         ]}
-        onAdd={() => setAddOpen(true)}
+        onAdd={() => {
+          const next = { name: "", orgId: "" };
+          setDraft(next);
+          formApi.setFieldsValue(next);
+          setAddOpen(true);
+        }}
         rowActions={(r) => (
           <>
             <RowBtn onClick={() => void openMenu(r)}>{t("roles.menuPerm")}</RowBtn>
@@ -330,7 +339,10 @@ function RolesPage() {
 
       <Drawer
         open={addOpen}
-        onClose={() => setAddOpen(false)}
+        onClose={() => {
+          setAddOpen(false);
+          formApi.resetFields();
+        }}
         title={t("roles.add")}
         size={480}
         destroyOnHidden
@@ -346,21 +358,41 @@ function RolesPage() {
           },
         ])}
       >
-        <Form.Item label={t("roles.name")} required {...drawerFormItemProps}>
-          <Input
-            placeholder={ph.input(t("roles.name"))}
-            value={draft.name}
-            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-          />
-        </Form.Item>
-        <Form.Item label={t("users.org")} required {...drawerFormItemProps}>
-          <OrgTreeSelect
-            nodes={orgNodes}
-            value={draft.orgId}
-            placeholder={ph.select(t("users.org"))}
-            onChange={(v) => setDraft({ ...draft, orgId: v })}
-          />
-        </Form.Item>
+        <Form form={formApi} layout="horizontal">
+          <Form.Item
+            name="name"
+            label={t("roles.name")}
+            required
+            {...drawerFormItemProps}
+            rules={[requiredInputRule(t, t("roles.name"))]}
+          >
+            <Input
+              placeholder={ph.input(t("roles.name"))}
+              value={draft.name}
+              onChange={(e) => {
+                setDraft({ ...draft, name: e.target.value });
+                formApi.setFieldValue("name", e.target.value);
+              }}
+            />
+          </Form.Item>
+          <Form.Item
+            name="orgId"
+            label={t("users.org")}
+            required
+            {...drawerFormItemProps}
+            rules={[requiredSelectRule(t, t("users.org"))]}
+          >
+            <OrgTreeSelect
+              nodes={orgNodes}
+              value={draft.orgId}
+              placeholder={ph.select(t("users.org"))}
+              onChange={(v) => {
+                setDraft({ ...draft, orgId: v });
+                formApi.setFieldValue("orgId", v);
+              }}
+            />
+          </Form.Item>
+        </Form>
       </Drawer>
 
       <Drawer

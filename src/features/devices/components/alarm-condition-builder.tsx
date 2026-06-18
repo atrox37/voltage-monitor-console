@@ -1,7 +1,8 @@
-﻿import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { Input, InputNumber, Select, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { type AlarmCond, operationsFor } from "@/features/devices/lib/rule-format";
+import { useTranslation } from "@/i18n";
+import { operationsFor, type AlarmCond } from "@/features/devices/lib/rule-format";
 import type { EnumDataItem, SimplePropertyMetadata } from "@/types/api/metadata";
 
 const selectProps = {
@@ -14,7 +15,7 @@ export function AlarmConditionBuilder({
   groups,
   properties,
   onChange,
-  emptyHint = "尚未添加条件",
+  emptyHint,
   noPropertiesHint,
 }: {
   groups: AlarmCond[][];
@@ -23,11 +24,15 @@ export function AlarmConditionBuilder({
   emptyHint?: string;
   noPropertiesHint?: string;
 }) {
+  const { t } = useTranslation();
+  const resolvedEmptyHint = emptyHint ?? t("common.noConditions");
+
   const setRow = (gi: number, ri: number, patch: Partial<AlarmCond>) => {
     onChange(
       groups.map((g, i) => (i !== gi ? g : g.map((r, j) => (j !== ri ? r : { ...r, ...patch })))),
     );
   };
+
   const addRow = (gi: number) => {
     if (properties.length === 0) return;
     const p = properties[0];
@@ -45,8 +50,10 @@ export function AlarmConditionBuilder({
     };
     onChange(groups.map((g, i) => (i !== gi ? g : [...g, newRow])));
   };
+
   const delRow = (gi: number, ri: number) =>
     onChange(groups.map((g, i) => (i !== gi ? g : g.filter((_, j) => j !== ri))));
+
   const addGroup = () => onChange([...groups, []]);
   const delGroup = (gi: number) => onChange(groups.filter((_, i) => i !== gi));
 
@@ -71,12 +78,12 @@ export function AlarmConditionBuilder({
   const condColumns = (gi: number): ColumnsType<CondRow> => [
     {
       key: "column",
-      title: "属性",
+      title: t("common.property"),
       render: (_, { ri, cond: r }) => (
         <Select
           {...selectProps}
           value={r.column || undefined}
-          placeholder="选择属性"
+          placeholder={t("validation.requiredSelect", { label: t("common.property") })}
           onChange={(v) => onColumnChange(gi, ri, v)}
           options={properties.map((pp) => ({ label: pp.name, value: pp.id }))}
         />
@@ -84,7 +91,7 @@ export function AlarmConditionBuilder({
     },
     {
       key: "operation",
-      title: "比较",
+      title: t("common.compare"),
       render: (_, { ri, cond: r }) => {
         const p = properties.find((x) => x.id === r.column);
         const ops = operationsFor(p?.valueType?.type);
@@ -100,7 +107,7 @@ export function AlarmConditionBuilder({
     },
     {
       key: "value",
-      title: "值",
+      title: t("common.value"),
       render: (_, { ri, cond: r }) => {
         const p = properties.find((x) => x.id === r.column);
         const isNumber = ["int", "long", "float", "double", "number"].includes(
@@ -128,12 +135,7 @@ export function AlarmConditionBuilder({
             />
           );
         }
-        return (
-          <Input
-            value={String(r.value ?? "")}
-            onChange={(e) => setRow(gi, ri, { value: e.target.value })}
-          />
-        );
+        return <Input value={String(r.value ?? "")} onChange={(e) => setRow(gi, ri, { value: e.target.value })} />;
       },
     },
     {
@@ -158,7 +160,7 @@ export function AlarmConditionBuilder({
         <div key={gi} className="rounded border border-dashed border-panel-border p-2">
           <div className="mb-1 flex items-center justify-between">
             <span className="rounded bg-panel/60 px-1.5 py-0.5 text-[10px] text-text-muted">
-              条件组 {gi + 1} · 组内 AND
+              {t("common.conditionGroup", { n: gi + 1 })}
             </span>
             <div className="flex items-center gap-1">
               <button
@@ -166,7 +168,7 @@ export function AlarmConditionBuilder({
                 onClick={() => addRow(gi)}
                 className="inline-flex items-center gap-0.5 rounded border border-panel-border px-1.5 py-0.5 text-[11px] text-text-secondary hover:border-primary/40 hover:text-primary"
               >
-                <PlusOutlined className="h-3 w-3" /> 条件
+                <PlusOutlined className="h-3 w-3" /> {t("common.addCondition")}
               </button>
               {groups.length > 1 && (
                 <button
@@ -179,13 +181,13 @@ export function AlarmConditionBuilder({
               )}
             </div>
           </div>
-          <Table<CondRow>
+          <Table
             rowKey="ri"
             size="small"
             pagination={false}
             columns={condColumns(gi)}
             dataSource={rows.map((cond, ri) => ({ ri, cond }))}
-            locale={{ emptyText: emptyHint }}
+            locale={{ emptyText: resolvedEmptyHint }}
           />
         </div>
       ))}
@@ -194,11 +196,9 @@ export function AlarmConditionBuilder({
         onClick={addGroup}
         className="inline-flex items-center gap-1 rounded border border-dashed border-panel-border px-3 py-1 text-xs text-text-muted hover:border-primary/40 hover:text-primary"
       >
-        <PlusOutlined className="h-3.5 w-3.5" /> 新增条件组 (组间 OR)
+        <PlusOutlined className="h-3.5 w-3.5" /> {t("common.addConditionGroup")}
       </button>
-      {noPropertiesHint && properties.length === 0 && (
-        <p className="text-xs text-status-warning">{noPropertiesHint}</p>
-      )}
+      {noPropertiesHint && properties.length === 0 && <p className="text-xs text-status-warning">{noPropertiesHint}</p>}
     </div>
   );
 }

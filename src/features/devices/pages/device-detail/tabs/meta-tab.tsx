@@ -13,7 +13,7 @@ import type {
   SimplePropertyMetadata,
   SimpleFunctionMetadata,
 } from "@/types/api/metadata";
-import { unitLabel } from "@/lib/data-types";
+import { unitLabel, defaultPropertyValueType, propertyTypeLabel } from "@/lib/data-types";
 
 import { PropertyDrawer } from "../drawers/property-drawer";
 import {
@@ -44,6 +44,17 @@ export function TabMeta() {
     () => props.filter((p) => filterTag === "all" || !p.tagId || p.tagId === filterTag),
     [props, filterTag],
   );
+
+  const closeMetaDrawers = () => {
+    setEditingProp(null);
+    setFuncDraft(null);
+  };
+
+  const switchSubTab = (key: "prop" | "fn") => {
+    if (sub === key) return;
+    closeMetaDrawers();
+    setSub(key);
+  };
 
   if (!device) return null;
 
@@ -82,7 +93,9 @@ export function TabMeta() {
       key: "type",
       title: t("common.type"),
       width: 128,
-      render: (_, p) => <span className="text-text-secondary">{p.valueType?.type ?? "—"}</span>,
+      render: (_, p) => (
+        <span className="text-text-secondary">{propertyTypeLabel(t, p.valueType?.type)}</span>
+      ),
     },
     {
       key: "unit",
@@ -200,7 +213,7 @@ export function TabMeta() {
             return (
               <button
                 key={k}
-                onClick={() => setSub(k)}
+                onClick={() => switchSubTab(k)}
                 className={`relative px-4 py-1.5 text-xs ${a ? "text-primary" : "text-text-secondary"}`}
               >
                 {l}
@@ -212,7 +225,13 @@ export function TabMeta() {
         <button
           onClick={() =>
             sub === "prop"
-              ? setEditingProp({ id: "", name: "", valueType: { type: "double", unit: "" } })
+              ? setEditingProp({
+                  id: "",
+                  name: "",
+                  rw: "none",
+                  create: true,
+                  valueType: defaultPropertyValueType("string"),
+                })
               : setFuncDraft({
                   data: {
                     id: "",

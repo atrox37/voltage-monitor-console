@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { CloseOutlined, DeleteOutlined, LoadingOutlined, MinusOutlined, PlusOutlined, UploadOutlined } from "@ant-design/icons";
-import { Button, Checkbox, Drawer, Form, Input, InputNumber, Switch } from "antd";
+import { Button, Checkbox, Drawer, Form, Input, InputNumber } from "antd";
+import { OptionToggle } from "@/components/option-toggle";
+import { DrawerSegmentTabs } from "@/components/drawer-segment-tabs";
 import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
 import { showError, showSuccess } from "@/lib/api-message";
 import { deleteNetwork, getDimensionTree, pageNetworks, saveNetwork, uploadNetworkFile } from "@/api";
 import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
+import { NetworkConnectStatusBadge } from "@/components/status-display";
 import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
 import {
@@ -22,6 +25,7 @@ import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { requiredInputError, requiredInputRule, requiredSelectError } from "@/lib/form-validation";
 import { useTranslation } from "@/i18n";
 import type { PageQuery } from "@/types";
 
@@ -170,6 +174,12 @@ function NetworkComponentsPage() {
             width: 96,
             render: (r) => <StatusBadge status={r.enabled ? "enabled" : "disabled"} />,
           },
+          {
+            key: "connectStatus",
+            title: t("ingest.components.connectStatus"),
+            width: 110,
+            render: (r) => <NetworkConnectStatusBadge status={r.connectStatus} />,
+          },
           { key: "org", title: t("common.orgBelong") },
           { key: "updateTime", title: t("common.updatedAt"), render: (r) => <span className="text-text-secondary">{r.updateTime}</span> },
         ]}
@@ -208,6 +218,18 @@ function NetworkComponentsPage() {
   );
 }
 
+type ComponentFormValues = {
+  name: string;
+  ip: string;
+  port: number;
+  username: string;
+  password: string;
+  topics: string[];
+  caCert: string;
+  sslCert: string;
+  sslKey: string;
+};
+
 function ComponentDrawer({
   mode, value, saving, onClose, onSave,
 }: {
@@ -219,6 +241,7 @@ function ComponentDrawer({
 }) {
   const { t } = useTranslation();
   const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<ComponentFormValues>();
   const [d, setD] = useState<NetworkCompForm>(value);
   const [topicDraft, setTopicDraft] = useState("");
   const [recruitOpen, setRecruitOpen] = useState(false);
@@ -228,16 +251,32 @@ function ComponentDrawer({
 
   useEffect(() => {
     setD(value);
-  }, [value]);
+    formApi.setFieldsValue({
+      name: value.name,
+      ip: value.ip,
+      port: value.port,
+      username: value.username,
+      password: value.password,
+      topics: value.topics,
+      caCert: value.caCert,
+      sslCert: value.sslCert,
+      sslKey: value.sslKey,
+    });
+  }, [formApi, value]);
 
   const set = <K extends keyof NetworkCompForm>(k: K, v: NetworkCompForm[K]) =>
     setD((x) => ({ ...x, [k]: v }));
+
+  const syncTopics = (topics: string[]) => {
+    set("topics", topics);
+    formApi.setFieldValue("topics", topics);
+  };
 
   const addTopic = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "Enter") return;
     const v = topicDraft.trim();
     if (!v) return;
-    set("topics", [...d.topics, v]);
+    syncTopics([...d.topics, v]);
     setTopicDraft("");
     e.preventDefault();
   };
@@ -257,6 +296,7 @@ function ComponentDrawer({
       const res = await uploadNetworkFile(fd);
       const key = uploadTag === "sslCa" ? "caCert" : uploadTag === "sslCert" ? "sslCert" : "sslKey";
       set(key, res.url);
+      formApi.setFieldValue(key, res.url);
     } catch (err) {
       if (isRequestCanceled(err)) return;
       showError(err instanceof Error ? err.message : t("ingest.protocols.uploadFailed"));
@@ -290,120 +330,260 @@ function ComponentDrawer({
             label: saving ? t("common.saving") : t("common.save"),
             type: "primary",
             disabled: saving,
-            onClick: () => onSave(d),
+            onClick: async () => {
+              try {
+                await formApi.validateFields();
+              } catch {
+                return;
+              }
+              onSave(d);
+            },
           },
         ])}
       >
-        <div className="mb-5">
-          <div className="inline-flex overflow-hidden rounded-md border border-panel-border">
-            {TYPE_OPTIONS.map((opt) => {
-              const active = d.type === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  disabled={mode === "edit"}
-                  className={`px-4 py-1.5 text-xs transition ${
-                    active
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-panel text-text-secondary hover:text-foreground"
-                  } ${mode === "edit" ? "cursor-not-allowed opacity-70" : ""}`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <Form form={formApi} layout="horizontal">
+        <DrawerSegmentTabs
+          options={TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+          value={d.type}
+          disabled={mode === "edit"}
+          allTextWhite
+        />
 
-        <Form.Item label={t("common.nameLabel")} required {...drawerFormItemProps}>
+        <Form.Item
+          name="name"
+          label={t("common.nameLabel")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredInputRule(t, t("common.nameLabel"))]}
+        >
           <Input
             placeholder={ph.input(t("common.nameLabel"))}
             value={d.name}
-            onChange={(e) => set("name", e.target.value)}
+            onChange={(e) => {
+              set("name", e.target.value);
+              formApi.setFieldValue("name", e.target.value);
+            }}
           />
         </Form.Item>
 
         <Form.Item label={t("common.status")} {...drawerFormItemProps}>
-          <Switch
+          <OptionToggle
             disabled={mode === "add"}
-            checked={d.enabled}
-            onChange={(enabled) => set("enabled", enabled)}
+            value={d.enabled ? 1 : 0}
+            onChange={(v) => set("enabled", v === 1)}
+            options={[
+              { label: t("common.disabled"), value: 0 },
+              { label: t("common.enabled"), value: 1 },
+            ]}
           />
-          <span className="ml-2 text-xs text-text-secondary">{d.enabled ? t("common.on") : t("common.off")}</span>
         </Form.Item>
 
-        <Form.Item label={t("ingest.components.ip")} required {...drawerFormItemProps}>
+        <Form.Item
+          name="ip"
+          label={t("ingest.components.ip")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredInputRule(t, t("ingest.components.ip"))]}
+        >
           <Input
             placeholder={ph.input(t("ingest.components.ip"))}
             value={d.ip}
-            onChange={(e) => set("ip", e.target.value)}
+            onChange={(e) => {
+              set("ip", e.target.value);
+              formApi.setFieldValue("ip", e.target.value);
+            }}
           />
         </Form.Item>
 
-        <Form.Item label={t("ingest.components.port")} required {...drawerFormItemProps}>
+        <Form.Item
+          name="port"
+          label={t("ingest.components.port")}
+          required
+          {...drawerFormItemProps}
+          rules={[
+            {
+              validator: async () => {
+                if (!d.port) {
+                  return Promise.reject(requiredInputError(t, t("ingest.components.port")));
+                }
+              },
+            },
+          ]}
+        >
           <div className="inline-flex items-center overflow-hidden rounded-md border border-panel-border">
-            <button type="button" onClick={() => set("port", Math.max(1, d.port - 1))} className="flex h-9 w-9 items-center justify-center bg-panel text-text-secondary hover:text-foreground">
+            <button
+              type="button"
+              onClick={() => {
+                const port = Math.max(1, d.port - 1);
+                set("port", port);
+                formApi.setFieldValue("port", port);
+              }}
+              className="flex h-9 w-9 items-center justify-center bg-panel text-text-secondary hover:text-foreground"
+            >
               <MinusOutlined className="text-sm" />
             </button>
             <InputNumber
               controls={false}
+              placeholder={ph.input(t("ingest.components.port"))}
               value={d.port}
-              onChange={(v) => set("port", Number(v) || 0)}
+              onChange={(v) => {
+                const port = Number(v) || 0;
+                set("port", port);
+                formApi.setFieldValue("port", port);
+              }}
               className="!h-9 !w-24 !rounded-none border-x border-panel-border text-center"
             />
-            <button type="button" onClick={() => set("port", d.port + 1)} className="flex h-9 w-9 items-center justify-center bg-panel text-text-secondary hover:text-foreground">
+            <button
+              type="button"
+              onClick={() => {
+                const port = d.port + 1;
+                set("port", port);
+                formApi.setFieldValue("port", port);
+              }}
+              className="flex h-9 w-9 items-center justify-center bg-panel text-text-secondary hover:text-foreground"
+            >
               <PlusOutlined className="text-sm" />
             </button>
           </div>
         </Form.Item>
 
-        <Form.Item label={t("ingest.components.username")} {...drawerFormItemProps}>
+        <Form.Item
+          name="username"
+          label={t("ingest.components.username")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredInputRule(t, t("ingest.components.username"))]}
+        >
           <Input
             placeholder={ph.input(t("ingest.components.username"))}
             value={d.username}
-            onChange={(e) => set("username", e.target.value)}
+            onChange={(e) => {
+              set("username", e.target.value);
+              formApi.setFieldValue("username", e.target.value);
+            }}
           />
         </Form.Item>
 
-        <Form.Item label={t("ingest.components.password")} {...drawerFormItemProps}>
+        <Form.Item
+          name="password"
+          label={t("ingest.components.password")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredInputRule(t, t("ingest.components.password"))]}
+        >
           <Input.Password
             placeholder={ph.input(t("ingest.components.password"))}
             value={d.password}
-            onChange={(e) => set("password", e.target.value)}
+            onChange={(e) => {
+              set("password", e.target.value);
+              formApi.setFieldValue("password", e.target.value);
+            }}
           />
         </Form.Item>
 
         <Form.Item label={t("ingest.components.ssl")} {...drawerFormItemProps}>
-          <Switch checked={d.ssl} onChange={(ssl) => set("ssl", ssl)} />
+          <OptionToggle
+            value={d.ssl ? 1 : 0}
+            onChange={(v) => set("ssl", v === 1)}
+            options={[
+              { label: t("common.off"), value: 0 },
+              { label: t("common.on"), value: 1 },
+            ]}
+          />
         </Form.Item>
 
         {d.ssl && (
           <>
-            <Form.Item label={t("ingest.components.caCert")} {...drawerFormItemProps}>
+            <Form.Item
+              name="caCert"
+              label={t("ingest.components.caCert")}
+              required
+              {...drawerFormItemProps}
+              rules={[
+                {
+                  validator: async () => {
+                    if (d.ssl && !d.caCert?.trim()) {
+                      return Promise.reject(requiredSelectError(t, t("ingest.components.caCert")));
+                    }
+                  },
+                },
+              ]}
+            >
               <UploadInput value={d.caCert} uploading={uploading && uploadTag === "sslCa"} onPick={() => pickUpload("sslCa")} />
             </Form.Item>
-            <Form.Item label={t("ingest.components.sslCert")} {...drawerFormItemProps}>
+            <Form.Item
+              name="sslCert"
+              label={t("ingest.components.sslCert")}
+              required
+              {...drawerFormItemProps}
+              rules={[
+                {
+                  validator: async () => {
+                    if (d.ssl && !d.sslCert?.trim()) {
+                      return Promise.reject(requiredSelectError(t, t("ingest.components.sslCert")));
+                    }
+                  },
+                },
+              ]}
+            >
               <UploadInput value={d.sslCert} uploading={uploading && uploadTag === "sslCert"} onPick={() => pickUpload("sslCert")} />
             </Form.Item>
-            <Form.Item label={t("ingest.components.sslKey")} {...drawerFormItemProps}>
+            <Form.Item
+              name="sslKey"
+              label={t("ingest.components.sslKey")}
+              required
+              {...drawerFormItemProps}
+              rules={[
+                {
+                  validator: async () => {
+                    if (d.ssl && !d.sslKey?.trim()) {
+                      return Promise.reject(requiredSelectError(t, t("ingest.components.sslKey")));
+                    }
+                  },
+                },
+              ]}
+            >
               <UploadInput value={d.sslKey} uploading={uploading && uploadTag === "sslKey"} onPick={() => pickUpload("sslKey")} />
             </Form.Item>
           </>
         )}
 
-        <Form.Item label={t("ingest.components.topics")} {...drawerFormItemProps}>
+        <Form.Item
+          name="topics"
+          label={t("ingest.components.topics")}
+          required
+          {...drawerFormItemProps}
+          rules={[
+            {
+              validator: async () => {
+                if (d.topics.length === 0) {
+                  return Promise.reject(requiredInputError(t, t("ingest.components.topics")));
+                }
+              },
+            },
+          ]}
+        >
           <div className="rounded-md border border-panel-border bg-background/40 p-2">
             <div className="flex flex-wrap gap-1.5">
               {d.topics.map((topic, i) => (
                 <span key={i} className="inline-flex items-center gap-1 rounded bg-panel px-2 py-1 text-[11px] text-foreground">
                   {topic}
-                  <button type="button" onClick={() => set("topics", d.topics.filter((_, idx) => idx !== i))} className="text-text-muted hover:text-status-critical">
+                  <button
+                    type="button"
+                    onClick={() => syncTopics(d.topics.filter((_, idx) => idx !== i))}
+                    className="text-text-muted hover:text-status-critical"
+                  >
                     <CloseOutlined className="text-xs" />
                   </button>
                 </span>
               ))}
-              <input value={topicDraft} onChange={(e) => setTopicDraft(e.target.value)} onKeyDown={addTopic} placeholder={t("ingest.components.topicPlaceholder")} className="min-w-[160px] flex-1 bg-transparent px-1 py-1 text-xs text-foreground placeholder:text-text-muted outline-none" />
+              <input
+                value={topicDraft}
+                onChange={(e) => setTopicDraft(e.target.value)}
+                onKeyDown={addTopic}
+                placeholder={t("ingest.components.topicPlaceholder")}
+                className="min-w-[160px] flex-1 bg-transparent px-1 py-1 text-xs text-foreground placeholder:text-text-muted outline-none"
+              />
             </div>
           </div>
         </Form.Item>
@@ -436,6 +616,7 @@ function ComponentDrawer({
             )}
           </div>
         </Form.Item>
+        </Form>
       </Drawer>
 
       {recruitOpen && (
@@ -467,11 +648,17 @@ function UploadInput({ value, uploading, onPick }: { value: string; uploading?: 
 function RecruitDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (r: RecruitRow) => void }) {
   const { t } = useTranslation();
   const ph = useFormPlaceholder();
+  const [formApi] = Form.useForm<{ name: string; topic: string; payload: string; target: string }>();
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
   const [payload, setPayload] = useState("");
   const [gateway, setGateway] = useState(false);
   const [direct, setDirect] = useState(false);
+
+  const syncTarget = (nextGateway: boolean, nextDirect: boolean) => {
+    const target = nextGateway || nextDirect ? "ok" : "";
+    formApi.setFieldValue("target", target);
+  };
 
   return (
     <Drawer
@@ -488,29 +675,107 @@ function RecruitDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (r: Rec
           key: "confirm",
           label: t("common.confirm"),
           type: "primary",
-          onClick: () => onAdd({ id: String(Date.now()), name, topic, payload, targets: { gateway, direct } }),
+          onClick: async () => {
+            syncTarget(gateway, direct);
+            try {
+              await formApi.validateFields();
+            } catch {
+              return;
+            }
+            onAdd({ id: String(Date.now()), name, topic, payload, targets: { gateway, direct } });
+          },
         },
       ])}
     >
-      <Form.Item label={t("ingest.components.recruitName")} required {...drawerFormItemProps}>
-        <Input placeholder={ph.input(t("ingest.components.recruitName"))} value={name} onChange={(e) => setName(e.target.value)} />
+      <Form form={formApi} layout="horizontal">
+      <Form.Item
+        name="name"
+        label={t("ingest.components.recruitName")}
+        required
+        {...drawerFormItemProps}
+        rules={[requiredInputRule(t, t("ingest.components.recruitName"))]}
+      >
+        <Input
+          placeholder={ph.input(t("ingest.components.recruitName"))}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            formApi.setFieldValue("name", e.target.value);
+          }}
+        />
       </Form.Item>
-      <Form.Item label={t("common.topic")} required {...drawerFormItemProps}>
-        <Input placeholder={ph.input(t("common.topic"))} value={topic} onChange={(e) => setTopic(e.target.value)} />
+      <Form.Item
+        name="topic"
+        label={t("common.topic")}
+        required
+        {...drawerFormItemProps}
+        rules={[requiredInputRule(t, t("common.topic"))]}
+      >
+        <Input
+          placeholder={ph.input(t("common.topic"))}
+          value={topic}
+          onChange={(e) => {
+            setTopic(e.target.value);
+            formApi.setFieldValue("topic", e.target.value);
+          }}
+        />
       </Form.Item>
-      <Form.Item label={t("common.payload")} {...drawerFormItemProps}>
-        <Input.TextArea rows={4} placeholder={ph.input(t("common.payload"))} value={payload} onChange={(e) => setPayload(e.target.value)} />
+      <Form.Item
+        name="payload"
+        label={t("common.payload")}
+        required
+        {...drawerFormItemProps}
+        rules={[requiredInputRule(t, t("common.payload"))]}
+      >
+        <Input.TextArea
+          rows={4}
+          placeholder={ph.input(t("common.payload"))}
+          value={payload}
+          onChange={(e) => {
+            setPayload(e.target.value);
+            formApi.setFieldValue("payload", e.target.value);
+          }}
+        />
       </Form.Item>
-      <Form.Item label={t("common.target")} {...drawerFormItemProps}>
+      <Form.Item
+        name="target"
+        label={t("common.target")}
+        required
+        {...drawerFormItemProps}
+        rules={[
+          {
+            validator: async () => {
+              if (!gateway && !direct) {
+                return Promise.reject(requiredInputError(t, t("common.target")));
+              }
+            },
+          },
+        ]}
+      >
         <div className="flex items-center gap-5 text-xs text-foreground">
-          <Checkbox checked={gateway} onChange={(e) => setGateway(e.target.checked)}>
+          <Checkbox
+            checked={gateway}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setGateway(next);
+              syncTarget(next, direct);
+            }}
+          >
             {t("common.gateway")}
           </Checkbox>
-          <Checkbox checked={direct} onChange={(e) => setDirect(e.target.checked)}>
+          <Checkbox
+            checked={direct}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setDirect(next);
+              syncTarget(gateway, next);
+            }}
+          >
             {t("common.directDevice")}
           </Checkbox>
         </div>
       </Form.Item>
+      </Form>
     </Drawer>
   );
 }

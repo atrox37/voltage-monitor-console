@@ -1,11 +1,23 @@
 import { useEffect, useState } from "react";
 
-import { Button, Drawer, Form, Input, Select } from "antd";
+import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
+import { detailFormItemProps, selectFormItemProps } from "@/components/drawer-form";
+import { OptionToggle } from "@/components/option-toggle";
+import { EnumEditor } from "@/features/products/components/enum-editor";
 import { useTranslation } from "@/i18n";
 import { useDeviceEdit } from "@/features/devices/contexts/device-edit-context";
+import {
+  DATA_UNITS,
+  dataTypeSelectOptions,
+  defaultPropertyValueType,
+  normalizePropertyType,
+} from "@/lib/data-types";
+import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { requiredInputRule, requiredSelectRule, validateEnumData } from "@/lib/form-validation";
 
-import type { PropertyTagMetadata, SimplePropertyMetadata } from "@/types/api/metadata";
-import { DATA_UNITS } from "@/lib/data-types";
+import type { EnumDataItem, PropertyTagMetadata, SimplePropertyMetadata } from "@/types/api/metadata";
+
+type PropertyFormValues = { id: string; name: string; tagId: string; dataType: string };
 
 export function PropertyDrawer({
   open,
@@ -20,18 +32,74 @@ export function PropertyDrawer({
   onSave: (p: SimplePropertyMetadata) => void;
   tags: PropertyTagMetadata[];
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const ph = useFormPlaceholder();
   const { dataTypes } = useDeviceEdit();
+  const [formApi] = Form.useForm<PropertyFormValues>();
   const [draft, setDraft] = useState<SimplePropertyMetadata>({ id: "", name: "" });
+
+  const propertyRwOptions = [
+    { label: t("devices.thingModel.propertyRw.read"), value: "read" },
+    { label: t("devices.thingModel.propertyRw.write"), value: "write" },
+    { label: t("devices.thingModel.propertyRw.readwrite"), value: "readwrite" },
+    { label: t("devices.thingModel.propertyRw.none"), value: "none" },
+  ];
+
   useEffect(() => {
-    if (value) setDraft({ ...value, valueType: value.valueType ?? { type: "double" } });
-  }, [value]);
+    if (!open || !value) {
+      formApi.resetFields();
+      return;
+    }
+    const normalizedType = normalizePropertyType(value.valueType?.type);
+    const next: SimplePropertyMetadata = {
+      ...value,
+      rw: value.rw ?? "none",
+      valueType: value.valueType
+        ? {
+            ...value.valueType,
+            type: normalizedType,
+            extra: value.valueType.extra ?? defaultPropertyValueType(normalizedType).extra,
+          }
+        : defaultPropertyValueType("string"),
+    };
+    setDraft(next);
+    formApi.setFieldsValue({
+      id: next.id,
+      name: next.name,
+      tagId: next.tagId ?? "",
+      dataType: normalizedType,
+    });
+  }, [formApi, open, value]);
+
+  const propType = normalizePropertyType(draft.valueType?.type);
+  const isNew = !value?.id;
+
+  const handleSave = async () => {
+    formApi.setFields([{ name: "enumData", errors: [] }]);
+    try {
+      await formApi.validateFields(["id", "name", "tagId", "dataType"]);
+    } catch {
+      return;
+    }
+    if (propType === "enum") {
+      const enumErr = validateEnumData(
+        t,
+        (draft.valueType?.extra?.enumData as EnumDataItem[]) ?? [],
+      );
+      if (enumErr) {
+        formApi.setFields([{ name: "enumData", errors: [enumErr] }]);
+        return;
+      }
+    }
+    onSave(draft);
+  };
+
   return (
     <Drawer
       open={open}
       onClose={onClose}
-      title={value?.id ? t("common.editProperty") : t("common.addProperty")}
-      size={480}
+      title={isNew ? t("common.addProperty") : t("common.editProperty")}
+      size={520}
       destroyOnHidden
       styles={{ body: { paddingTop: 8 } }}
       footer={
@@ -39,105 +107,161 @@ export function PropertyDrawer({
           <Button type="default" size="small" onClick={onClose}>
             {t("common.cancel")}
           </Button>
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => draft.name && draft.id && onSave(draft)}
-          >
+          <Button type="primary" size="small" onClick={() => void handleSave()}>
             {t("common.save")}
           </Button>
         </div>
       }
     >
-      <Form.Item
-        label={t("common.identifier")}
-        required
-        layout="horizontal"
-        labelCol={{ flex: "120px" }}
-        wrapperCol={{ flex: 1 }}
-        className="mb-3"
-      >
-        <Input
-          value={draft.id}
-          disabled={!!value?.id}
-          onChange={(e) => setDraft({ ...draft, id: e.target.value })}
-        />
-      </Form.Item>
-      <Form.Item
-        label={t("common.name")}
-        required
-        layout="horizontal"
-        labelCol={{ flex: "120px" }}
-        wrapperCol={{ flex: 1 }}
-        className="mb-3"
-      >
-        <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-      </Form.Item>
-      <Form.Item
-        label={t("common.type")}
-        layout="horizontal"
-        labelCol={{ flex: "120px" }}
-        wrapperCol={{ flex: 1 }}
-        className="mb-3"
-      >
-        <Select
-          className="vt-select-control"
-          classNames={{ popup: { root: "vt-select-popup" } }}
-          style={{ width: "100%" }}
-          value={draft.valueType?.type ?? "double"}
-          onChange={(v) =>
-            setDraft({
-              ...draft,
-              valueType: { ...(draft.valueType ?? { type: "double" }), type: String(v ?? "") },
-            })
-          }
-          options={dataTypes.map((d) => ({ label: d.name, value: d.id }))}
-        />
-      </Form.Item>
-      <Form.Item
-        label={t("common.unit")}
-        layout="horizontal"
-        labelCol={{ flex: "120px" }}
-        wrapperCol={{ flex: 1 }}
-        className="mb-3"
-      >
-        <Select
-          className="vt-select-control"
-          classNames={{ popup: { root: "vt-select-popup" } }}
-          style={{ width: "100%" }}
-          allowClear
-          value={draft.valueType?.unit || undefined}
-          onChange={(v) =>
-            setDraft({
-              ...draft,
-              valueType: { ...(draft.valueType ?? { type: "double" }), unit: String(v ?? "") },
-            })
-          }
-          options={DATA_UNITS.filter((u) => u.unit).map((u) => ({
-            label: `${u.zh ?? u.en}${u.unit ? ` (${u.unit})` : ""}`,
-            value: u.unit,
-          }))}
-          placeholder={t("common.none")}
-        />
-      </Form.Item>
-      <Form.Item
-        label={t("common.tag")}
-        layout="horizontal"
-        labelCol={{ flex: "120px" }}
-        wrapperCol={{ flex: 1 }}
-        className="mb-3"
-      >
-        <Select
-          className="vt-select-control"
-          classNames={{ popup: { root: "vt-select-popup" } }}
-          style={{ width: "100%" }}
-          allowClear
-          value={draft.tagId || undefined}
-          onChange={(v) => setDraft({ ...draft, tagId: String(v ?? "") || undefined })}
-          options={tags.map((tag) => ({ label: tag.name, value: tag.id }))}
-          placeholder={t("common.ungrouped")}
-        />
-      </Form.Item>
+      <Form form={formApi} layout="horizontal">
+        <Form.Item
+          name="id"
+          label={t("common.propertyId")}
+          required
+          {...detailFormItemProps}
+          rules={[requiredInputRule(t, t("common.propertyId"))]}
+        >
+          <Input
+            value={draft.id}
+            placeholder={ph.input(t("common.propertyId"))}
+            disabled={!isNew && !draft.create}
+            onChange={(e) => {
+              setDraft({ ...draft, id: e.target.value });
+              formApi.setFieldValue("id", e.target.value);
+            }}
+          />
+        </Form.Item>
+        <Form.Item
+          name="name"
+          label={t("common.propertyName")}
+          required
+          {...detailFormItemProps}
+          rules={[requiredInputRule(t, t("common.propertyName"))]}
+        >
+          <Input
+            value={draft.name}
+            placeholder={ph.input(t("common.propertyName"))}
+            onChange={(e) => {
+              setDraft({ ...draft, name: e.target.value });
+              formApi.setFieldValue("name", e.target.value);
+            }}
+          />
+        </Form.Item>
+        <Form.Item
+          name="dataType"
+          label={t("common.dataType")}
+          required
+          {...detailFormItemProps}
+          {...selectFormItemProps}
+          rules={[requiredSelectRule(t, t("common.dataType"))]}
+        >
+          <Select
+            className="vt-select-control"
+            classNames={{ popup: { root: "vt-select-popup" } }}
+            style={{ width: "100%" }}
+            placeholder={ph.select(t("common.dataType"))}
+            value={propType}
+            onChange={(v) => {
+              formApi.setFields([{ name: "enumData", errors: [] }]);
+              const dataType = String(v ?? "string");
+              setDraft({
+                ...draft,
+                valueType: defaultPropertyValueType(dataType),
+              });
+              formApi.setFieldValue("dataType", dataType);
+            }}
+            options={dataTypeSelectOptions(t, dataTypes)}
+          />
+        </Form.Item>
+        {propType === "number" && (
+          <Form.Item label={t("common.decimalPlaces")} {...detailFormItemProps}>
+            <InputNumber
+              className="w-full"
+              min={0}
+              max={10}
+              value={draft.valueType?.extra?.point ?? 1}
+              onChange={(v) =>
+                setDraft({
+                  ...draft,
+                  valueType: {
+                    ...(draft.valueType ?? defaultPropertyValueType("number")),
+                    extra: { ...(draft.valueType?.extra ?? {}), point: Number(v) || 0 },
+                  },
+                })
+              }
+            />
+          </Form.Item>
+        )}
+        {propType === "enum" && (
+          <Form.Item name="enumData" label={t("common.enumValues")} layout="vertical" className="mb-3">
+            <EnumEditor
+              data={(draft.valueType?.extra?.enumData as EnumDataItem[]) ?? []}
+              onChange={(enumData) => {
+                formApi.setFields([{ name: "enumData", errors: [] }]);
+                setDraft({
+                  ...draft,
+                  valueType: {
+                    ...(draft.valueType ?? { type: "enum" }),
+                    extra: { ...(draft.valueType?.extra ?? {}), enumData },
+                  },
+                });
+              }}
+            />
+          </Form.Item>
+        )}
+        <Form.Item label={t("common.unit")} {...detailFormItemProps}>
+          <Select
+            className="vt-select-control"
+            classNames={{ popup: { root: "vt-select-popup" } }}
+            style={{ width: "100%" }}
+            allowClear
+            value={draft.valueType?.unit || undefined}
+            onChange={(v) =>
+              setDraft({
+                ...draft,
+                valueType: {
+                  ...(draft.valueType ?? defaultPropertyValueType(propType)),
+                  unit: String(v ?? ""),
+                },
+              })
+            }
+            options={DATA_UNITS.filter((u) => u.unit).map((u) => ({
+              label: `${locale === "zh-CN" ? u.zh ?? u.en : u.en}${u.unit ? ` (${u.unit})` : ""}`,
+              value: u.unit,
+            }))}
+            placeholder={ph.select(t("common.unit"))}
+          />
+        </Form.Item>
+        <Form.Item label={t("common.readWrite")} {...detailFormItemProps}>
+          <OptionToggle
+            value={draft.rw ?? "readwrite"}
+            onChange={(v) => setDraft({ ...draft, rw: v })}
+            options={propertyRwOptions}
+          />
+        </Form.Item>
+        <Form.Item
+          name="tagId"
+          label={t("common.belongGroup")}
+          required
+          {...detailFormItemProps}
+          {...selectFormItemProps}
+          rules={[requiredSelectRule(t, t("common.belongGroup"))]}
+        >
+          <Select
+            className="vt-select-control"
+            classNames={{ popup: { root: "vt-select-popup" } }}
+            style={{ width: "100%" }}
+            value={draft.tagId || undefined}
+            placeholder={ph.select(t("common.belongGroup"))}
+            onChange={(v) => {
+              const tagId = String(v ?? "");
+              setDraft({ ...draft, tagId });
+              formApi.setFieldValue("tagId", tagId);
+            }}
+            options={tags.map((tag) => ({ label: tag.name, value: tag.id }))}
+          />
+        </Form.Item>
+      </Form>
     </Drawer>
   );
 }
