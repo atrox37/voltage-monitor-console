@@ -14,7 +14,7 @@ import {
   sendNotifyTemplateTest,
 } from "@/api";
 import { pageUsers } from "@/api/sys";
-import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
+import { ListPageTemplate, RowBtn, DateTimeText } from "@/components/list-page-template";
 import {
   blankTemplateForm,
   buildTemplateTestPayload,
@@ -185,16 +185,12 @@ function NotifyTemplatesPage() {
           {
             key: "createTime",
             title: t("notif.templates.createTime"),
-            render: (r) => (
-              <span className="font-mono text-xs text-text-secondary">{r.createTime}</span>
-            ),
+            render: (r) => <DateTimeText value={r.createTime} />,
           },
           {
             key: "updateTime",
             title: t("notif.templates.updateTime"),
-            render: (r) => (
-              <span className="font-mono text-xs text-text-secondary">{r.updateTime}</span>
-            ),
+            render: (r) => <DateTimeText value={r.updateTime} />,
           },
         ]}
         rows={rows}
@@ -563,24 +559,25 @@ function TemplateDrawer({
             ))
           )}
         </section>
-      </Drawer>
 
-      {testOpen && (
         <TestSendDrawer
+          open={testOpen}
           form={d}
           onClose={() => setTestOpen(false)}
           onSent={() => setTestOpen(false)}
         />
-      )}
+      </Drawer>
     </>
   );
 }
 
 function TestSendDrawer({
+  open,
   form,
   onClose,
   onSent,
 }: {
+  open: boolean;
   form: TemplateEditorForm;
   onClose: () => void;
   onSent: () => void;
@@ -624,12 +621,10 @@ function TestSendDrawer({
 
   return (
     <Drawer
-      open
+      open={open}
       onClose={onClose}
       title={t("notif.templates.testTitle")}
       size={480}
-      zIndex={1100}
-      mask={false}
       destroyOnHidden
       styles={{ body: { paddingTop: 8 } }}
       footer={drawerFooter([

@@ -1,9 +1,10 @@
 ﻿import { type ReactNode, useMemo, useRef, useState } from "react";
-import { Button, Card, Dropdown, Form, Input, Pagination, Select, Space, Typography } from "antd";
+import { Card, Dropdown, Form, Input, Pagination, Select, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { Table } from "antd";
 import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
+import { VtButton } from "@/components/vt-button";
 import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { getSorterColumnKey, useTableScrollSync, vtActionColumn } from "@/lib/table-utils";
 import { useAdaptiveTableScrollY, useTableBodyMaxScrollY } from "@/lib/use-table-height";
@@ -17,6 +18,7 @@ export {
   RowBtn,
 } from "@/components/row-action-buttons";
 export { StatusBadge } from "@/components/status-display";
+export { DateTimeText } from "@/components/datetime-text";
 export type { StatusKind } from "@/components/status-display";
 
 import type { PageQuery } from "@/types";
@@ -228,12 +230,12 @@ export function ListPageTemplate<T extends { id: string | number }>({
             ))}
             <Form.Item className="!mb-0 ml-auto">
               <Space>
-                <Button type="primary" icon={<SearchOutlined />} onClick={applyQuery}>
+                <VtButton type="primary" icon={<SearchOutlined />} onClick={applyQuery}>
                   {t("common.query")}
-                </Button>
-                <Button icon={<ReloadOutlined />} onClick={resetQuery}>
+                </VtButton>
+                <VtButton icon={<ReloadOutlined />} onClick={resetQuery}>
                   {t("common.reset")}
-                </Button>
+                </VtButton>
               </Space>
             </Form.Item>
           </Form>
@@ -254,9 +256,9 @@ export function ListPageTemplate<T extends { id: string | number }>({
           </span>
           {addNode ??
             (onAdd ? (
-              <Button type="primary" size="small" icon={<PlusOutlined />} onClick={onAdd}>
+              <VtButton type="primary" icon={<PlusOutlined />} onClick={onAdd}>
                 {t("common.add")}
-              </Button>
+              </VtButton>
             ) : null)}
         </div>
 
@@ -324,7 +326,7 @@ export function ActionsDropdown({ children }: { children: ReactNode }) {
       menu={{ items: [] }}
       dropdownRender={() => <Space direction="vertical">{children}</Space>}
     >
-      <Button size="small" icon={<MoreOutlined />} />
+      <VtButton icon={<MoreOutlined />} />
     </Dropdown>
   );
 }

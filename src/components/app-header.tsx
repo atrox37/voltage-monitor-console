@@ -1,4 +1,5 @@
-﻿import { Avatar, Button, Dropdown, Layout, Space, Typography } from "antd";
+import { VtButton } from "@/components/vt-button";
+import { Avatar, Dropdown, Layout, Space, Typography } from "antd";
 import {
   DownOutlined,
   GlobalOutlined,
@@ -53,9 +54,8 @@ export function AppHeader({
 
   return (
     <Header className="flex items-center justify-between border-b border-[var(--panel-border)] bg-[var(--background)] px-4">
-      <Button
+      <VtButton
         type="text"
-        size="small"
         icon={sidebarExpanded ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
         onClick={onToggleSidebar}
         title={sidebarExpanded ? t("header.collapseSidebar") : t("header.expandSidebar")}
@@ -63,21 +63,21 @@ export function AppHeader({
 
       <Space size="middle">
         <Dropdown menu={langItems} trigger={["click"]}>
-          <Button size="small" icon={<GlobalOutlined />}>
+          <VtButton icon={<GlobalOutlined />}>
             {locale === "zh-CN" ? t("header.langZh") : t("header.langEn")}
             <DownOutlined className="!text-[10px] opacity-70" />
-          </Button>
+          </VtButton>
         </Dropdown>
         <Dropdown menu={userItems} trigger={["click"]}>
-          <Button size="small" className="!flex !items-center !gap-2">
-            <Avatar size="small" className="!bg-primary !text-[10px] !font-bold">
+          <VtButton className="!flex !items-center !gap-2">
+            <Avatar className="!bg-primary !text-[10px] !font-bold">
               {avatarLetter}
             </Avatar>
             <Typography.Text ellipsis className="max-w-[8rem] !text-xs">
               {displayName}
             </Typography.Text>
             <DownOutlined className="!text-[10px] opacity-70" />
-          </Button>
+          </VtButton>
         </Dropdown>
       </Space>
     </Header>

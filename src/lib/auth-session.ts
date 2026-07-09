@@ -1,7 +1,5 @@
 import { useSyncExternalStore } from "react";
-import CryptoJS from "crypto-js";
 import { login as loginApi, logout as logoutApi } from "@/api/auth";
-import stompManager from "@/lib/stomp";
 import {
   getAuthSnapshot,
   getServerAuthSnapshot,
@@ -19,6 +17,11 @@ export {
   getDisplayName,
 } from "@/lib/auth-token";
 
+async function disconnectRealtime() {
+  const stompManager = (await import("@/lib/stomp")).default;
+  await stompManager.disconnect();
+}
+
 export function useAuth() {
   const state = useSyncExternalStore(
     subscribeAuth,
@@ -29,12 +32,13 @@ export function useAuth() {
     token: state.token,
     userInfo: state.userInfo,
     isLoggedIn: !!state.token,
-    displayName: state.userInfo?.username ?? state.userInfo?.account ?? "—",
+    displayName: state.userInfo?.username ?? state.userInfo?.account ?? "",
   };
 }
 
 export const authActions = {
   async login(params: LoginParams): Promise<void> {
+    const CryptoJS = (await import("crypto-js")).default;
     const encryptedPassword = CryptoJS.MD5(params.password).toString();
     const res = await loginApi({
       account: params.account,
@@ -57,11 +61,11 @@ export const authActions = {
     try {
       await logoutApi();
     } catch {
-      // 忽略登出接口错误，仍清理本地状态
+      // Ignore logout API failures and still clear local session state.
     } finally {
       const { cancelAllPendingRequests } = await import("@/lib/request");
       cancelAllPendingRequests();
-      await stompManager.disconnect();
+      await disconnectRealtime();
       persistAuth({ token: "", userInfo: null });
     }
   },
@@ -76,16 +80,16 @@ export const authActions = {
         userInfo: { ...current.userInfo, ...res },
       });
     } catch {
-      // 部分后端版本无此接口
+      // Some backend versions do not expose this endpoint.
     }
   },
 
   clearSession(): void {
+    persistAuth({ token: "", userInfo: null });
     void (async () => {
       const { cancelAllPendingRequests } = await import("@/lib/request");
       cancelAllPendingRequests();
-      await stompManager.disconnect();
-      persistAuth({ token: "", userInfo: null });
+      await disconnectRealtime();
     })();
   },
 };

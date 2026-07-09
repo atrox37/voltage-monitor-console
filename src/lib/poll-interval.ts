@@ -15,7 +15,6 @@ const POLL_INTERVAL_VALUES: Omit<PollIntervalOption, "label">[] = [
   { value: "0/20 * * * * ?", seconds: 20 },
   { value: "0/30 * * * * ?", seconds: 30 },
   { value: "0 */1 * * * ?", seconds: 60 },
-  { value: "0 */2 * * * ?", seconds: 120 },
 ];
 
 function pollIntervalLabel(seconds: number, loc = getLocale()): string {

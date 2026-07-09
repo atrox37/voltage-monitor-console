@@ -11,7 +11,8 @@ import {
   RightOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
-import { Button, Drawer, Empty, Form, Input, Spin, Table } from "antd";
+import { Drawer, Empty, Form, Input, Spin, Table } from 'antd';
+import { VtButton } from '@/components/vt-button';
 import { useQueryClient } from "@tanstack/react-query";
 import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { showSuccess } from "@/lib/api-message";
@@ -184,20 +185,20 @@ function OrgsPage() {
             allowAll
           />
         </div>
-        <Button type="default" size="small" icon={<ExpandAltOutlined />} onClick={expandAll}>
+        <VtButton type="default" icon={<ExpandAltOutlined />} onClick={expandAll}>
           {t("orgs.expand")}
-        </Button>
-        <Button type="default" size="small" icon={<CompressOutlined />} onClick={collapseAll}>
+        </VtButton>
+        <VtButton type="default" icon={<CompressOutlined />} onClick={collapseAll}>
           {t("orgs.collapse")}
-        </Button>
+        </VtButton>
       </div>
 
       {focusId && (
         <div className="flex shrink-0 items-center gap-2 text-xs text-text-secondary">
           <ArrowLeftOutlined />
-          <Button type="link" size="small" className="!px-0" onClick={() => setFocusId("")}>
+          <VtButton type="link" className="!px-0" onClick={() => setFocusId("")}>
             {t("orgs.backFull")}
-          </Button>
+          </VtButton>
           <span className="text-text-muted">{t("orgs.focusCurrent")}</span>
           <span className="font-medium text-primary">{focusLabel}</span>
         </div>
@@ -237,17 +238,16 @@ function OrgsPage() {
         styles={{ body: { paddingTop: 8 } }}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={() => setEditing(null)}>
+            <VtButton type="default" onClick={() => setEditing(null)}>
               {t("common.close")}
-            </Button>
-            <Button
+            </VtButton>
+            <VtButton
               type="primary"
-              size="small"
               onClick={() => void saveEditing()}
               disabled={saving}
             >
               {t("common.save")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
@@ -310,7 +310,6 @@ function OrgsPage() {
         ) : (
           <Table
             rowKey={(m) => String(m.id ?? m.username)}
-            size="small"
             tableLayout="fixed"
             pagination={false}
             className="vt-ant-data-table"
@@ -349,6 +348,7 @@ function OrgChartNode({
   const hasChildren = children.length > 0;
   const isCollapsed = collapsed.has(node.id);
   const showChildren = hasChildren && !isCollapsed;
+  const lineClass = "bg-foreground/55";
   return (
     <div className="flex flex-col items-center">
       <NodeCard
@@ -359,24 +359,25 @@ function OrgChartNode({
       />
       {showChildren && (
         <>
-          <div className="h-6 w-px bg-panel-border" />
+          <div className={`h-6 w-0.5 shrink-0 ${lineClass}`} />
           <div className="flex items-start">
             {children.map((c, i) => {
-              const single = children.length === 1;
+              const count = children.length;
+              const only = count === 1;
               const first = i === 0;
-              const last = i === children.length - 1;
-              const sideBorder = "border-panel-border";
-              const topClass = single
-                ? ""
-                : first
-                  ? `border-t ${sideBorder} ml-[50%] w-1/2`
-                  : last
-                    ? `border-t ${sideBorder} mr-[50%] w-1/2`
-                    : `border-t ${sideBorder} w-full`;
+              const last = i === count - 1;
               return (
-                <div key={c.id} className="flex flex-col items-center px-3">
-                  <div className={`h-0 ${topClass}`} />
-                  <div className="h-6 w-px bg-panel-border" />
+                <div key={c.id} className="relative flex flex-col items-center px-3">
+                  {!only && (
+                    <div
+                      aria-hidden
+                      className={[
+                        `absolute top-0 h-0.5 ${lineClass}`,
+                        first ? "left-1/2 w-[calc(50%+12px)]" : last ? "right-1/2 w-[calc(50%+12px)]" : "inset-x-0",
+                      ].join(" ")}
+                    />
+                  )}
+                  <div className={`h-6 w-0.5 shrink-0 ${lineClass}`} />
                   <OrgChartNode
                     node={c}
                     collapsed={collapsed}

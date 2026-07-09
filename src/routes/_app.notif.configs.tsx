@@ -2,12 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Drawer, Form, Input, InputNumber } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { DrawerSegmentTabs } from "@/components/drawer-segment-tabs";
-import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import { drawerFooter, drawerFormItemProps, drawerScrollBodyStyles, drawerScrollSectionClass, drawerStickySectionClass } from "@/components/drawer-form";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { requiredInputRule } from "@/lib/form-validation";
 import { showError, showSuccess } from "@/lib/api-message";
 import { deleteNotifyConfig, pageNotifyConfigs, saveNotifyConfig } from "@/api";
-import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
+import { ListPageTemplate, RowBtn, DateTimeText } from "@/components/list-page-template";
 import {
   blankConfigForm,
   codeLabel,
@@ -128,16 +128,12 @@ function NotifyConfigsPage() {
           {
             key: "createTime",
             title: t("notif.configs.createTime"),
-            render: (r) => (
-              <span className="font-mono text-xs text-text-secondary">{r.createTime}</span>
-            ),
+            render: (r) => <DateTimeText value={r.createTime} />,
           },
           {
             key: "updateTime",
             title: t("notif.configs.updateTime"),
-            render: (r) => (
-              <span className="font-mono text-xs text-text-secondary">{r.updateTime}</span>
-            ),
+            render: (r) => <DateTimeText value={r.updateTime} />,
           },
         ]}
         rows={rows}
@@ -235,7 +231,7 @@ function ConfigDrawer({
       title={t("notif.configs.configTitle", { type: typeTitle })}
       size={520}
       destroyOnHidden
-      styles={{ body: { paddingTop: 8 } }}
+      styles={drawerScrollBodyStyles}
       footer={drawerFooter([
         { key: "cancel", label: t("common.cancel"), onClick: onClose },
         {
@@ -254,7 +250,7 @@ function ConfigDrawer({
         },
       ])}
     >
-      <Form form={formApi} layout="horizontal">
+      <div className={drawerStickySectionClass}>
         <DrawerSegmentTabs
           options={options}
           value={d.code}
@@ -262,6 +258,10 @@ function ConfigDrawer({
           allTextWhite
           onChange={(code) => set("code", code)}
         />
+      </div>
+
+      <div className={drawerScrollSectionClass}>
+      <Form form={formApi} layout="horizontal">
 
         <Form.Item
           name="name"
@@ -371,6 +371,7 @@ function ConfigDrawer({
           />
         </Form.Item>
       </Form>
+      </div>
     </Drawer>
   );
 }

@@ -134,17 +134,11 @@ class RequestService {
           if (!this.isRefreshing) {
             this.isRefreshing = true;
             try {
-              const { authActions } = await import("@/lib/auth-session");
-              authActions.clearSession();
-              this.isRefreshing = false;
-              this.onRefreshFailed();
               await this.handleAuthFailure();
               return Promise.reject(error);
-            } catch {
+            } finally {
               this.isRefreshing = false;
               this.onRefreshFailed();
-              await this.handleAuthFailure();
-              return Promise.reject(error);
             }
           }
 

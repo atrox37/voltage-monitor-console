@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useSyncExternalStore } from "react";
-import { messages } from "./locales";
+import { ensureMessages, getMessages } from "./locales";
 import type { Locale, TranslationDict } from "./types";
 
 export type { Locale, NavSearchItem, TranslationDict } from "./types";
@@ -30,6 +30,8 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
+void ensureMessages(DEFAULT_LOCALE);
+
 export function getLocale(): Locale {
   return locale;
 }
@@ -43,6 +45,7 @@ export function hydrateLocale(): void {
   if (typeof document !== "undefined") {
     document.documentElement.lang = locale === "zh-CN" ? "zh-CN" : "en";
   }
+  void ensureMessages(locale).then(() => emit());
 }
 
 export function setLocale(next: Locale): void {
@@ -53,6 +56,7 @@ export function setLocale(next: Locale): void {
     document.documentElement.lang = next === "zh-CN" ? "zh-CN" : "en";
   }
   emit();
+  void ensureMessages(next).then(() => emit());
 }
 
 const subscribeLocale = (listener: () => void) => {
@@ -75,7 +79,9 @@ export function translate(
   key: string,
   params?: Record<string, string | number>,
 ): string {
-  const raw = resolvePath(messages[loc], key) ?? resolvePath(messages[DEFAULT_LOCALE], key) ?? key;
+  const current = getMessages(loc);
+  const fallback = getMessages(DEFAULT_LOCALE);
+  const raw = resolvePath(current ?? fallback ?? {}, key) ?? resolvePath(fallback ?? {}, key) ?? key;
   if (!params) return raw;
   return Object.entries(params).reduce(
     (acc, [k, v]) => acc.replace(new RegExp(`\\{${k}\\}`, "g"), String(v)),

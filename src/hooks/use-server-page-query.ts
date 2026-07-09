@@ -8,7 +8,7 @@ type ServerPageQueryOptions<TDto, TRow> = {
   queryKey: readonly unknown[];
   page: number;
   pageSize: number;
-  /** terms + sorts锛屼笉鍚?current/size */
+  /** terms + sorts，不含 current/size */
   query: Omit<PageQuery, "current" | "size">;
   fetchPage: (query: PageQuery) => Promise<PageResult<TDto>>;
   mapRow: (dto: TDto) => TRow;
@@ -16,7 +16,7 @@ type ServerPageQueryOptions<TDto, TRow> = {
   enabled?: boolean;
 };
 
-/** 鏈嶅姟绔垎椤靛垪琛?鈥?鏇夸唬鎵嬪啓 useEffect + useState */
+/** 服务端分页列表 — 替代手写 useEffect + useState */
 export function useServerPageQuery<TDto, TRow>({
   queryKey,
   page,

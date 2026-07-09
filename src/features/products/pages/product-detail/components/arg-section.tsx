@@ -64,8 +64,10 @@ export function ArgSection({
 
   return (
     <div className="mt-4">
-      <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-xs font-semibold text-text-secondary">{title}</span>
+      <div className={`mb-1.5 flex items-center ${title ? "justify-between" : "justify-end"}`}>
+        {title ? (
+          <span className="text-xs font-semibold text-text-secondary">{title}</span>
+        ) : null}
         <button
           type="button"
           onClick={onAdd}

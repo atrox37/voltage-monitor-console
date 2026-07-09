@@ -12,13 +12,13 @@ import {
   saveGateway,
 } from "@/api";
 import { DatePicker, Drawer, Form, Input, Pagination, Select, Table } from "antd";
-import { OptionToggle } from "@/components/option-toggle";
+import { OptionToggle, enabledDisabledNumberOptions } from "@/components/option-toggle";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import { drawerFooter, drawerFormItemProps, selectFormItemProps } from "@/components/drawer-form";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
-import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
+import { ListPageTemplate, RowBtn, StatusBadge, DateTimeText } from "@/components/list-page-template";
 import type { OrgNode } from "@/components/org-tree-select";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
 import {
@@ -250,7 +250,7 @@ function GatewaysPage() {
           {
             key: "updateTime",
             title: t("common.updatedAt"),
-            render: (r) => <span className="text-text-secondary">{r.updateTime}</span>,
+            render: (r) => <DateTimeText value={r.updateTime} />,
           },
         ]}
         onAdd={openAdd}
@@ -473,10 +473,7 @@ function GatewayDrawer({
               const enabled = v === 1;
               set("enabled", enabled);
             }}
-            options={[
-              { label: t("common.disabled"), value: 0 },
-              { label: t("common.enabled"), value: 1 },
-            ]}
+            options={enabledDisabledNumberOptions(t)}
           />
         </Form.Item>
       </Form>
@@ -687,7 +684,7 @@ function ZhaoDrawer({ gateway, onClose }: { gateway: GatewayListRow; onClose: ()
                       : "border-panel-border"
                   }`}
                 >
-                  {checked.includes(b.id) ? "✓" : ""}
+                  {checked.includes(b.id) ? "?" : ""}
                 </span>
                 {b.name}
               </button>

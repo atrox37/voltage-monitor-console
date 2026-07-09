@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
-import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
+import { Drawer, Form, Input, InputNumber, Select } from 'antd';
+import { VtButton } from '@/components/vt-button';
 import type { ColumnsType } from "antd/es/table";
 import { DetailTable } from "@/components/detail-table";
-import { detailFormItemProps, selectFormItemProps } from "@/components/drawer-form";
-import { OptionToggle } from "@/components/option-toggle";
+import { detailFormItemProps, detailBlockFormItemProps, selectFormItemProps } from "@/components/drawer-form";
+import { OptionToggle, enableOffNumberOptions } from "@/components/option-toggle";
 import { useTranslation } from "@/i18n";
 import { vtActionColumn } from "@/lib/table-utils";
 import { useProductEdit } from "@/features/products/contexts/product-edit-context";
@@ -239,12 +240,12 @@ export function TabRule() {
         size={720}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={() => setDraft(null)}>
+            <VtButton type="default" onClick={() => setDraft(null)}>
               {t("common.cancel")}
-            </Button>
-            <Button type="primary" size="small" disabled={ruleSaving} onClick={() => void saveRule()}>
+            </VtButton>
+            <VtButton type="primary" disabled={ruleSaving} onClick={() => void saveRule()}>
               {ruleSaving ? t("common.saving") : t("common.save")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
@@ -278,10 +279,7 @@ export function TabRule() {
                   setDraft({ ...draft, rule: { ...draft.rule, state: v } });
                   formApi.setFieldValue("state", v);
                 }}
-                options={[
-                  { label: t("common.enable"), value: 1 },
-                  { label: t("common.off"), value: 0 },
-                ]}
+                options={enableOffNumberOptions(t)}
               />
             </Form.Item>
             <Form.Item
@@ -359,8 +357,7 @@ export function TabRule() {
               name="triggerCondition"
               label={t("common.triggerCondition")}
               required
-              layout="vertical"
-              className="mb-3"
+              {...detailBlockFormItemProps}
               rules={[
                 {
                   validator: async () => {

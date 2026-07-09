@@ -1,7 +1,8 @@
 ﻿import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeftOutlined, SaveOutlined, SyncOutlined } from "@ant-design/icons";
-import { Button, Empty, Spin, Tabs, Tag } from "antd";
+import { Empty, Spin, Tabs, Tag } from 'antd';
+import { VtButton } from '@/components/vt-button';
 import { useTranslation } from "@/i18n";
 import { useDeviceEdit } from "@/features/devices/contexts/device-edit-context";
 
@@ -46,9 +47,9 @@ export function DeviceDetailView() {
             description={t("devices.detail.notFound")}
             extra={
               <Link to="/devices/list">
-                <Button type="primary" size="small">
+                <VtButton type="primary">
                   {t("common.backToList")}
-                </Button>
+                </VtButton>
               </Link>
             }
           />
@@ -82,13 +83,12 @@ export function DeviceDetailView() {
     <main className="vt-page-content vt-page-fill flex flex-col gap-2 !overflow-hidden">
       <div className="flex shrink-0 items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button
-            size="small"
+          <VtButton
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate({ to: "/devices/list" })}
           >
             {t("common.back")}
-          </Button>
+          </VtButton>
           <h2 className="vt-section-title text-base">{device.name}</h2>
           <span className="text-[11px] text-text-muted">ID</span>
           <span className="text-xs text-text-secondary">{device.id}</span>
@@ -96,16 +96,14 @@ export function DeviceDetailView() {
         <div className="flex items-center gap-3">
           <span className="text-xs text-text-muted">{t("common.status")}</span>
           <Tag color={statusColor}>{statusLabel}</Tag>
-          <Button
-            size="small"
+          <VtButton
             icon={<SyncOutlined spin={syncing} />}
             disabled={syncing}
             onClick={() => void syncModel()}
           >
             {t("common.modelSync")}
-          </Button>
-          <Button
-            size="small"
+          </VtButton>
+          <VtButton
             type="primary"
             icon={<SaveOutlined />}
             disabled={saving}
@@ -113,7 +111,7 @@ export function DeviceDetailView() {
             onClick={() => void save()}
           >
             {saving ? t("common.saving") : t("common.save")}
-          </Button>
+          </VtButton>
         </div>
       </div>
 
@@ -121,7 +119,6 @@ export function DeviceDetailView() {
         activeKey={tab}
         onChange={(key) => setTab(key as TabKey)}
         destroyInactiveTabPane
-        size="small"
         className="vt-detail-tabs min-h-0 flex-1"
         items={tabs.map((tabItem) => ({
           key: tabItem.key,

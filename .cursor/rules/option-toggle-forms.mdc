@@ -1,0 +1,42 @@
+---
+description: 表单二选一/多选单选控件统一使用 OptionToggle
+globs: src/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# 表单单选（OptionToggle）
+
+所有表单中的**单选**场景（启用/禁用、是/否、开启/关闭、必填/非必填等）统一使用 `OptionToggle`，**禁止**使用 Ant Design `Select`、`Radio.Group` 或原生 `<select>`。
+
+## 组件与 helper
+
+- 组件：`@/components/option-toggle` → `OptionToggle`（样式类 `vt-option-toggle` / `vt-option-toggle__btn`，定义于 `ant-overrides.css`）
+- 常用选项 helper（按需选用，勿重复造轮子）：
+  - `enabledDisabledNumberOptions(t)` — 启用 / 禁用
+  - `onOffNumberOptions(t)` — 开启 / 关闭
+  - `enableOffNumberOptions(t)` — 启用 / 关闭（规则状态）
+  - `enabledDisabledStringOptions(t)` — 字符串 enabled/disabled
+  - `requiredOptionalNumberOptions(t)` — 必填 / 非必填
+
+## 用法示例
+
+抽屉表单（与网络组件「状态」字段一致）：
+
+```tsx
+<Form.Item name="enabled" label={t("common.status")} {...drawerFormItemProps}>
+  <OptionToggle
+    value={enabled ? 1 : 0}
+    onChange={(v) => setEnabled(v === 1)}
+    options={enabledDisabledNumberOptions(t)}
+  />
+</Form.Item>
+```
+
+详情页嵌套抽屉同理，单选字段优先 `{...drawerFormItemProps}`，控件使用 `OptionToggle`（自带 `vt-option-toggle` 样式）。
+
+## 约定
+
+- 选项文案走 i18n，顺序遵循 helper 定义（如「启用」在前）
+- 与 `Form` 联用时，`onChange` 内同步 `formApi.setFieldValue`
+- 需要校验时用 `requiredSelectRule`，不要用 Select 专用逻辑
+- 新增业务单选：优先扩展 `option-toggle.tsx` 中的 helper，保持样式一致

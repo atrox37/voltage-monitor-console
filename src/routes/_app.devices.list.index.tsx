@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Drawer, Form, Input, Select } from "antd";
 import { deleteDevice, pageDevices, pageGateways, pageProducts, saveDevice } from "@/api";
 import { drawerFooter, drawerFormItemProps, selectFormItemProps } from "@/components/drawer-form";
-import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
+import { ListPageTemplate, RowBtn, StatusBadge, DateTimeText } from "@/components/list-page-template";
 import { deviceConnectionStatus } from "@/components/status-display";
 import {
   mapCreateFormToDevicePo,
@@ -246,7 +246,7 @@ function DevicesPage() {
             title: t("common.createTime"),
             sortable: true,
             sortKey: "t.create_time",
-            render: (r) => <span className="font-mono text-xs text-text-secondary">{r.createTime}</span>,
+            render: (r) => <DateTimeText value={r.createTime} />,
           },
         ]}
         rows={rows}

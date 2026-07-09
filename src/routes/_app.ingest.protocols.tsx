@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, Drawer, Form, Input } from "antd";
+import { Drawer, Form, Input } from 'antd';
+import { VtButton } from '@/components/vt-button';
 import { OptionToggle } from "@/components/option-toggle";
-import { drawerFormItemProps } from "@/components/drawer-form";
+import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
 import { LoadingOutlined, UploadOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons";
@@ -15,7 +16,7 @@ import {
   testProtocol,
   uploadProtocol,
 } from "@/api";
-import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
+import { ListPageTemplate, RowBtn, DateTimeText } from "@/components/list-page-template";
 import { useDimensionTreeQuery } from "@/hooks/use-dimension-tree-query";
 import { useServerPageQuery } from "@/hooks/use-server-page-query";
 import {
@@ -243,7 +244,7 @@ function ProtocolsPage() {
           {
             key: "updateTime",
             title: t("common.updatedAt"),
-            render: (r) => <span className="text-text-secondary">{r.updateTime}</span>,
+            render: (r) => <DateTimeText value={r.updateTime} />,
           },
         ]}
         onAdd={openAdd}
@@ -371,12 +372,11 @@ function ProtocolDrawer({
         styles={{ body: { paddingTop: 8 } }}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={onClose}>
+            <VtButton type="default" onClick={onClose}>
               {t("common.cancel")}
-            </Button>
-            <Button
+            </VtButton>
+            <VtButton
               type="primary"
-              size="small"
               disabled={saving || uploading}
               onClick={async () => {
                 try {
@@ -388,7 +388,7 @@ function ProtocolDrawer({
               }}
             >
               {saving ? t("common.saving") : t("common.save")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
@@ -470,13 +470,14 @@ function ProtocolDrawer({
             {...drawerFormItemProps}
             rules={[requiredInputRule(t, t("ingest.protocols.upload"))]}
           >
-            <div className="flex gap-2">
+            <div className="flex w-full gap-2">
               <Input
                 readOnly
+                className="min-w-0 flex-1"
                 placeholder={ph.select(t("ingest.protocols.upload"))}
                 value={draft.location ? (draft.location.split("/").pop() ?? "") : ""}
               />
-              <Button
+              <VtButton
                 icon={uploading ? <LoadingOutlined spin /> : <UploadOutlined />}
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
@@ -556,9 +557,9 @@ function ProtocolTestDrawer({
       styles={{ body: { paddingTop: 8 } }}
       footer={
         <div className="flex justify-end gap-2">
-          <Button type="primary" size="small" disabled={testing} onClick={() => void runTest()}>
+          <VtButton type="primary" disabled={testing} onClick={() => void runTest()}>
             {testing ? t("common.loading") : t("ingest.protocols.testSend")}
-          </Button>
+          </VtButton>
         </div>
       }
     >
@@ -601,7 +602,7 @@ function ProtocolTestDrawer({
           name="payload"
           label={t("ingest.protocols.sendPayload")}
           required
-          layout="vertical"
+          layout="horizontal"
           className="mb-3"
           rules={[requiredInputRule(t, t("ingest.protocols.sendPayload"))]}
         >

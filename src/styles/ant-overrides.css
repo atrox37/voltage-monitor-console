@@ -325,6 +325,50 @@
    以下样式放在 @layer 之外，确保优先级高于 Ant Design CSS-in-JS
    ──────────────────────────────────────────────────── */
 
+/* 表单分段单选：与网络组件「状态」一致 */
+.vt-option-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+}
+
+.vt-option-toggle__btn {
+  appearance: none;
+  box-sizing: border-box;
+  border: none;
+  margin: 0;
+  padding: 0 12px;
+  min-height: 28px;
+  font-size: 12px;
+  line-height: 28px;
+  white-space: nowrap;
+  background: var(--panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.vt-option-toggle__btn + .vt-option-toggle__btn {
+  border-left: 1px solid var(--panel-border);
+}
+
+.vt-option-toggle__btn--active {
+  background: #ff6900 !important;
+  color: #fff !important;
+}
+
+.vt-option-toggle__btn:hover:not(:disabled):not(.vt-option-toggle__btn--active) {
+  color: var(--foreground);
+}
+
+.vt-option-toggle__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* 抽屉内容区纵向铺满，供内部表格 flex + scrollY 使用 */
 .vt-drawer-fill-body {
   display: flex !important;

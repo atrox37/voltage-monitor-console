@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
-import { Button, Drawer, Form, Input } from "antd";
+import { Drawer, Form, Input } from 'antd';
+import { VtButton } from '@/components/vt-button';
+import { detailFormItemProps } from "@/components/drawer-form";
 import { useTranslation } from "@/i18n";
 import { useProductEdit } from "@/features/products/contexts/product-edit-context";
 import type { SimpleTreeMetadata } from "@/types/api/metadata";
@@ -99,17 +101,17 @@ export function TabTree() {
         size={400}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={() => setRenameOf(null)}>
+            <VtButton type="default" onClick={() => setRenameOf(null)}>
               {t("common.cancel")}
-            </Button>
-            <Button type="primary" size="small" onClick={rename}>
+            </VtButton>
+            <VtButton type="primary" onClick={rename}>
               {t("common.save")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
         {renameOf && (
-          <Form.Item label={t("common.nodeNamePrompt")} required layout="horizontal" labelCol={{ flex: "120px" }} wrapperCol={{ flex: 1 }} className="mb-3">
+          <Form.Item label={t("common.nodeNamePrompt")} required {...detailFormItemProps}>
             <Input autoFocus value={renameOf.name} onChange={(e) => setRenameOf({ ...renameOf, name: e.target.value })} />
           </Form.Item>
         )}

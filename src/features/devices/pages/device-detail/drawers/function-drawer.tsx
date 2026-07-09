@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 
-import { Button, Checkbox, Drawer, Form, Input } from "antd";
-import { detailFormItemProps } from "@/components/drawer-form";
+import { Checkbox, Drawer, Form, Input } from 'antd';
+import { VtButton } from '@/components/vt-button';
+import { detailCompactFormItemProps } from "@/components/drawer-form";
 import { useTranslation } from "@/i18n";
 import { requiredInputRule } from "@/lib/form-validation";
 
@@ -51,12 +52,12 @@ export function FunctionDrawer({
       styles={{ body: { paddingTop: 8 } }}
       footer={
         <div className="flex justify-end gap-2">
-          <Button type="default" size="small" onClick={onClose}>
+          <VtButton type="default" onClick={onClose}>
             {t("common.cancel")}
-          </Button>
-          <Button type="primary" size="small" onClick={() => void handleSave()}>
+          </VtButton>
+          <VtButton type="primary" onClick={() => void handleSave()}>
             {t("common.save")}
-          </Button>
+          </VtButton>
         </div>
       }
     >
@@ -65,7 +66,7 @@ export function FunctionDrawer({
           name="id"
           label={t("common.identifier")}
           required
-          {...detailFormItemProps}
+          {...detailCompactFormItemProps}
           rules={[requiredInputRule(t, t("common.identifier"))]}
         >
           <Input
@@ -81,7 +82,7 @@ export function FunctionDrawer({
           name="name"
           label={t("common.name")}
           required
-          {...detailFormItemProps}
+          {...detailCompactFormItemProps}
           rules={[requiredInputRule(t, t("common.name"))]}
         >
           <Input
@@ -92,7 +93,7 @@ export function FunctionDrawer({
             }}
           />
         </Form.Item>
-        <Form.Item label={t("common.asyncLabel")} {...detailFormItemProps}>
+        <Form.Item label={t("common.asyncLabel")} {...detailCompactFormItemProps}>
           <Checkbox
             checked={!!draft.async}
             onChange={(e) => setDraft({ ...draft, async: e.target.checked })}

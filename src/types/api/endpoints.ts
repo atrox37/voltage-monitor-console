@@ -32,6 +32,9 @@ export const API = {
     dimensionDelete: 'GET /sys-app/sys-dimension/_delete',
     auditLogPage: 'POST /sys-app/audit_log/_page',
     auditLogDeleteBatch: 'POST /sys-app/audit_log/_delete_batch',
+    credentialPage: 'POST /sys-app/sys_credential/_page',
+    credentialSave: 'POST /sys-app/sys_credential/_save_or_update',
+    credentialDeleteBatch: 'POST /sys-app/sys_credential/_delete_batch',
   },
   iot: {
     unit: 'GET /iot-app/configuration/unit',

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { CloseOutlined, PlusOutlined } from "@ant-design/icons";
-import { Button, Drawer, Form, Input, Select } from "antd";
-import { detailFormItemProps } from "@/components/drawer-form";
+import { Drawer, Form, Input } from 'antd';
+import { VtButton } from '@/components/vt-button';
+import { OptionToggle, requiredOptionalNumberOptions } from "@/components/option-toggle";
+import { drawerFormItemProps } from "@/components/drawer-form";
 import { OrgTreeSelect } from "@/components/org-tree-select";
 import { useTranslation } from "@/i18n";
 import { requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
@@ -10,13 +12,14 @@ import { useProductEdit } from "@/features/products/contexts/product-edit-contex
 import { useProductTypeLabel } from "@/features/products/lib/product-type-i18n";
 import type { TagModel } from "@/types/api/metadata";
 import { DescField } from "../components/desc-field";
+import { DateTimeText } from "@/components/datetime-text";
 
 export function TabInfo() {
   const ph = useFormPlaceholder();
   const { t } = useTranslation();
   const getProductTypeLabel = useProductTypeLabel();
   const { product, orgNodes, updateProduct, updateMetadata } = useProductEdit();
-  const [tagFormApi] = Form.useForm<{ tagKey: string; tagName: string; optional: string }>();
+  const [tagFormApi] = Form.useForm<{ tagKey: string; tagName: string; optional: 0 | 1 }>();
   const [tagDraft, setTagDraft] = useState<{ tag: TagModel; index: number } | null>(null);
 
   useEffect(() => {
@@ -27,16 +30,13 @@ export function TabInfo() {
     tagFormApi.setFieldsValue({
       tagKey: tagDraft.tag.tagKey ?? "",
       tagName: tagDraft.tag.tagName ?? "",
-      optional: tagDraft.tag.optional ? "1" : "0",
+      optional: tagDraft.tag.optional ? 1 : 0,
     });
   }, [tagDraft, tagFormApi]);
 
   if (!product) return null;
 
-  const tagRequiredOptions = [
-    { label: t("common.yes"), value: "0" },
-    { label: t("common.no"), value: "1" },
-  ];
+  const tagRequiredOptions = requiredOptionalNumberOptions(t);
 
   const setField = <K extends "name" | "sn">(k: K, v: string) => {
     updateProduct({ [k]: v });
@@ -67,8 +67,6 @@ export function TabInfo() {
 
   return (
     <div className="flex h-full flex-col gap-5 overflow-auto">
-      <div className="text-sm font-semibold text-foreground">{product.name}</div>
-
       <div className="grid grid-cols-1 gap-x-6 gap-y-1 md:grid-cols-2 xl:grid-cols-3">
         <DescField label={t("common.productName")}>
           <Input
@@ -109,7 +107,7 @@ export function TabInfo() {
           />
         </DescField>
         <DescField label={t("common.updateTime")}>
-          <span className="font-mono text-xs text-text-secondary">{product.updateTime}</span>
+          <DateTimeText value={product.updateTime} />
         </DescField>
       </div>
 
@@ -161,12 +159,12 @@ export function TabInfo() {
         size={480}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={() => setTagDraft(null)}>
+            <VtButton type="default" onClick={() => setTagDraft(null)}>
               {t("common.cancel")}
-            </Button>
-            <Button type="primary" size="small" onClick={() => void saveTag()}>
+            </VtButton>
+            <VtButton type="primary" onClick={() => void saveTag()}>
               {t("common.save")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
@@ -176,7 +174,7 @@ export function TabInfo() {
               name="tagKey"
               label="Key"
               required
-              {...detailFormItemProps}
+              {...drawerFormItemProps}
               rules={[requiredInputRule(t, "Key")]}
             >
               <Input
@@ -192,7 +190,7 @@ export function TabInfo() {
               name="tagName"
               label={t("common.name")}
               required
-              {...detailFormItemProps}
+              {...drawerFormItemProps}
               rules={[requiredInputRule(t, t("common.name"))]}
             >
               <Input
@@ -208,20 +206,15 @@ export function TabInfo() {
               name="optional"
               label={t("common.required")}
               required
-              {...detailFormItemProps}
+              {...drawerFormItemProps}
               rules={[requiredSelectRule(t, t("common.required"))]}
             >
-              <Select
-                className="vt-select-control"
-                classNames={{ popup: { root: "vt-select-popup" } }}
-                style={{ width: "100%" }}
-                placeholder={ph.select(t("common.required"))}
-                value={tagDraft.tag.optional ? "1" : "0"}
+              <OptionToggle
                 options={tagRequiredOptions}
                 onChange={(v) => {
                   setTagDraft({
                     ...tagDraft,
-                    tag: { ...tagDraft.tag, optional: v === "1" },
+                    tag: { ...tagDraft.tag, optional: v === 1 },
                   });
                   tagFormApi.setFieldValue("optional", v);
                 }}

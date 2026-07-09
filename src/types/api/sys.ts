@@ -142,6 +142,17 @@ export interface SysMenuPo {
   children?: SysMenuPo[];
 }
 
+// ---- API Credential ----
+
+/** SysCredentialPo.java — sys_credential 表 */
+export interface SysCredentialPo {
+  id?: number | string;
+  accessKeyId?: string;
+  secretKey?: string;
+  creatorId?: number | string;
+  createTime?: string;
+}
+
 // ---- Audit Log ----
 
 /** 审计日志 PO */

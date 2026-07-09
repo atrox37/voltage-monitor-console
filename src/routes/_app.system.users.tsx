@@ -1,13 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import CryptoJS from "crypto-js";
-import { LockOutlined } from "@ant-design/icons";
+import { LockOutlined, KeyOutlined } from "@ant-design/icons";
 import { Drawer, Form, Input, Select } from "antd";
-import { OptionToggle } from "@/components/option-toggle";
+import { OptionToggle, enabledDisabledStringOptions } from "@/components/option-toggle";
 import { drawerFooter, drawerFormItemProps, selectFormItemProps } from "@/components/drawer-form";
 import { showError, showSuccess } from "@/lib/api-message";
 import { getDimensionTree, pageRoles, pageUsers, saveUser } from "@/api/sys";
-import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
+import { ListPageTemplate, RowBtn, StatusBadge, DateTimeText } from "@/components/list-page-template";
 import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
 import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
@@ -15,12 +14,18 @@ import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { useTranslation } from "@/i18n";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
+import { CredentialDrawer } from "@/features/system/components/credential-drawer";
 import { requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
 import type { PageQuery, SysRolePo, SysUserPageDto, SysUserPo } from "@/types";
 
 export const Route = createFileRoute("/_app/system/users")({
   component: UsersPage,
 });
+
+async function md5(value: string) {
+  const CryptoJS = (await import("crypto-js")).default;
+  return CryptoJS.MD5(value).toString();
+}
 
 type UserRow = {
   id: string;
@@ -43,14 +48,14 @@ function mapUserRow(dto: SysUserPageDto): UserRow {
   return {
     id: String(po.id ?? ""),
     username: po.username,
-    role: dto.sysRolePo?.roleName ?? "—",
+    role: dto.sysRolePo?.roleName ?? "?",
     roleId: String(po.roleId ?? ""),
-    org: dto.dimensionPo?.name ?? "—",
+    org: dto.dimensionPo?.name ?? "?",
     orgId: String(po.orgId ?? ""),
     email: po.email ?? "",
     phone: po.phone,
     status: po.state === 0 ? "disabled" : "enabled",
-    updatedAt: po.updateTime ?? "—",
+    updatedAt: po.updateTime ?? "?",
     raw: dto,
   };
 }
@@ -98,6 +103,7 @@ function UsersPage() {
   const [editing, setEditing] = useState<UserForm | null>(null);
   const [isAdd, setIsAdd] = useState(false);
   const [passUser, setPassUser] = useState<SysUserPo | null>(null);
+  const [credentialUserId, setCredentialUserId] = useState<string | null>(null);
   const [newPass, setNewPass] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -204,7 +210,7 @@ function UsersPage() {
         state: editing.status === "disabled" ? 0 : 1,
       };
       if (isAdd) {
-        payload.password = CryptoJS.MD5(editing.password).toString();
+        payload.password = await md5(editing.password);
       }
       await saveUser(payload);
       showSuccess(t("common.saveSuccess"));
@@ -233,7 +239,7 @@ function UsersPage() {
         email: passUser.email,
         phone: passUser.phone,
         state: passUser.state,
-        password: CryptoJS.MD5(newPass).toString(),
+        password: await md5(newPass),
       });
       showSuccess(t("users.passwordUpdated"));
       setPassUser(null);
@@ -248,7 +254,7 @@ function UsersPage() {
   return (
     <>
       <ListPageTemplate<UserRow>
-        actionColumnWidth={220}
+        actionColumnWidth={340}
         title={t("users.title")}
         loading={loading}
         serverSide
@@ -296,9 +302,7 @@ function UsersPage() {
           {
             key: "updatedAt",
             title: t("users.updatedAt"),
-            render: (r) => (
-              <span className="font-mono text-xs text-text-secondary">{r.updatedAt}</span>
-            ),
+            render: (r) => <DateTimeText value={r.updatedAt} />,
           },
         ]}
         onAdd={openAdd}
@@ -313,6 +317,9 @@ function UsersPage() {
               }}
             >
               {t("users.changePassword")}
+            </RowBtn>
+            <RowBtn icon={KeyOutlined} onClick={() => setCredentialUserId(r.id)}>
+              {t("users.credentialManage")}
             </RowBtn>
           </>
         )}
@@ -463,10 +470,7 @@ function UsersPage() {
                   setEditing({ ...editing, status: v });
                   formApi.setFieldValue("status", v);
                 }}
-                options={[
-                  { label: t("common.disabled"), value: "disabled" },
-                  { label: t("common.enabled"), value: "enabled" },
-                ]}
+                options={enabledDisabledStringOptions(t)}
               />
             </Form.Item>
           </Form>
@@ -524,6 +528,12 @@ function UsersPage() {
           </Form.Item>
         </Form>
       </Drawer>
+
+      <CredentialDrawer
+        open={!!credentialUserId}
+        userId={credentialUserId}
+        onClose={() => setCredentialUserId(null)}
+      />
     </>
   );
 }

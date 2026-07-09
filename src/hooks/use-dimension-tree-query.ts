@@ -4,7 +4,7 @@ import { dimensionToOrgNodes } from "@/lib/dimension-tree";
 import { queryKeys } from "@/lib/query-keys";
 import type { OrgNode } from "@/components/org-tree-select";
 
-/** 鏈烘瀯鏍?鈥?澶氬垪琛ㄩ〉鍏辩敤锛岀紦瀛?5 鍒嗛挓 */
+/** 机构树 — 多列表页共用，缓存 5 分钟 */
 export function useDimensionTreeQuery() {
   return useQuery<OrgNode[]>({
     queryKey: queryKeys.dimensionTree,

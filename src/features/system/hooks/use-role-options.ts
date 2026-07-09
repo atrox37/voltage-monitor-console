@@ -3,7 +3,7 @@ import { pageRoles } from "@/api/sys";
 import { queryKeys } from "@/lib/query-keys";
 import type { SysRolePo } from "@/types";
 
-/** 瑙掕壊涓嬫媺閫夐」 鈥?鐢ㄦ埛绠＄悊绛夐〉鍏辩敤 */
+/** 角色下拉选项 — 用户管理等页共用 */
 export function useRoleOptions() {
   return useQuery<SysRolePo[]>({
     queryKey: queryKeys.users.roleOptions,

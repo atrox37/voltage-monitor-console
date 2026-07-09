@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
-import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
+import { Drawer, Form, Input, InputNumber, Select } from 'antd';
+import { VtButton } from '@/components/vt-button';
 import type { ColumnsType } from "antd/es/table";
 import { parseDeviceRule, updateDeviceRule } from "@/api";
 import { DetailTable } from "@/components/detail-table";
-import { detailFormItemProps, selectFormItemProps } from "@/components/drawer-form";
-import { OptionToggle } from "@/components/option-toggle";
+import { detailFormItemProps, detailBlockFormItemProps, selectFormItemProps } from "@/components/drawer-form";
+import { OptionToggle, enabledDisabledNumberOptions } from "@/components/option-toggle";
 import {
   RowActionBtn,
   RowActionGroup,
@@ -345,12 +346,12 @@ export function DeviceAlarmRulesTab() {
         styles={{ body: { paddingTop: 8 } }}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={closeDrawer}>
+            <VtButton type="default" onClick={closeDrawer}>
               {t("common.cancel")}
-            </Button>
-            <Button type="primary" size="small" disabled={saving || loading} onClick={() => void handleSave()}>
+            </VtButton>
+            <VtButton type="primary" disabled={saving || loading} onClick={() => void handleSave()}>
               {saving ? t("common.saving") : t("common.save")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
@@ -386,10 +387,7 @@ export function DeviceAlarmRulesTab() {
                   setDraft({ ...draft, rule: { ...draft.rule, state: v } });
                   formApi.setFieldValue("state", v);
                 }}
-                options={[
-                  { label: t("status.enabled"), value: 1 },
-                  { label: t("status.disabled"), value: 0 },
-                ]}
+                options={enabledDisabledNumberOptions(t, "status")}
               />
             </Form.Item>
             <Form.Item
@@ -460,8 +458,7 @@ export function DeviceAlarmRulesTab() {
               name="triggerCondition"
               label={t("common.triggerCondition")}
               required
-              layout="vertical"
-              className="mb-3"
+              {...detailBlockFormItemProps}
               rules={[
                 {
                   validator: async () => {
@@ -486,7 +483,7 @@ export function DeviceAlarmRulesTab() {
               name="notificationHandler"
               label={t("common.notificationHandling")}
               required
-              layout="vertical"
+              {...detailBlockFormItemProps}
               className="mb-0"
               rules={[
                 {

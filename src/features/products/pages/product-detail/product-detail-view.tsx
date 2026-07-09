@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeftOutlined, SaveOutlined, SyncOutlined } from "@ant-design/icons";
-import { Button, Spin, Tabs, Tag } from "antd";
+import { Spin, Tabs, Tag } from 'antd';
+import { VtButton } from '@/components/vt-button';
 import { useTranslation } from "@/i18n";
 import { useProductEdit } from "@/features/products/contexts/product-edit-context";
 import { useProductTypeLabel } from "@/features/products/lib/product-type-i18n";
@@ -58,37 +59,34 @@ export function ProductDetailView() {
     <main className="vt-page-content vt-page-fill flex flex-col gap-2 !overflow-hidden">
       <div className="flex shrink-0 items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button
-            size="small"
+          <VtButton
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate({ to: "/devices/products" })}
           >
             {t("common.back")}
-          </Button>
+          </VtButton>
           <h2 className="vt-section-title text-base">{product.name}</h2>
           <Tag color={typeColor}>{getProductTypeLabel(product.type)}</Tag>
           <span className="text-[11px] text-text-muted">ID</span>
           <span className="text-xs text-text-secondary">{product.id}</span>
         </div>
         <div className="flex items-center gap-3">
-          <Button
-            size="small"
+          <VtButton
             icon={<SyncOutlined spin={syncing} />}
             disabled={syncing}
             onClick={() => void syncEdge()}
           >
             {t("common.edgeSync")}
-          </Button>
-          <Button
+          </VtButton>
+          <VtButton
             type="primary"
-            size="small"
             icon={<SaveOutlined />}
             disabled={saving}
             loading={saving}
             onClick={() => void save()}
           >
             {saving ? t("common.saving") : t("common.save")}
-          </Button>
+          </VtButton>
         </div>
       </div>
 
@@ -96,7 +94,6 @@ export function ProductDetailView() {
         activeKey={tab}
         onChange={(key) => setTab(key as TabKey)}
         destroyInactiveTabPane
-        size="small"
         className="vt-detail-tabs min-h-0 flex-1"
         items={visible.map((tabItem) => ({
           key: tabItem.key,

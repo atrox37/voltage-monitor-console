@@ -12,7 +12,9 @@ function readStorage(): AuthSnapshot {
     return { token: "", userInfo: null };
   }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const storage = window.localStorage;
+    if (!storage?.getItem) return { token: "", userInfo: null };
+    const raw = storage.getItem(STORAGE_KEY);
     if (!raw) return { token: "", userInfo: null };
     const parsed = JSON.parse(raw) as Partial<AuthSnapshot>;
     return {
@@ -37,10 +39,16 @@ function emit() {
 export function persistAuth(next: AuthSnapshot): void {
   snapshot = next;
   if (typeof window !== "undefined") {
-    if (next.token) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
+    try {
+      const storage = window.localStorage;
+      if (!storage?.setItem && !storage?.removeItem) return;
+      if (next.token) {
+        storage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } else {
+        storage.removeItem(STORAGE_KEY);
+      }
+    } catch {
+      // Ignore storage failures (private mode, extension interference, etc.)
     }
   }
   emit();

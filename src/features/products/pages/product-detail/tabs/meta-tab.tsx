@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
-import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
+import { Drawer, Form, Input, InputNumber, Select } from 'antd';
+import { VtButton } from '@/components/vt-button';
 import type { ColumnsType } from "antd/es/table";
 import { DetailTable } from "@/components/detail-table";
 import {
@@ -18,7 +19,7 @@ import {
   propertyTypeLabel,
   unitLabel,
 } from "@/lib/data-types";
-import { detailFormItemProps, selectFormItemProps } from "@/components/drawer-form";
+import { detailCompactFormItemProps, selectFormItemProps } from "@/components/drawer-form";
 import { requiredInputRule, requiredSelectRule, validateEnumData } from "@/lib/form-validation";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { vtActionColumn } from "@/lib/table-utils";
@@ -187,7 +188,7 @@ export function TabMeta() {
       width: 120,
       render: (_, p) => (
         <span className="whitespace-nowrap text-text-secondary">
-          {p.valueType?.unit ? unitLabel(p.valueType.unit) : "—"}
+          {p.valueType?.unit ? unitLabel(p.valueType.unit) : "?"}
         </span>
       ),
     },
@@ -406,12 +407,12 @@ export function TabMeta() {
         size={520}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={() => setPropDraft(null)}>
+            <VtButton type="default" onClick={() => setPropDraft(null)}>
               {t("common.cancel")}
-            </Button>
-            <Button type="primary" size="small" onClick={() => void saveProp()}>
+            </VtButton>
+            <VtButton type="primary" onClick={() => void saveProp()}>
               {t("common.save")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
@@ -419,14 +420,14 @@ export function TabMeta() {
           <Form form={propFormApi} layout="horizontal">
             <Form.Item
               name="id"
-              label={t("common.propertyId")}
+              label={t("common.identifier")}
               required
-              {...detailFormItemProps}
-              rules={[requiredInputRule(t, t("common.propertyId"))]}
+              {...detailCompactFormItemProps}
+              rules={[requiredInputRule(t, t("common.identifier"))]}
             >
               <Input
                 value={propDraft.data.id}
-                placeholder={ph.input(t("common.propertyId"))}
+                placeholder={ph.input(t("common.identifier"))}
                 disabled={!propDraft.data.create}
                 onChange={(e) => {
                   setPropDraft({ ...propDraft, data: { ...propDraft.data, id: e.target.value } });
@@ -436,14 +437,14 @@ export function TabMeta() {
             </Form.Item>
             <Form.Item
               name="name"
-              label={t("common.propertyName")}
+              label={t("common.name")}
               required
-              {...detailFormItemProps}
-              rules={[requiredInputRule(t, t("common.propertyName"))]}
+              {...detailCompactFormItemProps}
+              rules={[requiredInputRule(t, t("common.name"))]}
             >
               <Input
                 value={propDraft.data.name}
-                placeholder={ph.input(t("common.propertyName"))}
+                placeholder={ph.input(t("common.name"))}
                 onChange={(e) => {
                   setPropDraft({ ...propDraft, data: { ...propDraft.data, name: e.target.value } });
                   propFormApi.setFieldValue("name", e.target.value);
@@ -454,7 +455,7 @@ export function TabMeta() {
               name="dataType"
               label={t("common.dataType")}
               required
-              {...detailFormItemProps}
+              {...detailCompactFormItemProps}
               {...selectFormItemProps}
               rules={[requiredSelectRule(t, t("common.dataType"))]}
             >
@@ -480,7 +481,7 @@ export function TabMeta() {
               />
             </Form.Item>
             {propType === "number" && (
-              <Form.Item label={t("common.decimalPlaces")} {...detailFormItemProps}>
+              <Form.Item label={t("common.decimalPlaces")} {...detailCompactFormItemProps}>
                 <InputNumber
                   className="w-full"
                   min={0}
@@ -502,7 +503,7 @@ export function TabMeta() {
               </Form.Item>
             )}
             {propType === "enum" && (
-              <Form.Item name="enumData" label={t("common.enumValues")} layout="vertical" className="mb-3">
+              <Form.Item name="enumData" label={t("common.enumValues")} {...detailCompactFormItemProps}>
                 <EnumEditor
                   data={(propDraft.data.valueType?.extra?.enumData as EnumDataItem[]) ?? []}
                   onChange={(enumData) => {
@@ -521,7 +522,7 @@ export function TabMeta() {
                 />
               </Form.Item>
             )}
-            <Form.Item label={t("common.unit")} {...detailFormItemProps}>
+            <Form.Item label={t("common.unit")} {...detailCompactFormItemProps}>
               <Select
                 className="vt-select-control"
                 classNames={{ popup: { root: "vt-select-popup" } }}
@@ -547,7 +548,7 @@ export function TabMeta() {
                 placeholder={ph.select(t("common.unit"))}
               />
             </Form.Item>
-            <Form.Item label={t("common.readWrite")} {...detailFormItemProps}>
+            <Form.Item label={t("common.readWrite")} {...detailCompactFormItemProps}>
               <OptionToggle
                 value={propDraft.data.rw ?? "readwrite"}
                 onChange={(v) => setPropDraft({ ...propDraft, data: { ...propDraft.data, rw: v } })}
@@ -556,18 +557,18 @@ export function TabMeta() {
             </Form.Item>
             <Form.Item
               name="tagId"
-              label={t("common.belongGroup")}
+              label={t("common.group")}
               required
-              {...detailFormItemProps}
+              {...detailCompactFormItemProps}
               {...selectFormItemProps}
-              rules={[requiredSelectRule(t, t("common.belongGroup"))]}
+              rules={[requiredSelectRule(t, t("common.group"))]}
             >
               <Select
                 className="vt-select-control"
                 classNames={{ popup: { root: "vt-select-popup" } }}
                 style={{ width: "100%" }}
                 value={propDraft.data.tagId || undefined}
-                placeholder={ph.select(t("common.belongGroup"))}
+                placeholder={ph.select(t("common.group"))}
                 onChange={(v) => {
                   const tagId = String(v ?? "");
                   setPropDraft({
@@ -603,9 +604,8 @@ export function TabMeta() {
         size={400}
         footer={
           <div className="flex justify-end gap-2">
-            <Button
+            <VtButton
               type="default"
-              size="small"
               onClick={() => {
                 if (!renameTag) return;
                 updateMetadata((m) => {
@@ -623,10 +623,9 @@ export function TabMeta() {
               }}
             >
               {t("common.deleteGroup")}
-            </Button>
-            <Button
+            </VtButton>
+            <VtButton
               type="primary"
-              size="small"
               onClick={async () => {
                 if (!renameTag) return;
                 try {
@@ -644,7 +643,7 @@ export function TabMeta() {
               }}
             >
               {t("common.save")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
@@ -652,15 +651,15 @@ export function TabMeta() {
           <Form form={renameFormApi} layout="horizontal">
             <Form.Item
               name="name"
-              label={t("common.groupName")}
+              label={t("common.name")}
               required
-              {...detailFormItemProps}
-              rules={[requiredInputRule(t, t("common.groupName"))]}
+              {...detailCompactFormItemProps}
+              rules={[requiredInputRule(t, t("common.name"))]}
             >
               <Input
                 autoFocus
                 value={renameTag.name}
-                placeholder={ph.input(t("common.groupName"))}
+                placeholder={ph.input(t("common.name"))}
                 onChange={(e) => {
                   setRenameTag({ ...renameTag, name: e.target.value });
                   renameFormApi.setFieldValue("name", e.target.value);
@@ -684,9 +683,8 @@ export function TabMeta() {
         size={400}
         footer={
           <div className="flex justify-end gap-2">
-            <Button
+            <VtButton
               type="default"
-              size="small"
               onClick={() => {
                 setNewTagOpen(false);
                 setNewTagName("");
@@ -694,10 +692,9 @@ export function TabMeta() {
               }}
             >
               {t("common.cancel")}
-            </Button>
-            <Button
+            </VtButton>
+            <VtButton
               type="primary"
-              size="small"
               onClick={async () => {
                 try {
                   const values = await newTagFormApi.validateFields();
@@ -708,21 +705,21 @@ export function TabMeta() {
               }}
             >
               {t("common.save")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
         <Form form={newTagFormApi} layout="horizontal">
           <Form.Item
             name="name"
-            label={t("common.groupName")}
+            label={t("common.name")}
             required
-            {...detailFormItemProps}
-            rules={[requiredInputRule(t, t("common.groupName"))]}
+            {...detailCompactFormItemProps}
+            rules={[requiredInputRule(t, t("common.name"))]}
           >
             <Input
               autoFocus
-              placeholder={ph.input(t("common.groupName"))}
+              placeholder={ph.input(t("common.name"))}
               value={newTagName}
               onChange={(e) => {
                 setNewTagName(e.target.value);

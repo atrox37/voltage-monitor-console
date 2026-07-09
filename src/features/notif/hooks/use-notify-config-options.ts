@@ -8,7 +8,7 @@ const ALL_CONFIGS_SORT: PageQuery["sorts"] = [{ column: "t.create_time", order: 
 
 export type NotifyConfigOption = { id: string; name: string; code: NotifyChannelCode };
 
-/** 閫氱煡閰嶇疆涓嬫媺 鈥?妯℃澘椤电瓑鍏辩敤 */
+/** 通知配置下拉 — 模板页等共用 */
 export function useNotifyConfigOptions() {
   return useQuery<NotifyConfigOption[]>({
     queryKey: [...queryKeys.notifyConfigs.root, "options"] as const,

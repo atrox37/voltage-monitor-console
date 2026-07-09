@@ -52,6 +52,7 @@ export type {
   SysMenuPo,
   AuditLogPo,
   AuditLogDto,
+  SysCredentialPo,
   SysUserVO,
   SysRoleVO,
   SysDimension,

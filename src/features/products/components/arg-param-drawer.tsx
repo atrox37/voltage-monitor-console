@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
-import { detailFormItemProps, selectFormItemProps } from "@/components/drawer-form";
+import { Drawer, Form, Input, InputNumber, Select } from 'antd';
+import { VtButton } from '@/components/vt-button';
+import { detailCompactFormItemProps, selectFormItemProps } from "@/components/drawer-form";
 import { useTranslation } from "@/i18n";
 import {
   DATA_UNITS,
@@ -81,29 +82,26 @@ export function ArgParamDrawer({ open, initial, dataTypes, onClose, onSave }: Ar
       onClose={onClose}
       title={t("common.paramInfo")}
       size={420}
-      zIndex={1200}
-      mask
-      maskClosable={false}
       destroyOnClose
       styles={{ body: { paddingTop: 8 } }}
       footer={
         <div className="flex justify-end gap-2">
-          <Button type="default" size="small" onClick={onClose}>
+          <VtButton type="default" onClick={onClose}>
             {t("common.cancel")}
-          </Button>
-          <Button type="primary" size="small" onClick={() => void handleSave()}>
+          </VtButton>
+          <VtButton type="primary" onClick={() => void handleSave()}>
             {t("common.save")}
-          </Button>
+          </VtButton>
         </div>
       }
     >
       <Form form={formApi} layout="horizontal">
         <Form.Item
           name="id"
-          label={t("common.paramId")}
+          label={t("common.identifier")}
           required
-          {...detailFormItemProps}
-          rules={[requiredInputRule(t, t("common.paramId"))]}
+          {...detailCompactFormItemProps}
+          rules={[requiredInputRule(t, t("common.identifier"))]}
         >
           <Input
             value={draft.id}
@@ -115,10 +113,10 @@ export function ArgParamDrawer({ open, initial, dataTypes, onClose, onSave }: Ar
         </Form.Item>
         <Form.Item
           name="name"
-          label={t("common.paramName")}
+          label={t("common.name")}
           required
-          {...detailFormItemProps}
-          rules={[requiredInputRule(t, t("common.paramName"))]}
+          {...detailCompactFormItemProps}
+          rules={[requiredInputRule(t, t("common.name"))]}
         >
           <Input
             value={draft.name}
@@ -132,7 +130,7 @@ export function ArgParamDrawer({ open, initial, dataTypes, onClose, onSave }: Ar
           name="dataType"
           label={t("common.type")}
           required
-          {...detailFormItemProps}
+          {...detailCompactFormItemProps}
           {...selectFormItemProps}
           rules={[requiredSelectRule(t, t("common.dataType"))]}
         >
@@ -152,7 +150,7 @@ export function ArgParamDrawer({ open, initial, dataTypes, onClose, onSave }: Ar
           />
         </Form.Item>
         {valueType === "number" && (
-          <Form.Item label={t("common.decimalPlaces")} {...detailFormItemProps}>
+          <Form.Item label={t("common.decimalPlaces")} {...detailCompactFormItemProps}>
             <InputNumber
               className="w-full"
               min={0}
@@ -171,7 +169,7 @@ export function ArgParamDrawer({ open, initial, dataTypes, onClose, onSave }: Ar
           </Form.Item>
         )}
         {valueType === "enum" && (
-          <Form.Item name="enumData" label={t("common.enumValues")} layout="vertical" className="mb-3">
+          <Form.Item name="enumData" label={t("common.enumValues")} {...detailCompactFormItemProps}>
             <EnumEditor
               data={(draft.valueType?.extra?.enumData as EnumDataItem[]) ?? []}
               onChange={(enumData) => {
@@ -187,7 +185,7 @@ export function ArgParamDrawer({ open, initial, dataTypes, onClose, onSave }: Ar
             />
           </Form.Item>
         )}
-        <Form.Item label={t("common.unit")} {...detailFormItemProps}>
+        <Form.Item label={t("common.unit")} {...detailCompactFormItemProps}>
           <Select
             className="vt-select-control"
             classNames={{ popup: { root: "vt-select-popup" } }}

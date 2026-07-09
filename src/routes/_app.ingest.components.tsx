@@ -1,16 +1,27 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { CloseOutlined, DeleteOutlined, LoadingOutlined, MinusOutlined, PlusOutlined, UploadOutlined } from "@ant-design/icons";
-import { Button, Checkbox, Drawer, Form, Input, InputNumber } from "antd";
-import { OptionToggle } from "@/components/option-toggle";
+import { CloseOutlined, DeleteOutlined, EditOutlined, LoadingOutlined, MinusOutlined, PlusOutlined, UploadOutlined } from "@ant-design/icons";
+import { Checkbox, Drawer, Form, Input, InputNumber, Table } from "antd";
+import type { ColumnsType } from "antd/es/table";
+import { VtButton } from "@/components/vt-button";
+import { OptionToggle, enabledDisabledNumberOptions, onOffNumberOptions } from "@/components/option-toggle";
 import { DrawerSegmentTabs } from "@/components/drawer-segment-tabs";
-import { drawerFooter, drawerFormItemProps } from "@/components/drawer-form";
+import {
+  drawerFormItemProps,
+  drawerBlockFormItemProps,
+  drawerFooter,
+  drawerScrollBodyStyles,
+  drawerScrollSectionClass,
+  drawerStickySectionClass,
+  nestedDrawerProps,
+} from "@/components/drawer-form";
 import { showError, showSuccess } from "@/lib/api-message";
 import { deleteNetwork, getDimensionTree, pageNetworks, saveNetwork, uploadNetworkFile } from "@/api";
-import { ListPageTemplate, RowBtn, StatusBadge } from "@/components/list-page-template";
+import { ListPageTemplate, RowBtn, StatusBadge, DateTimeText } from "@/components/list-page-template";
 import { NetworkConnectStatusBadge } from "@/components/status-display";
 import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
+import { vtActionColumn } from "@/lib/table-utils";
 import {
   blankNetworkForm,
   mapNetworkFormToPo,
@@ -25,7 +36,7 @@ import { termEq, termLike, toDbId } from "@/lib/query-terms";
 import { isRequestCanceled } from "@/lib/request";
 import { DEFAULT_PAGE_SIZE } from "@/lib/list-pagination";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
-import { requiredInputError, requiredInputRule, requiredSelectError } from "@/lib/form-validation";
+import { requiredInputError, requiredInputRule, requiredSelectError, requiredSelectRule } from "@/lib/form-validation";
 import { useTranslation } from "@/i18n";
 import type { PageQuery } from "@/types";
 
@@ -181,7 +192,7 @@ function NetworkComponentsPage() {
             render: (r) => <NetworkConnectStatusBadge status={r.connectStatus} />,
           },
           { key: "org", title: t("common.orgBelong") },
-          { key: "updateTime", title: t("common.updatedAt"), render: (r) => <span className="text-text-secondary">{r.updateTime}</span> },
+          { key: "updateTime", title: t("common.updatedAt"), render: (r) => <DateTimeText value={r.updateTime} /> },
         ]}
         onAdd={() => {
           setAddingOpen(true);
@@ -224,6 +235,8 @@ type ComponentFormValues = {
   port: number;
   username: string;
   password: string;
+  enabled: 0 | 1;
+  ssl: 0 | 1;
   topics: string[];
   caCert: string;
   sslCert: string;
@@ -245,9 +258,12 @@ function ComponentDrawer({
   const [d, setD] = useState<NetworkCompForm>(value);
   const [topicDraft, setTopicDraft] = useState("");
   const [recruitOpen, setRecruitOpen] = useState(false);
+  const [recruitDraft, setRecruitDraft] = useState<RecruitRow | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadTag, setUploadTag] = useState<"sslCa" | "sslCert" | "sslKey" | null>(null);
   const [uploading, setUploading] = useState(false);
+  /** 编辑已启用组件时，仅允许修改状态，保存后可再次编辑其他字段 */
+  const fieldsLocked = mode === "edit" && value.enabled;
 
   useEffect(() => {
     setD(value);
@@ -257,6 +273,8 @@ function ComponentDrawer({
       port: value.port,
       username: value.username,
       password: value.password,
+      enabled: value.enabled ? 1 : 0,
+      ssl: value.ssl ? 1 : 0,
       topics: value.topics,
       caCert: value.caCert,
       sslCert: value.sslCert,
@@ -322,7 +340,7 @@ function ComponentDrawer({
         title={mode === "add" ? t("common.addTitle") : t("common.editTitle")}
         size={560}
         destroyOnHidden
-        styles={{ body: { paddingTop: 8 } }}
+        styles={drawerScrollBodyStyles}
         footer={drawerFooter([
           { key: "cancel", label: t("common.cancel"), onClick: onClose },
           {
@@ -341,13 +359,22 @@ function ComponentDrawer({
           },
         ])}
       >
+        <div className={drawerStickySectionClass}>
+          {fieldsLocked && (
+            <p className="rounded-md border border-status-warning/30 bg-status-warning/10 px-3 py-2 text-xs text-status-warning">
+              {t("ingest.components.enabledEditHint")}
+            </p>
+          )}
+          <DrawerSegmentTabs
+            options={TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+            value={d.type}
+            disabled={mode === "edit"}
+            allTextWhite
+          />
+        </div>
+
+        <div className={drawerScrollSectionClass}>
         <Form form={formApi} layout="horizontal">
-        <DrawerSegmentTabs
-          options={TYPE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
-          value={d.type}
-          disabled={mode === "edit"}
-          allTextWhite
-        />
 
         <Form.Item
           name="name"
@@ -357,6 +384,7 @@ function ComponentDrawer({
           rules={[requiredInputRule(t, t("common.nameLabel"))]}
         >
           <Input
+            disabled={fieldsLocked}
             placeholder={ph.input(t("common.nameLabel"))}
             value={d.name}
             onChange={(e) => {
@@ -366,15 +394,21 @@ function ComponentDrawer({
           />
         </Form.Item>
 
-        <Form.Item label={t("common.status")} {...drawerFormItemProps}>
+        <Form.Item
+          name="enabled"
+          label={t("common.status")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredSelectRule(t, t("common.status"))]}
+        >
           <OptionToggle
             disabled={mode === "add"}
             value={d.enabled ? 1 : 0}
-            onChange={(v) => set("enabled", v === 1)}
-            options={[
-              { label: t("common.disabled"), value: 0 },
-              { label: t("common.enabled"), value: 1 },
-            ]}
+            onChange={(v) => {
+              set("enabled", v === 1);
+              formApi.setFieldValue("enabled", v);
+            }}
+            options={enabledDisabledNumberOptions(t)}
           />
         </Form.Item>
 
@@ -386,6 +420,7 @@ function ComponentDrawer({
           rules={[requiredInputRule(t, t("ingest.components.ip"))]}
         >
           <Input
+            disabled={fieldsLocked}
             placeholder={ph.input(t("ingest.components.ip"))}
             value={d.ip}
             onChange={(e) => {
@@ -410,20 +445,22 @@ function ComponentDrawer({
             },
           ]}
         >
-          <div className="inline-flex items-center overflow-hidden rounded-md border border-panel-border">
+          <div className={`inline-flex w-fit items-center overflow-hidden rounded-md border border-panel-border ${fieldsLocked ? "opacity-60" : ""}`}>
             <button
               type="button"
+              disabled={fieldsLocked}
               onClick={() => {
                 const port = Math.max(1, d.port - 1);
                 set("port", port);
                 formApi.setFieldValue("port", port);
               }}
-              className="flex h-9 w-9 items-center justify-center bg-panel text-text-secondary hover:text-foreground"
+              className="flex h-9 w-9 items-center justify-center bg-panel text-text-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               <MinusOutlined className="text-sm" />
             </button>
             <InputNumber
               controls={false}
+              disabled={fieldsLocked}
               placeholder={ph.input(t("ingest.components.port"))}
               value={d.port}
               onChange={(v) => {
@@ -435,12 +472,13 @@ function ComponentDrawer({
             />
             <button
               type="button"
+              disabled={fieldsLocked}
               onClick={() => {
                 const port = d.port + 1;
                 set("port", port);
                 formApi.setFieldValue("port", port);
               }}
-              className="flex h-9 w-9 items-center justify-center bg-panel text-text-secondary hover:text-foreground"
+              className="flex h-9 w-9 items-center justify-center bg-panel text-text-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               <PlusOutlined className="text-sm" />
             </button>
@@ -450,11 +488,10 @@ function ComponentDrawer({
         <Form.Item
           name="username"
           label={t("ingest.components.username")}
-          required
           {...drawerFormItemProps}
-          rules={[requiredInputRule(t, t("ingest.components.username"))]}
         >
           <Input
+            disabled={fieldsLocked}
             placeholder={ph.input(t("ingest.components.username"))}
             value={d.username}
             onChange={(e) => {
@@ -467,11 +504,10 @@ function ComponentDrawer({
         <Form.Item
           name="password"
           label={t("ingest.components.password")}
-          required
           {...drawerFormItemProps}
-          rules={[requiredInputRule(t, t("ingest.components.password"))]}
         >
           <Input.Password
+            disabled={fieldsLocked}
             placeholder={ph.input(t("ingest.components.password"))}
             value={d.password}
             onChange={(e) => {
@@ -481,14 +517,21 @@ function ComponentDrawer({
           />
         </Form.Item>
 
-        <Form.Item label={t("ingest.components.ssl")} {...drawerFormItemProps}>
+        <Form.Item
+          name="ssl"
+          label={t("ingest.components.ssl")}
+          required
+          {...drawerFormItemProps}
+          rules={[requiredSelectRule(t, t("ingest.components.ssl"))]}
+        >
           <OptionToggle
+            disabled={fieldsLocked}
             value={d.ssl ? 1 : 0}
-            onChange={(v) => set("ssl", v === 1)}
-            options={[
-              { label: t("common.off"), value: 0 },
-              { label: t("common.on"), value: 1 },
-            ]}
+            onChange={(v) => {
+              set("ssl", v === 1);
+              formApi.setFieldValue("ssl", v);
+            }}
+            options={onOffNumberOptions(t)}
           />
         </Form.Item>
 
@@ -509,7 +552,7 @@ function ComponentDrawer({
                 },
               ]}
             >
-              <UploadInput value={d.caCert} uploading={uploading && uploadTag === "sslCa"} onPick={() => pickUpload("sslCa")} />
+              <UploadInput disabled={fieldsLocked} value={d.caCert} uploading={uploading && uploadTag === "sslCa"} onPick={() => pickUpload("sslCa")} />
             </Form.Item>
             <Form.Item
               name="sslCert"
@@ -526,7 +569,7 @@ function ComponentDrawer({
                 },
               ]}
             >
-              <UploadInput value={d.sslCert} uploading={uploading && uploadTag === "sslCert"} onPick={() => pickUpload("sslCert")} />
+              <UploadInput disabled={fieldsLocked} value={d.sslCert} uploading={uploading && uploadTag === "sslCert"} onPick={() => pickUpload("sslCert")} />
             </Form.Item>
             <Form.Item
               name="sslKey"
@@ -543,7 +586,7 @@ function ComponentDrawer({
                 },
               ]}
             >
-              <UploadInput value={d.sslKey} uploading={uploading && uploadTag === "sslKey"} onPick={() => pickUpload("sslKey")} />
+              <UploadInput disabled={fieldsLocked} value={d.sslKey} uploading={uploading && uploadTag === "sslKey"} onPick={() => pickUpload("sslKey")} />
             </Form.Item>
           </>
         )}
@@ -552,7 +595,7 @@ function ComponentDrawer({
           name="topics"
           label={t("ingest.components.topics")}
           required
-          {...drawerFormItemProps}
+          {...drawerBlockFormItemProps}
           rules={[
             {
               validator: async () => {
@@ -563,15 +606,16 @@ function ComponentDrawer({
             },
           ]}
         >
-          <div className="rounded-md border border-panel-border bg-background/40 p-2">
+          <div className={`w-full rounded-md border border-panel-border bg-background/40 p-2 ${fieldsLocked ? "opacity-60" : ""}`}>
             <div className="flex flex-wrap gap-1.5">
               {d.topics.map((topic, i) => (
                 <span key={i} className="inline-flex items-center gap-1 rounded bg-panel px-2 py-1 text-[11px] text-foreground">
                   {topic}
                   <button
                     type="button"
+                    disabled={fieldsLocked}
                     onClick={() => syncTopics(d.topics.filter((_, idx) => idx !== i))}
-                    className="text-text-muted hover:text-status-critical"
+                    className="text-text-muted hover:text-status-critical disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <CloseOutlined className="text-xs" />
                   </button>
@@ -579,73 +623,167 @@ function ComponentDrawer({
               ))}
               <input
                 value={topicDraft}
+                disabled={fieldsLocked}
                 onChange={(e) => setTopicDraft(e.target.value)}
                 onKeyDown={addTopic}
                 placeholder={t("ingest.components.topicPlaceholder")}
-                className="min-w-[160px] flex-1 bg-transparent px-1 py-1 text-xs text-foreground placeholder:text-text-muted outline-none"
+                className="min-w-[160px] flex-1 bg-transparent px-1 py-1 text-xs text-foreground placeholder:text-text-muted outline-none disabled:cursor-not-allowed"
               />
             </div>
           </div>
         </Form.Item>
 
-        <Form.Item label={t("ingest.components.recruit")} {...drawerFormItemProps}>
-          <div className="rounded-md border border-panel-border">
-            <div className="flex items-center border-b border-panel-border bg-panel/40 px-3 py-2 text-[11px] text-text-secondary">
-              <div className="w-1/4">{t("ingest.components.recruitColName")}</div>
-              <div className="w-1/3">{t("ingest.components.recruitColTopic")}</div>
-              <div className="w-1/4">{t("ingest.components.recruitColPayload")}</div>
-              <div className="ml-auto">
-                <button type="button" onClick={() => setRecruitOpen(true)} className="flex h-6 w-6 items-center justify-center rounded border border-panel-border text-text-secondary hover:text-primary">
-                  <PlusOutlined className="text-xs" />
-                </button>
-              </div>
-            </div>
-            {d.recruits.length === 0 ? (
-              <div className="px-3 py-6 text-center text-[11px] text-text-muted">{t("common.noData")}</div>
-            ) : (
-              d.recruits.map((r) => (
-                <div key={r.id} className="flex items-start border-t border-panel-border/60 px-3 py-2 text-xs text-foreground">
-                  <div className="w-1/4 pr-2 break-words">{r.name}</div>
-                  <div className="w-1/3 pr-2 break-all text-text-secondary">{r.topic}</div>
-                  <div className="w-1/4 pr-2 break-all text-text-secondary">{r.payload}</div>
-                  <button type="button" onClick={() => set("recruits", d.recruits.filter((x) => x.id !== r.id))} className="ml-auto text-text-muted hover:text-status-critical">
-                    <DeleteOutlined className="text-sm" />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
+        <Form.Item label={t("ingest.components.recruit")} {...drawerBlockFormItemProps}>
+          <RecruitSection
+            items={d.recruits}
+            disabled={fieldsLocked}
+            onAdd={() => {
+              setRecruitDraft(null);
+              setRecruitOpen(true);
+            }}
+            onEdit={(row) => {
+              setRecruitDraft(row);
+              setRecruitOpen(true);
+            }}
+            onDelete={(id) => set("recruits", d.recruits.filter((x) => x.id !== id))}
+          />
         </Form.Item>
         </Form>
-      </Drawer>
+        </div>
 
-      {recruitOpen && (
         <RecruitDialog
-          onClose={() => setRecruitOpen(false)}
-          onAdd={(r) => { set("recruits", [...d.recruits, r]); setRecruitOpen(false); }}
+          open={recruitOpen}
+          initial={recruitDraft}
+          onClose={() => {
+            setRecruitOpen(false);
+            setRecruitDraft(null);
+          }}
+          onSave={(r) => {
+            if (recruitDraft) {
+              set(
+                "recruits",
+                d.recruits.map((x) => (x.id === r.id ? r : x)),
+              );
+            } else {
+              set("recruits", [...d.recruits, r]);
+            }
+            setRecruitOpen(false);
+            setRecruitDraft(null);
+          }}
         />
-      )}
+      </Drawer>
     </>
   );
 }
 
-function UploadInput({ value, uploading, onPick }: { value: string; uploading?: boolean; onPick: () => void }) {
+function RecruitSection({
+  items,
+  disabled,
+  onAdd,
+  onEdit,
+  onDelete,
+}: {
+  items: RecruitRow[];
+  disabled?: boolean;
+  onAdd: () => void;
+  onEdit: (row: RecruitRow) => void;
+  onDelete: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const columns: ColumnsType<RecruitRow> = [
+    { key: "name", title: t("ingest.components.recruitColName"), dataIndex: "name" },
+    {
+      key: "topic",
+      title: t("ingest.components.recruitColTopic"),
+      dataIndex: "topic",
+      render: (v) => <span className="break-all text-text-secondary">{v}</span>,
+    },
+    {
+      key: "payload",
+      title: t("ingest.components.recruitColPayload"),
+      dataIndex: "payload",
+      render: (v) => <span className="break-all text-text-secondary">{v}</span>,
+    },
+    vtActionColumn<RecruitRow>(
+      t("common.actions"),
+      (row) => (
+        <>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onEdit(row)}
+            className="mx-0.5 rounded p-1 text-text-muted hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <EditOutlined className="h-3 w-3" />
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onDelete(row.id)}
+            className="mx-0.5 rounded p-1 text-text-muted hover:text-status-critical disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <DeleteOutlined className="h-3 w-3" />
+          </button>
+        </>
+      ),
+      100,
+    ),
+  ];
+
+  return (
+    <div className={disabled ? "opacity-60" : undefined}>
+      <div className="mb-1.5 flex items-center justify-end">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onAdd}
+          className="inline-flex items-center gap-1 rounded border border-panel-border px-2 py-0.5 text-[11px] text-text-secondary hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <PlusOutlined className="h-3 w-3" /> {t("common.add")}
+        </button>
+      </div>
+      <div className="overflow-hidden rounded border border-panel-border">
+        <Table
+          rowKey="id"
+          size="small"
+          pagination={false}
+          className="vt-ant-data-table"
+          columns={columns}
+          dataSource={items}
+          locale={{ emptyText: t("common.noData") }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function UploadInput({ value, uploading, onPick, disabled }: { value: string; uploading?: boolean; onPick: () => void; disabled?: boolean }) {
   const { t } = useTranslation();
   const fileName = value ? value.split("/").pop() ?? "" : "";
   return (
-    <div className="flex gap-2">
-      <Input readOnly placeholder={t("common.selectFile")} value={fileName} />
-      <Button
+    <div className="flex w-full gap-2">
+      <Input readOnly disabled={disabled} className="min-w-0 flex-1" placeholder={t("common.selectFile")} value={fileName} />
+      <VtButton
         icon={uploading ? <LoadingOutlined spin /> : <UploadOutlined />}
         onClick={onPick}
-        disabled={uploading}
+        disabled={disabled || uploading}
         title={t("common.selectFile")}
       />
     </div>
   );
 }
 
-function RecruitDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (r: RecruitRow) => void }) {
+function RecruitDialog({
+  open,
+  initial,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  initial: RecruitRow | null;
+  onClose: () => void;
+  onSave: (r: RecruitRow) => void;
+}) {
   const { t } = useTranslation();
   const ph = useFormPlaceholder();
   const [formApi] = Form.useForm<{ name: string; topic: string; payload: string; target: string }>();
@@ -654,6 +792,35 @@ function RecruitDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (r: Rec
   const [payload, setPayload] = useState("");
   const [gateway, setGateway] = useState(false);
   const [direct, setDirect] = useState(false);
+  const isEdit = !!initial;
+
+  useEffect(() => {
+    if (!open) {
+      formApi.resetFields();
+      setName("");
+      setTopic("");
+      setPayload("");
+      setGateway(false);
+      setDirect(false);
+      return;
+    }
+    const nextName = initial?.name ?? "";
+    const nextTopic = initial?.topic ?? "";
+    const nextPayload = initial?.payload ?? "";
+    const nextGateway = initial?.targets.gateway ?? false;
+    const nextDirect = initial?.targets.direct ?? false;
+    setName(nextName);
+    setTopic(nextTopic);
+    setPayload(nextPayload);
+    setGateway(nextGateway);
+    setDirect(nextDirect);
+    formApi.setFieldsValue({
+      name: nextName,
+      topic: nextTopic,
+      payload: nextPayload,
+      target: nextGateway || nextDirect ? "ok" : "",
+    });
+  }, [open, initial, formApi]);
 
   const syncTarget = (nextGateway: boolean, nextDirect: boolean) => {
     const target = nextGateway || nextDirect ? "ok" : "";
@@ -662,13 +829,11 @@ function RecruitDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (r: Rec
 
   return (
     <Drawer
-      open
+      open={open}
       onClose={onClose}
-      title={t("ingest.components.recruitAdd")}
+      title={isEdit ? t("common.edit") : t("ingest.components.recruitAdd")}
       size={480}
-      zIndex={1200}
-      destroyOnHidden
-      styles={{ body: { paddingTop: 8 } }}
+      {...nestedDrawerProps}
       footer={drawerFooter([
         { key: "cancel", label: t("common.cancel"), onClick: onClose },
         {
@@ -682,7 +847,13 @@ function RecruitDialog({ onClose, onAdd }: { onClose: () => void; onAdd: (r: Rec
             } catch {
               return;
             }
-            onAdd({ id: String(Date.now()), name, topic, payload, targets: { gateway, direct } });
+            onSave({
+              id: initial?.id ?? String(Date.now()),
+              name,
+              topic,
+              payload,
+              targets: { gateway, direct },
+            });
           },
         },
       ])}

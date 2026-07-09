@@ -15,7 +15,7 @@ import {
   saveRoleMenus,
   saveRolePermissions,
 } from "@/api/sys";
-import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
+import { ListPageTemplate, RowBtn, DateTimeText } from "@/components/list-page-template";
 import { OrgTreeSelect, type OrgNode } from "@/components/org-tree-select";
 import { dimensionToOrgNodes } from "@/lib/dimension-tree";
 import {
@@ -51,10 +51,10 @@ function mapRoleRow(dto: SysRolePageDto): RoleRow {
   const po = dto.sysRolePo;
   return {
     id: String(po.id ?? ""),
-    name: po.roleName ?? "—",
-    org: dto.sysDimensionPo?.name ?? "—",
+    name: po.roleName ?? "?",
+    org: dto.sysDimensionPo?.name ?? "?",
     orgId: String(po.orgId ?? ""),
-    updatedAt: po.updateTime ?? "—",
+    updatedAt: po.updateTime ?? "?",
     raw: dto,
   };
 }
@@ -306,9 +306,7 @@ function RolesPage() {
             key: "updatedAt",
             title: t("roles.updatedAt"),
             align: "center",
-            render: (r) => (
-              <span className="font-mono text-xs text-text-secondary">{r.updatedAt}</span>
-            ),
+            render: (r) => <DateTimeText value={r.updatedAt} />,
           },
         ]}
         onAdd={() => {
@@ -435,16 +433,12 @@ function RolesPage() {
             ))}
           </div>
         )}
-      </Drawer>
 
-      {menuRole && (
         <Drawer
           open={!!permNode}
           onClose={() => setPermNode(null)}
           title={t("roles.permDrawer")}
           size={560}
-          zIndex={1100}
-          mask={false}
           destroyOnHidden
           styles={{ body: { paddingTop: 8 } }}
           footer={drawerFooter([
@@ -468,7 +462,7 @@ function RolesPage() {
                 <Input value={permNode.label} disabled />
               </Form.Item>
               <Form.Item label={t("roles.menuPath")} {...drawerFormItemProps}>
-                <Input value={permNode.path ?? "—"} disabled />
+                <Input value={permNode.path ?? "?"} disabled />
               </Form.Item>
               <Form.Item label={t("roles.permission")} {...drawerFormItemProps}>
                 <div className="flex flex-wrap gap-2">
@@ -503,7 +497,7 @@ function RolesPage() {
             </>
           ) : null}
         </Drawer>
-      )}
+      </Drawer>
     </>
   );
 }

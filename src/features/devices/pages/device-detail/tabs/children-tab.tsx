@@ -1,12 +1,15 @@
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { PlusOutlined } from "@ant-design/icons";
-import { Button, Drawer, Form, Input, Pagination, Table } from "antd";
+import { Drawer, Form, Input, Pagination, Table } from 'antd';
+import { VtButton } from '@/components/vt-button';
+import { detailFormItemProps } from "@/components/drawer-form";
 import type { ColumnsType } from "antd/es/table";
 import type { TableRowSelection } from "antd/es/table/interface";
 
 import { useTranslation } from "@/i18n";
 import { DetailTable } from "@/components/detail-table";
+import { DateTimeText } from "@/components/datetime-text";
 import { RowActionBtn } from "@/components/row-action-buttons";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDeviceEdit } from "@/features/devices/contexts/device-edit-context";
@@ -108,7 +111,7 @@ function AddChildrenDrawer({
       title: t("common.updatedAt"),
       width: 176,
       render: (_, r) => (
-        <span className="text-text-secondary">{r.deviceInstancePo.updateTime ?? "—"}</span>
+        <DateTimeText value={r.deviceInstancePo.updateTime} />
       ),
     },
   ];
@@ -154,19 +157,18 @@ function AddChildrenDrawer({
       styles={{ body: { paddingTop: 8 } }}
       footer={
         <div className="flex justify-end gap-2">
-          <Button size="small" onClick={onClose}>
+          <VtButton onClick={onClose}>
             {t("common.close")}
-          </Button>
-          <Button type="primary" size="small" loading={saving} onClick={() => void handleSubmit()}>
+          </VtButton>
+          <VtButton type="primary" loading={saving} onClick={() => void handleSubmit()}>
             {t("common.save")}
-          </Button>
+          </VtButton>
         </div>
       }
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-panel-border">
         <Table<DeviceInstancePageDto>
           rowKey={(r) => String(r.deviceInstancePo.id)}
-          size="small"
           loading={loading}
           tableLayout="fixed"
           pagination={false}
@@ -180,7 +182,6 @@ function AddChildrenDrawer({
         <div className="vt-table-pagination-bar shrink-0 border-t border-panel-border px-4 py-2">
           <Pagination
             className="vt-ant-pagination"
-            size="small"
             current={page}
             pageSize={pageSize}
             total={total}
@@ -429,7 +430,6 @@ export function TabChildren() {
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <DetailTable<DeviceListRow>
             rowKey="id"
-            size="small"
             columns={childColumns}
             dataSource={children}
             locale={{ emptyText: t("common.noData") }}
@@ -446,12 +446,12 @@ export function TabChildren() {
         size={400}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={() => setRenameOf(null)}>
+            <VtButton type="default" onClick={() => setRenameOf(null)}>
               {t("common.cancel")}
-            </Button>
-            <Button type="primary" size="small" onClick={rename}>
+            </VtButton>
+            <VtButton type="primary" onClick={rename}>
               {t("common.save")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
@@ -459,10 +459,7 @@ export function TabChildren() {
           <Form.Item
             label={t("devices.detail.children.nodeName")}
             required
-            layout="horizontal"
-            labelCol={{ flex: "120px" }}
-            wrapperCol={{ flex: 1 }}
-            className="mb-3"
+            {...detailFormItemProps}
           >
             <Input
               autoFocus

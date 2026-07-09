@@ -34,3 +34,6 @@ dist-ssr
 .tanstack/
 
 dist.zip
+
+.codegraph/
+.playwright-mcp/

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { Alert, Button, Card, Form, Input, Spin, Typography } from "antd";
+import { Alert, Card, Form, Input, Spin, Typography } from "antd";
+import { VtButton } from "@/components/vt-button";
 
 import { ThunderboltOutlined } from "@ant-design/icons";
 
@@ -198,9 +199,9 @@ function LoginPage() {
 
               {error && <Alert type="error" message={error} showIcon className="mb-4" />}
 
-              <Button type="primary" htmlType="submit" loading={loading} block size="large">
+              <VtButton type="primary" htmlType="submit" loading={loading} block>
                 {loading ? t("login.submitting") : t("login.submit")}
-              </Button>
+              </VtButton>
             </Form>
 
             <Typography.Text

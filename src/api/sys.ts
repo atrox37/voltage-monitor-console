@@ -20,6 +20,7 @@ import type {
   RolePermissionBatchVo,
   SysMenuPo,
   AuditLogDto,
+  SysCredentialPo,
 } from "@/types";
 import { apiPath } from "./paths";
 
@@ -131,6 +132,21 @@ export function pageAuditLogs(params: PageQuery): Promise<PageResult<AuditLogDto
 /** POST /sys-app/audit_log/_delete_batch */
 export function deleteAuditLogBatch(ids: number[]): Promise<void> {
   return Request.post<void>(apiPath(API.sys.auditLogDeleteBatch), ids);
+}
+
+/** POST /sys-app/sys_credential/_page */
+export function pageCredentials(params: PageQuery): Promise<PageResult<SysCredentialPo>> {
+  return Request.post<PageResult<SysCredentialPo>>(apiPath(API.sys.credentialPage), params);
+}
+
+/** POST /sys-app/sys_credential/_save_or_update */
+export function createCredential(data: Pick<SysCredentialPo, "creatorId">): Promise<SaveResult> {
+  return Request.post<SaveResult>(apiPath(API.sys.credentialSave), data);
+}
+
+/** POST /sys-app/sys_credential/_delete_batch */
+export function deleteCredentialBatch(ids: (number | string)[]): Promise<void> {
+  return Request.post<void>(apiPath(API.sys.credentialDeleteBatch), ids);
 }
 
 export type { AuditLogDto } from "@/types";

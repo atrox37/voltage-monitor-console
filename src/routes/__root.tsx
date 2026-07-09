@@ -1,6 +1,7 @@
 ﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, Link, createRootRouteWithContext, useRouter } from "@tanstack/react-router";
-import { Button, Result } from "antd";
+import { Result } from "antd";
+import { VtButton } from "@/components/vt-button";
 import { AntdAppProvider } from "@/providers/antd-app-provider";
 import { useTranslation } from "@/i18n";
 
@@ -15,7 +16,7 @@ function NotFoundComponent() {
           subTitle={<span className="text-text-secondary">{t("errors.notFoundDesc")}</span>}
           extra={
             <Link to="/">
-              <Button type="primary">{t("errors.backHome")}</Button>
+              <VtButton type="primary">{t("errors.backHome")}</VtButton>
             </Link>
           }
         />
@@ -37,7 +38,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           subTitle={<span className="text-text-secondary">{t("errors.loadFailedDesc")}</span>}
           extra={
             <div className="flex items-center justify-center gap-3">
-              <Button
+              <VtButton
                 type="primary"
                 onClick={() => {
                   router.invalidate();
@@ -45,14 +46,14 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
                 }}
               >
                 {t("errors.retry")}
-              </Button>
-              <Button
+              </VtButton>
+              <VtButton
                 onClick={() => {
                   window.location.href = "/";
                 }}
               >
                 {t("errors.backHome")}
-              </Button>
+              </VtButton>
             </div>
           }
         />

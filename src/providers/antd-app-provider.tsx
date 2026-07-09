@@ -26,7 +26,7 @@ export const antdTheme = {
     colorTextTertiary: "#8b9bb8",
     colorTextPlaceholder: "#8b9bb8",
     borderRadius: 6,
-    fontFamily: '"Arimo", "Inter", system-ui, sans-serif',
+    fontFamily: '"Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif',
     fontSize: 14,
     controlHeight: 32,
   },

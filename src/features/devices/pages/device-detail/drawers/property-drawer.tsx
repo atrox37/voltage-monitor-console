@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 
-import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
-import { detailFormItemProps, selectFormItemProps } from "@/components/drawer-form";
+import { Drawer, Form, Input, InputNumber, Select } from 'antd';
+import { VtButton } from '@/components/vt-button';
+import { detailCompactFormItemProps, selectFormItemProps } from "@/components/drawer-form";
 import { OptionToggle } from "@/components/option-toggle";
 import { EnumEditor } from "@/features/products/components/enum-editor";
 import { useTranslation } from "@/i18n";
@@ -104,26 +105,26 @@ export function PropertyDrawer({
       styles={{ body: { paddingTop: 8 } }}
       footer={
         <div className="flex justify-end gap-2">
-          <Button type="default" size="small" onClick={onClose}>
+          <VtButton type="default" onClick={onClose}>
             {t("common.cancel")}
-          </Button>
-          <Button type="primary" size="small" onClick={() => void handleSave()}>
+          </VtButton>
+          <VtButton type="primary" onClick={() => void handleSave()}>
             {t("common.save")}
-          </Button>
+          </VtButton>
         </div>
       }
     >
       <Form form={formApi} layout="horizontal">
         <Form.Item
           name="id"
-          label={t("common.propertyId")}
+          label={t("common.identifier")}
           required
-          {...detailFormItemProps}
-          rules={[requiredInputRule(t, t("common.propertyId"))]}
+          {...detailCompactFormItemProps}
+          rules={[requiredInputRule(t, t("common.identifier"))]}
         >
           <Input
             value={draft.id}
-            placeholder={ph.input(t("common.propertyId"))}
+            placeholder={ph.input(t("common.identifier"))}
             disabled={!isNew && !draft.create}
             onChange={(e) => {
               setDraft({ ...draft, id: e.target.value });
@@ -133,14 +134,14 @@ export function PropertyDrawer({
         </Form.Item>
         <Form.Item
           name="name"
-          label={t("common.propertyName")}
+          label={t("common.name")}
           required
-          {...detailFormItemProps}
-          rules={[requiredInputRule(t, t("common.propertyName"))]}
+          {...detailCompactFormItemProps}
+          rules={[requiredInputRule(t, t("common.name"))]}
         >
           <Input
             value={draft.name}
-            placeholder={ph.input(t("common.propertyName"))}
+            placeholder={ph.input(t("common.name"))}
             onChange={(e) => {
               setDraft({ ...draft, name: e.target.value });
               formApi.setFieldValue("name", e.target.value);
@@ -151,7 +152,7 @@ export function PropertyDrawer({
           name="dataType"
           label={t("common.dataType")}
           required
-          {...detailFormItemProps}
+          {...detailCompactFormItemProps}
           {...selectFormItemProps}
           rules={[requiredSelectRule(t, t("common.dataType"))]}
         >
@@ -174,7 +175,7 @@ export function PropertyDrawer({
           />
         </Form.Item>
         {propType === "number" && (
-          <Form.Item label={t("common.decimalPlaces")} {...detailFormItemProps}>
+          <Form.Item label={t("common.decimalPlaces")} {...detailCompactFormItemProps}>
             <InputNumber
               className="w-full"
               min={0}
@@ -193,7 +194,7 @@ export function PropertyDrawer({
           </Form.Item>
         )}
         {propType === "enum" && (
-          <Form.Item name="enumData" label={t("common.enumValues")} layout="vertical" className="mb-3">
+          <Form.Item name="enumData" label={t("common.enumValues")} {...detailCompactFormItemProps}>
             <EnumEditor
               data={(draft.valueType?.extra?.enumData as EnumDataItem[]) ?? []}
               onChange={(enumData) => {
@@ -209,7 +210,7 @@ export function PropertyDrawer({
             />
           </Form.Item>
         )}
-        <Form.Item label={t("common.unit")} {...detailFormItemProps}>
+        <Form.Item label={t("common.unit")} {...detailCompactFormItemProps}>
           <Select
             className="vt-select-control"
             classNames={{ popup: { root: "vt-select-popup" } }}
@@ -232,7 +233,7 @@ export function PropertyDrawer({
             placeholder={ph.select(t("common.unit"))}
           />
         </Form.Item>
-        <Form.Item label={t("common.readWrite")} {...detailFormItemProps}>
+        <Form.Item label={t("common.readWrite")} {...detailCompactFormItemProps}>
           <OptionToggle
             value={draft.rw ?? "readwrite"}
             onChange={(v) => setDraft({ ...draft, rw: v })}
@@ -241,18 +242,18 @@ export function PropertyDrawer({
         </Form.Item>
         <Form.Item
           name="tagId"
-          label={t("common.belongGroup")}
+          label={t("common.group")}
           required
-          {...detailFormItemProps}
+          {...detailCompactFormItemProps}
           {...selectFormItemProps}
-          rules={[requiredSelectRule(t, t("common.belongGroup"))]}
+          rules={[requiredSelectRule(t, t("common.group"))]}
         >
           <Select
             className="vt-select-control"
             classNames={{ popup: { root: "vt-select-popup" } }}
             style={{ width: "100%" }}
             value={draft.tagId || undefined}
-            placeholder={ph.select(t("common.belongGroup"))}
+            placeholder={ph.select(t("common.group"))}
             onChange={(v) => {
               const tagId = String(v ?? "");
               setDraft({ ...draft, tagId });

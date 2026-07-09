@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
-import { Button, Drawer, Form, Input, Select, Table, Tag } from "antd";
+import { Drawer, Form, Input, Select, Table, Tag } from 'antd';
+import { VtButton } from '@/components/vt-button';
+import { detailFormItemProps } from "@/components/drawer-form";
 import type { ColumnsType } from "antd/es/table";
 import { useTranslation } from "@/i18n";
 import { pageNotifyTemplates } from "@/api";
@@ -222,9 +224,9 @@ export function DeviceAlarmHandlerEditor({
       title: t("common.templateVariables"),
       width: 120,
       render: (_, r) => (
-        <Button type="default" size="small" disabled={!r.templateId} onClick={() => openVarsDrawer(r.index)}>
+        <VtButton type="default" disabled={!r.templateId} onClick={() => openVarsDrawer(r.index)}>
           {t("common.edit")}
-        </Button>
+        </VtButton>
       ),
     },
     {
@@ -259,7 +261,6 @@ export function DeviceAlarmHandlerEditor({
       </div>
       <Table
         rowKey={(_, i) => String(i)}
-        size="small"
         pagination={false}
         columns={columns}
         dataSource={rows.map((row, index) => ({ ...row, index }))}
@@ -275,12 +276,11 @@ export function DeviceAlarmHandlerEditor({
         styles={{ body: { paddingTop: 8 } }}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={() => setVarsDrawer(null)}>
+            <VtButton type="default" onClick={() => setVarsDrawer(null)}>
               {t("common.cancel")}
-            </Button>
-            <Button
+            </VtButton>
+            <VtButton
               type="primary"
-              size="small"
               onClick={() => {
                 if (!varsDrawer) return;
                 const row = rows[varsDrawer.index];
@@ -295,21 +295,14 @@ export function DeviceAlarmHandlerEditor({
               }}
             >
               {t("common.confirm")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
         {varsDrawer && (
           <>
             {varsDrawer.templateKeys.map((key) => (
-              <Form.Item
-                key={key}
-                label={key}
-                layout="horizontal"
-                labelCol={{ flex: "120px" }}
-                wrapperCol={{ flex: 1 }}
-                className="mb-3"
-              >
+              <Form.Item key={key} label={key} {...detailFormItemProps}>
                 <Input
                   placeholder={t("common.none")}
                   value={varsDrawer.draft[key] ?? ""}

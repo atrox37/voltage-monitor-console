@@ -3,8 +3,12 @@ import { useCallback, useEffect, useLayoutEffect, useState, type RefObject } fro
 import { APP_HEADER_HEIGHT, TABLE_HEAD_HEIGHT_MIDDLE } from "@/lib/table-layout";
 
 /**
- * 鏍规嵁 window.innerHeight 鍑忓幓椤甸潰鍥哄畾鍖哄煙楂樺害锛屽姩鎬佽绠楄〃鏍?scroll.y銆? * 鐩戝惉 window resize 浜嬩欢锛岀獥鍙ｅ彉鍖栨椂鑷姩鏇存柊銆? *
- * @param overhead - 闄よ〃鏍?body 婊氬姩鍖轰互澶栥€侀〉闈㈠唴鎵€鏈夊浐瀹氶珮搴︿箣鍜岋紙涓嶅惈椤舵爮锛夈€? *   椤舵爮楂樺害鐢?{@link APP_HEADER_HEIGHT} 鍦?hook 鍐呭崟鐙墸闄ゃ€? */
+ * 根据 window.innerHeight 减去页面固定区域高度，动态计算表格 scroll.y。
+ * 监听 window resize 事件，窗口变化时自动更新。
+ *
+ * @param overhead - 除表格 body 滚动区以外、页面内所有固定高度之和（不含顶栏）。
+ *   顶栏高度由 {@link APP_HEADER_HEIGHT} 在 hook 内单独扣除。
+ */
 export function useTableHeight(overhead: number): number {
   const calc = useCallback(
     () => Math.max(20, window.innerHeight - APP_HEADER_HEIGHT - overhead),

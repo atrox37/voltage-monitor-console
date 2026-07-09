@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button, Drawer, Form, Input, InputNumber, Select } from "antd";
+import { Drawer, Form, Input, InputNumber, Select } from 'antd';
+import { VtButton } from '@/components/vt-button';
 import { detailFormItemProps, selectFormItemProps } from "@/components/drawer-form";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
 import { requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
@@ -64,12 +65,12 @@ export function DevicePropertyWriteDialog({
       size={420}
       footer={
         <div className="flex justify-end gap-2">
-          <Button size="small" onClick={onClose}>
+          <VtButton onClick={onClose}>
             {t("common.cancel")}
-          </Button>
-          <Button type="primary" size="small" onClick={() => void handleSubmit()}>
+          </VtButton>
+          <VtButton type="primary" onClick={() => void handleSubmit()}>
             {t("common.write")}
-          </Button>
+          </VtButton>
         </div>
       }
     >

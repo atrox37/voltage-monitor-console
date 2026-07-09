@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, Drawer, Form, Input } from "antd";
+import { Drawer, Form, Input } from 'antd';
+import { VtButton } from '@/components/vt-button';
 import { OptionToggle } from "@/components/option-toggle";
 import { drawerFormItemProps } from "@/components/drawer-form";
 import { useFormPlaceholder } from "@/lib/form-placeholder";
@@ -8,7 +9,7 @@ import { requiredInputRule, requiredSelectRule } from "@/lib/form-validation";
 import { useMemo, useState } from "react";
 import { showApiError, showSuccess } from "@/lib/api-message";
 import { deleteProduct, pageProducts, saveProduct } from "@/api";
-import { ListPageTemplate, RowBtn } from "@/components/list-page-template";
+import { ListPageTemplate, RowBtn, DateTimeText } from "@/components/list-page-template";
 import { useDimensionTreeQuery } from "@/hooks/use-dimension-tree-query";
 import { useServerPageQuery } from "@/hooks/use-server-page-query";
 import {
@@ -169,9 +170,7 @@ function ProductsPage() {
           {
             key: "updateTime",
             title: t("common.updateTime"),
-            render: (r) => (
-              <span className="font-mono text-xs text-text-secondary">{r.updateTime}</span>
-            ),
+            render: (r) => <DateTimeText value={r.updateTime} />,
           },
         ]}
         rows={rows}
@@ -237,12 +236,12 @@ function ProductsPage() {
         styles={{ body: { paddingTop: 8 } }}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={() => setAddOpen(false)}>
+            <VtButton type="default" onClick={() => setAddOpen(false)}>
               {t("common.close")}
-            </Button>
-            <Button type="primary" size="small" disabled={saving} onClick={() => void saveAdd()}>
+            </VtButton>
+            <VtButton type="primary" disabled={saving} onClick={() => void saveAdd()}>
               {saving ? t("common.saving") : t("common.saveSubmit")}
-            </Button>
+            </VtButton>
           </div>
         }
       >

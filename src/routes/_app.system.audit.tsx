@@ -1,19 +1,8 @@
 ﻿import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
-import {
-  Button,
-  Card,
-  DatePicker,
-  Form,
-  Input,
-  Pagination,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-} from "antd";
+import { Card, DatePicker, Form, Input, Pagination, Select, Space, Table, Tag, Tooltip } from 'antd';
+import { VtButton } from '@/components/vt-button';
 import type { ColumnsType } from "antd/es/table";
 import { DeleteOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -27,6 +16,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { subDays } from "date-fns";
 import { useTableScrollSync } from "@/lib/table-utils";
 import { useAdaptiveTableScrollY, useTableBodyMaxScrollY } from "@/lib/use-table-height";
+import { DateTimeText } from "@/components/datetime-text";
 
 export const Route = createFileRoute("/_app/system/audit")({
   component: AuditLogPage,
@@ -167,9 +157,7 @@ function AuditLogPage() {
       key: "createTime",
       title: t("common.time"),
       width: 180,
-      render: (_, r) => (
-        <span className="font-mono text-xs text-text-secondary">{r.auditPo.createTime}</span>
-      ),
+      render: (_, r) => <DateTimeText value={r.auditPo.createTime} />,
     },
     {
       key: "username",
@@ -246,7 +234,7 @@ function AuditLogPage() {
       <h2 className="vt-section-title text-base">{t("auditLog.title")}</h2>
 
       {/* 筛选区 */}
-      <Card size="small" variant="borderless" className="vt-ant-filter-card shrink-0">
+      <Card variant="borderless" className="vt-ant-filter-card shrink-0">
         <Form layout="inline" className="flex w-full flex-wrap items-center gap-y-2">
           <Form.Item label={t("common.timeRange")}>
             <DatePicker.RangePicker
@@ -286,12 +274,12 @@ function AuditLogPage() {
           </Form.Item>
           <Form.Item className="!mb-0 ml-auto">
             <Space>
-              <Button type="primary" icon={<SearchOutlined />} onClick={applyQuery}>
+              <VtButton type="primary" icon={<SearchOutlined />} onClick={applyQuery}>
                 {t("common.query")}
-              </Button>
-              <Button icon={<ReloadOutlined />} onClick={resetQuery}>
+              </VtButton>
+              <VtButton icon={<ReloadOutlined />} onClick={resetQuery}>
                 {t("common.reset")}
-              </Button>
+              </VtButton>
             </Space>
           </Form.Item>
         </Form>
@@ -299,7 +287,6 @@ function AuditLogPage() {
 
       {/* 表格区 */}
       <Card
-        size="small"
         variant="borderless"
         className="flex min-h-0 flex-1 flex-col vt-ant-table-card"
         styles={{
@@ -310,15 +297,14 @@ function AuditLogPage() {
           <span className="text-xs text-[var(--text-secondary)]">
             {t("common.total", { count: total })}
           </span>
-          <Button
-            size="small"
+          <VtButton
             danger
             icon={<DeleteOutlined />}
             disabled={selectedIds.length === 0}
             onClick={handleDeleteBatch}
           >
             {t("auditLog.deleteSelected", { count: selectedIds.length })}
-          </Button>
+          </VtButton>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -353,7 +339,6 @@ function AuditLogPage() {
           </div>
           <div className="flex shrink-0 items-center justify-end border-t border-[var(--panel-border)] px-4 py-2">
             <Pagination
-              size="small"
               current={page}
               pageSize={pageSize}
               total={total}

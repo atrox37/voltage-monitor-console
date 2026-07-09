@@ -10,6 +10,7 @@ import { useProductTypeLabel } from "@/features/products/lib/product-type-i18n";
 import type { TagModel } from "@/types/api/metadata";
 
 import { Row } from "../components/detail-row";
+import { DateTimeText } from "@/components/datetime-text";
 
 export function TabInfo() {
   const { t } = useTranslation();
@@ -29,8 +30,6 @@ export function TabInfo() {
 
   return (
     <div className="flex h-full flex-col gap-5 overflow-auto">
-      <div className="text-sm font-semibold text-foreground">{device.name}</div>
-
       {/* 基本字段区 */}
       <div className="grid grid-cols-1 gap-x-6 gap-y-1 md:grid-cols-2 xl:grid-cols-3">
         <Row label={t("common.deviceName")}>
@@ -113,10 +112,10 @@ export function TabInfo() {
         </Row>
 
         <Row label={t("common.createTime")}>
-          <span className="text-text-secondary">{device.createTime}</span>
+          <DateTimeText value={device.createTime} />
         </Row>
         <Row label={t("common.updateTime")}>
-          <span className="text-text-secondary">{device.updateTime}</span>
+          <DateTimeText value={device.updateTime} />
         </Row>
       </div>
 
@@ -128,7 +127,7 @@ export function TabInfo() {
             {(device.metadata.tags ?? []).map((tag, index) => (
               <div
                 key={`${tag.tagKey}-${index}`}
-                className="grid grid-cols-[140px_1fr] items-center gap-3"
+                className="grid grid-cols-[88px_1fr] items-center gap-3"
               >
                 <span className="text-xs font-medium text-foreground">{tag.tagName}</span>
                 <Input

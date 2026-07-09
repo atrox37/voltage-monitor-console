@@ -1,5 +1,4 @@
 ﻿import { type ComponentType, type ReactNode, useState } from "react";
-import { Button } from "antd";
 import {
   ApartmentOutlined,
   AppstoreOutlined,
@@ -7,6 +6,7 @@ import {
   DownloadOutlined,
   EditOutlined,
   EyeOutlined,
+  KeyOutlined,
   LinkOutlined,
   PlayCircleOutlined,
   PoweroffOutlined,
@@ -16,13 +16,13 @@ import {
   SyncOutlined,
 } from "@ant-design/icons";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { VtButton } from "@/components/vt-button";
 import { useTranslation } from "@/i18n";
 
-/** 列表/详情操作列按钮统一尺寸与排版（与用户管理「编辑」一致：small + 12px 图标） */
+/** 列表操作列按钮：比筛选区查询/重置小一号（small） */
 export const ROW_ACTION_BTN_CLASS =
   "!inline-flex !h-6 !min-h-6 shrink-0 !items-center !justify-center !gap-1 !px-2 text-xs";
 
-/** 操作列图标统一 12px（Ant Design / Lucide 通用） */
 export const ROW_ACTION_ICON_CLASS = "!h-3 !w-3 shrink-0 text-xs leading-none";
 
 export function RowActionGroup({ children }: { children: ReactNode }) {
@@ -62,6 +62,8 @@ const ROW_ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   Test: PlayCircleOutlined,
   总招: RadarChartOutlined,
   Recruit: RadarChartOutlined,
+  凭证管理: KeyOutlined,
+  "Credential Management": KeyOutlined,
 };
 
 export type RowActionBtnProps = {
@@ -100,7 +102,7 @@ export function RowActionBtn({
 
   return (
     <>
-      <Button
+      <VtButton
         size="small"
         type={onlyIcon ? "text" : "default"}
         disabled={disabled}
@@ -121,7 +123,7 @@ export function RowActionBtn({
         }}
       >
         {!onlyIcon ? children : null}
-      </Button>
+      </VtButton>
       {triggerConfirm && (
         <ConfirmDialog
           open={confirmOpen}
@@ -140,7 +142,7 @@ export function RowActionBtn({
 /** @deprecated 使用 RowActionBtn */
 export const RowBtn = RowActionBtn;
 
-/** 启用/禁用等切换型操作（与 RowActionBtn 同高） */
+/** 启用/禁用等切换型操作 */
 export function RowActionToggle({
   active,
   onClick,
@@ -155,8 +157,8 @@ export function RowActionToggle({
   disabled?: boolean;
 }) {
   return (
-    <Button size="small" disabled={disabled} className={ROW_ACTION_BTN_CLASS} onClick={onClick}>
+    <VtButton size="small" disabled={disabled} className={ROW_ACTION_BTN_CLASS} onClick={onClick}>
       {active ? activeLabel : inactiveLabel}
-    </Button>
+    </VtButton>
   );
 }

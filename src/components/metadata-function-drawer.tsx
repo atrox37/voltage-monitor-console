@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Button, Checkbox, Drawer, Form, Input } from "antd";
-import { detailFormItemProps } from "@/components/drawer-form";
+import { Checkbox, Drawer, Form, Input } from 'antd';
+import { VtButton } from '@/components/vt-button';
+import { detailCompactFormItemProps } from "@/components/drawer-form";
 import { ArgParamDrawer } from "@/features/products/components/arg-param-drawer";
 import { ArgSection } from "@/features/products/pages/product-detail/components/arg-section";
 import { useTranslation } from "@/i18n";
@@ -83,17 +84,14 @@ export function MetadataFunctionDrawer({
         onClose={handleClose}
         title={isNew ? t("common.addFunction") : t("common.editFunction")}
         size={560}
-        mask
-        maskClosable={!argTarget}
-        keyboard={!argTarget}
         footer={
           <div className="flex justify-end gap-2">
-            <Button type="default" size="small" onClick={handleClose}>
+            <VtButton type="default" onClick={handleClose}>
               {t("common.cancel")}
-            </Button>
-            <Button type="primary" size="small" onClick={() => void handleSave()}>
+            </VtButton>
+            <VtButton type="primary" onClick={() => void handleSave()}>
               {t("common.save")}
-            </Button>
+            </VtButton>
           </div>
         }
       >
@@ -103,7 +101,7 @@ export function MetadataFunctionDrawer({
               name="id"
               label={t("common.identifier")}
               required
-              {...detailFormItemProps}
+              {...detailCompactFormItemProps}
               rules={[requiredInputRule(t, t("common.identifier"))]}
             >
               <Input
@@ -120,7 +118,7 @@ export function MetadataFunctionDrawer({
               name="name"
               label={t("common.name")}
               required
-              {...detailFormItemProps}
+              {...detailCompactFormItemProps}
               rules={[requiredInputRule(t, t("common.name"))]}
             >
               <Input
@@ -132,13 +130,7 @@ export function MetadataFunctionDrawer({
                 }}
               />
             </Form.Item>
-            <Form.Item
-              label={t("common.asyncLabel")}
-              layout="horizontal"
-              labelCol={{ flex: "120px" }}
-              wrapperCol={{ flex: 1 }}
-              className="mb-3"
-            >
+            <Form.Item label={t("common.asyncLabel")} {...detailCompactFormItemProps}>
               <Checkbox
                 checked={!!local.data.async}
                 onChange={(e) =>
@@ -182,15 +174,15 @@ export function MetadataFunctionDrawer({
             />
           </Form>
         )}
-      </Drawer>
 
-      <ArgParamDrawer
-        open={!!argTarget}
-        initial={argTarget?.initial ?? null}
-        dataTypes={dataTypes}
-        onClose={() => setArgTarget(null)}
-        onSave={saveArgParam}
-      />
+        <ArgParamDrawer
+          open={!!argTarget}
+          initial={argTarget?.initial ?? null}
+          dataTypes={dataTypes}
+          onClose={() => setArgTarget(null)}
+          onSave={saveArgParam}
+        />
+      </Drawer>
     </>
   );
 }

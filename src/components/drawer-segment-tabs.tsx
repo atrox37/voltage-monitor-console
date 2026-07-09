@@ -20,7 +20,7 @@ export function DrawerSegmentTabs({
   onChange,
   disabled,
   allTextWhite = false,
-  className = "mb-5",
+  className = "",
 }: DrawerSegmentTabsProps) {
   return (
     <div className={className}>
